@@ -1,0 +1,16 @@
+[package]
+name = "rabbitmq-stream-client"
+version = "0.1.0"
+authors = ["wolf4ood <enrico.risa@gmail.com>"]
+edition = "2018"
+
+
+[workspace]
+members = [
+ ".",
+ "protocol"
+]
+
+
+[dependencies]
+rabbitmq-stream-protocol = { version = "0.1" , path = "protocol" }
