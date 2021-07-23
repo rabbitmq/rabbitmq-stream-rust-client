@@ -33,5 +33,6 @@ jobs:
           profile: minimal
           override: true
           components: rustfmt
-      - name: Run make test
+      - name: Run test
+        run: make test
         uses: actions-rs/cargo@v1
