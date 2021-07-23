@@ -16,13 +16,15 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         rust: [stable]
+    services:
+      rabbitmq-streaming:
+        image: pivotalrabbitmq/rabbitmq-stream
+        env:
+          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
+        ports:
+          - 5552:5552
+          - 15672:15672
     steps:
-
-      - uses: actions/checkout@v2
-      - name: Starting RabbitMQ Server
-        run: |
-          docker-compose -f ./compose/docker-compose.yml up -d
-
       - uses: actions/checkout@v2
       - name: Install latest ${{ matrix.rust }}
         uses: actions-rs/toolchain@v1
@@ -31,19 +33,5 @@ jobs:
           profile: minimal
           override: true
           components: rustfmt
-
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
+      - name: Run test
+        run: make test
