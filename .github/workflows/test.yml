@@ -35,4 +35,3 @@ jobs:
           components: rustfmt
       - name: Run test
         run: make test
-        uses: actions-rs/cargo@v1
