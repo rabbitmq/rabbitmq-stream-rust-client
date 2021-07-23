@@ -47,17 +47,14 @@ rabbitmq-stream-client = "*"
 
 #### Compiling
 
-```
-git clone https://github.com/korsmakolnikov/rabbitmq-stream-rust-client.git
-cd rabbitmq-stream-rust-client
-cargo build
+```bash
+git clone https://github.com/korsmakolnikov/rabbitmq-stream-rust-client.git .
+make build
 ```
 
 #### Running Tests
 
-```
-cd compose
-docker-compose up -d
-cd ..
-cargo test --all
+```bash
+make rabbitmq-server
+make test 
 ```
