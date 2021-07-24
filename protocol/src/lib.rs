@@ -1,13 +1,8 @@
 mod codec;
-mod commands;
+pub mod commands;
+mod error;
 mod protocol;
 mod request;
 mod types;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use request::Request;

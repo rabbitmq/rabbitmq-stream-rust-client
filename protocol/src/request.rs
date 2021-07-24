@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::{codec::Encoder, types::CorrelationId};
+use crate::{codec::Encoder, error::EncodeError, types::CorrelationId};
 
 use byteorder::{BigEndian, WriteBytesExt};
 
@@ -11,12 +11,12 @@ pub struct RequestHeader {
 }
 
 impl Encoder for RequestHeader {
-    fn encode(&self, writer: &mut impl Write) -> Result<(), ()> {
-        writer.write_u16::<BigEndian>(self.key);
-        writer.write_u16::<BigEndian>(self.version);
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u16::<BigEndian>(self.key)?;
+        writer.write_u16::<BigEndian>(self.version)?;
 
         if let Some(correletion_id) = &self.correlation_id {
-            writer.write_u32::<BigEndian>(**correletion_id);
+            writer.write_u32::<BigEndian>(**correletion_id)?;
         }
         Ok(())
     }
@@ -46,7 +46,7 @@ impl<T: Encoder> Request<T> {
 }
 
 impl<T: Encoder> Encoder for Request<T> {
-    fn encode(&self, writer: &mut impl Write) -> Result<(), ()> {
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.header.encode(writer)?;
         self.command.encode(writer)?;
         Ok(())
