@@ -1,22 +1,20 @@
 use std::{collections::HashMap, io::Write};
 
-use crate::types::CorrelationId;
+use crate::{
+    codec::{Decoder, Encoder},
+    types::CorrelationId,
+};
+use byteorder::{BigEndian, WriteBytesExt};
 
-pub struct OpenRequest<'a> {
-    correlation_id: CorrelationId,
-    virtual_host: &'a str,
+#[derive(PartialEq, Debug)]
+pub struct OpenRequest {
+    virtual_host: String,
 }
 
-impl<'a> OpenRequest<'a> {
-    fn serialize(&self) -> Vec<u8> {
-        let mut vec = vec![];
-
-        vec.write_all(&self.correlation_id.to_be_bytes()).unwrap();
-        vec.write_all(&self.virtual_host.len().to_be_bytes())
-            .unwrap();
-        vec.write_all(&self.virtual_host.as_bytes()).unwrap();
-
-        vec
+impl Encoder for OpenRequest {
+    fn encode(&self, writer: &mut impl Write) -> Result<(), ()> {
+        self.encode_str(writer, &self.virtual_host)?;
+        Ok(())
     }
 }
 
@@ -54,15 +52,42 @@ impl OpenResponse {
 
 #[cfg(test)]
 mod tests {
+
+    impl Decoder for OpenRequest {
+        fn decode(input: &[u8]) -> Result<(&[u8], Self), ()> {
+            let (remaining, virtual_host) = Self::decode_str(input)?;
+
+            Ok((
+                remaining,
+                OpenRequest {
+                    virtual_host: virtual_host.unwrap(),
+                },
+            ))
+        }
+    }
+    use crate::{
+        codec::{Decoder, Encoder},
+        request::Request,
+    };
+
     use super::OpenRequest;
 
     #[test]
     fn open_request_ser_der() {
+        let mut buffer = vec![];
+
         let open = OpenRequest {
-            correlation_id: 1.into(),
-            virtual_host: "test",
+            virtual_host: "test".to_owned(),
         };
 
-        let serialized = open.serialize();
+        let _ = open.encode(&mut buffer);
+
+        let (remaining, decoded) = OpenRequest::decode(&buffer).unwrap();
+
+        assert_eq!(open, decoded);
+
+        dbg!(remaining);
+
+        assert!(remaining.is_empty());
     }
 }
