@@ -51,5 +51,5 @@ macro_rules! reader {
 }
 
 reader!(read_u32, 4, u32);
-reader!(read_i32, 4, i32);
+// reader!(read_i32, 4, i32);
 reader!(read_i16, 2, i16);

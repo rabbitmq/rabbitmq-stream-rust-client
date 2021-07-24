@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Write};
 
 use crate::{
     codec::{read_u32, Decoder, Encoder},
-    error::EncodeError,
+    error::{DecodeError, EncodeError},
 };
 
 #[derive(PartialEq, Debug)]
@@ -29,7 +29,7 @@ impl OpenResponse {
 }
 
 impl Decoder for OpenResponse {
-    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (mut input, num_properties) = read_u32(input)?;
 
         let mut connection_properties = HashMap::with_capacity(num_properties as usize);
