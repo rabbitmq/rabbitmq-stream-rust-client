@@ -1,4 +1,7 @@
 mod protocol;
+mod types;
+
+mod commands;
 
 #[cfg(test)]
 mod tests {
