@@ -26,7 +26,7 @@ impl Encoder for OpenCommand {
     }
 
     fn encoded_size(&self) -> u32 {
-        4 + self.virtual_host.len() as u32
+        2 + self.virtual_host.len() as u32
     }
 }
 
