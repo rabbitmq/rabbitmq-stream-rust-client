@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io::Write};
 
 use crate::{
-    codec::{read_u32, Decoder, Encoder},
+    codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_OPEN,
 };
@@ -52,18 +52,7 @@ impl OpenResponse {
 
 impl Decoder for OpenResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (mut input, num_properties) = read_u32(input)?;
-
-        let mut connection_properties = HashMap::with_capacity(num_properties as usize);
-        for _ in 0..num_properties {
-            let (input1, key) = Self::decode_str(input)?;
-            let (input2, value) = Self::decode_str(input1)?;
-
-            if let (Some(k), Some(v)) = (key, value) {
-                connection_properties.insert(k, v);
-            }
-            input = input2;
-        }
+        let (input, connection_properties) = Self::decode_map(input)?;
 
         Ok((
             input,
@@ -85,7 +74,6 @@ mod tests {
         commands::open::OpenResponse,
         error::DecodeError,
     };
-    use byteorder::{BigEndian, WriteBytesExt};
 
     impl Decoder for OpenCommand {
         fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
@@ -122,12 +110,7 @@ mod tests {
             &self,
             writer: &mut impl std::io::Write,
         ) -> Result<(), crate::error::EncodeError> {
-            writer.write_u32::<BigEndian>(self.connection_properties.len() as u32)?;
-
-            for (k, v) in &self.connection_properties {
-                self.encode_str(writer, k)?;
-                self.encode_str(writer, v)?;
-            }
+            self.encode_map(writer, &self.connection_properties)?;
             Ok(())
         }
 
