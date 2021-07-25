@@ -4,6 +4,8 @@ use std::string::FromUtf8Error;
 pub enum DecodeError {
     Incomplete(usize),
     Utf8Error(FromUtf8Error),
+    UnknownResponseCode(u16),
+    UsupportedResponseType(u16),
 }
 
 #[derive(Debug)]

@@ -4,33 +4,38 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_OPEN,
+    response::ResponseCode,
+    types::CorrelationId,
 };
 
-use super::{Command, Correlated};
+use super::Command;
 
 #[derive(PartialEq, Debug)]
 pub struct OpenCommand {
+    correlation_id: CorrelationId,
     virtual_host: String,
 }
 
 impl OpenCommand {
-    pub fn new(virtual_host: String) -> Self {
-        Self { virtual_host }
+    pub fn new(correlation_id: CorrelationId, virtual_host: String) -> Self {
+        Self {
+            correlation_id,
+            virtual_host,
+        }
     }
 }
 
 impl Encoder for OpenCommand {
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        self.encode_str(writer, &self.virtual_host)?;
+        self.correlation_id.encode(writer)?;
+        self.virtual_host.as_str().encode(writer)?;
         Ok(())
     }
 
     fn encoded_size(&self) -> u32 {
-        2 + self.virtual_host.len() as u32
+        self.correlation_id.encoded_size() + self.virtual_host.len() as u32
     }
 }
-
-impl Correlated for OpenCommand {}
 
 impl Command for OpenCommand {
     fn key(&self) -> u16 {
@@ -40,7 +45,9 @@ impl Command for OpenCommand {
 
 #[derive(Debug, PartialEq)]
 pub struct OpenResponse {
-    connection_properties: HashMap<String, String>,
+    pub(crate) correlation_id: CorrelationId,
+    pub(crate) code: ResponseCode,
+    pub(crate) connection_properties: HashMap<String, String>,
 }
 
 impl OpenResponse {
@@ -52,11 +59,15 @@ impl OpenResponse {
 
 impl Decoder for OpenResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, response_code) = ResponseCode::decode(input)?;
         let (input, connection_properties) = Self::decode_map(input)?;
 
         Ok((
             input,
             OpenResponse {
+                correlation_id,
+                code: response_code,
                 connection_properties,
             },
         ))
@@ -70,18 +81,21 @@ mod tests {
 
     use super::OpenCommand;
     use crate::{
-        codec::{Decoder, Encoder},
+        codec::{read_u32, Decoder, Encoder},
         commands::open::OpenResponse,
         error::DecodeError,
+        ResponseCode,
     };
 
     impl Decoder for OpenCommand {
         fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-            let (remaining, virtual_host) = Self::decode_str(input)?;
+            let (input, correlation_id) = read_u32(input)?;
+            let (input, virtual_host) = Self::decode_str(input)?;
 
             Ok((
-                remaining,
+                input,
                 OpenCommand {
+                    correlation_id: correlation_id.into(),
                     virtual_host: virtual_host.unwrap(),
                 },
             ))
@@ -93,6 +107,7 @@ mod tests {
         let mut buffer = vec![];
 
         let open = OpenCommand {
+            correlation_id: 1.into(),
             virtual_host: "test".to_owned(),
         };
 
@@ -110,7 +125,9 @@ mod tests {
             &self,
             writer: &mut impl std::io::Write,
         ) -> Result<(), crate::error::EncodeError> {
-            self.encode_map(writer, &self.connection_properties)?;
+            self.correlation_id.encode(writer)?;
+            self.code.encode(writer)?;
+            self.connection_properties.encode(writer)?;
             Ok(())
         }
 
@@ -128,6 +145,8 @@ mod tests {
         properties.insert("test".to_owned(), "test".to_owned());
 
         let open_response = OpenResponse {
+            correlation_id: 1.into(),
+            code: ResponseCode::Ok,
             connection_properties: properties,
         };
 

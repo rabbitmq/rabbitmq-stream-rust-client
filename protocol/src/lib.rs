@@ -3,6 +3,8 @@ pub mod commands;
 mod error;
 mod protocol;
 mod request;
+mod response;
 mod types;
 
-pub use request::Request;
+pub use request::*;
+pub use response::*;
