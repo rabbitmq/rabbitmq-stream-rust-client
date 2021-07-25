@@ -101,7 +101,9 @@ impl Encoder for &str {
 
 impl Encoder for HashMap<String, String> {
     fn encoded_size(&self) -> u32 {
-        todo!()
+        4 + self.iter().fold(0, |acc, (k, v)| {
+            acc + k.as_str().encoded_size() + v.as_str().encoded_size()
+        })
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
