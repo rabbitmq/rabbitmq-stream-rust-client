@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+#[derive(Debug, PartialEq)]
 pub struct CorrelationId(u32);
 
 impl Deref for CorrelationId {

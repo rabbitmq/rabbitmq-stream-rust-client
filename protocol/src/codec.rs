@@ -5,6 +5,7 @@ use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use crate::error::{DecodeError, EncodeError};
 
 pub trait Encoder {
+    fn encoded_size(&self) -> u32;
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError>;
 
     fn encode_str(&self, writer: &mut impl Write, input: &str) -> Result<(), EncodeError> {
@@ -27,23 +28,23 @@ where
             return Ok((input, None));
         }
         let (bytes, input) = input.split_at(len as usize);
-        let string = String::from_utf8(bytes.to_vec()).unwrap();
+        let string = String::from_utf8(bytes.to_vec())?;
         Ok((input, Some(string)))
     }
 }
 
-macro_rules! check_len {
-    ($buf:ident, $size:expr) => {
-        if $buf.len() < $size {
-            return Err(crate::error::DecodeError::Incomplete($size));
-        }
-    };
+fn check_len(input: &[u8], size: usize) -> Result<(), DecodeError> {
+    if input.len() < size {
+        return Err(DecodeError::Incomplete(size));
+    }
+    Ok(())
 }
 
 macro_rules! reader {
     ( $fn:ident, $size:expr, $ret:ty) => {
+        #[allow(unused)]
         pub fn $fn(input: &[u8]) -> Result<(&[u8], $ret), crate::error::DecodeError> {
-            check_len!(input, $size);
+            check_len(input, $size)?;
             let x = byteorder::BigEndian::$fn(input);
             Ok((&input[$size..], x))
         }
@@ -51,5 +52,6 @@ macro_rules! reader {
 }
 
 reader!(read_u32, 4, u32);
-// reader!(read_i32, 4, i32);
+reader!(read_i32, 4, i32);
 reader!(read_i16, 2, i16);
+reader!(read_u16, 2, u16);
