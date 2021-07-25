@@ -37,13 +37,10 @@ impl Decoder for OpenResponse {
             let (input1, key) = Self::decode_str(input)?;
             let (input2, value) = Self::decode_str(input1)?;
 
-            input = input2;
-            match (key, value) {
-                (Some(k), Some(v)) => {
-                    connection_properties.insert(k, v);
-                }
-                _ => {}
+            if let (Some(k), Some(v)) = (key, value) {
+                connection_properties.insert(k, v);
             }
+            input = input2;
         }
 
         Ok((

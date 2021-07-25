@@ -2,10 +2,10 @@
 all: test build
 
 fmt:
-	cargo fmt
+	cargo fmt --all -- --check
 
 clippy:
-	cargo clippy --all
+	cargo clippy --all -- -D warnings
 
 build: fmt clippy
 	cargo build

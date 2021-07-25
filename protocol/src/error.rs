@@ -5,11 +5,11 @@ pub enum DecodeError {
 
 #[derive(Debug)]
 pub enum EncodeError {
-    IO(std::io::Error),
+    Io(std::io::Error),
 }
 
 impl From<std::io::Error> for EncodeError {
     fn from(err: std::io::Error) -> Self {
-        EncodeError::IO(err)
+        EncodeError::Io(err)
     }
 }
