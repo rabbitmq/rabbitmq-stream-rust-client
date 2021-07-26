@@ -104,17 +104,17 @@ mod tests {
     fn sasl_authenticate_request_test() {
         let mut buffer = vec![];
 
-        let peer_properties = SaslAuthenticateCommand {
+        let auth = SaslAuthenticateCommand {
             correlation_id: 99.into(),
             mechanism: "plain".to_owned(),
             sasl_data: vec![],
         };
 
-        let _ = peer_properties.encode(&mut buffer);
+        let _ = auth.encode(&mut buffer);
 
         let (remaining, decoded) = SaslAuthenticateCommand::decode(&buffer).unwrap();
 
-        assert_eq!(peer_properties, decoded);
+        assert_eq!(auth, decoded);
 
         assert!(remaining.is_empty());
     }
@@ -139,17 +139,17 @@ mod tests {
     fn sasl_authenticate_response_test() {
         let mut buffer = vec![];
 
-        let peer_properties_response = SaslAuthenticateResponse {
+        let auth_response = SaslAuthenticateResponse {
             correlation_id: 1.into(),
             code: ResponseCode::Ok,
             mechanism: "plain".to_owned(),
         };
 
-        let _ = peer_properties_response.encode(&mut buffer);
+        let _ = auth_response.encode(&mut buffer);
 
         let (remaining, decoded) = SaslAuthenticateResponse::decode(&buffer).unwrap();
 
-        assert_eq!(peer_properties_response, decoded);
+        assert_eq!(auth_response, decoded);
 
         assert!(remaining.is_empty());
     }
