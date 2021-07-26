@@ -1,4 +1,6 @@
 /// Low level stream commands
+///
+#[allow(unused)]
 pub mod commands {
     pub const COMMAND_DECLARE_PUBLISHER: u16 = 1;
     pub const COMMAND_PUBLISH: u16 = 2;
@@ -26,6 +28,8 @@ pub mod commands {
 }
 
 // server responses
+//
+#[allow(unused)]
 pub mod responses {
     pub const RESPONSE_CODE_OK: u16 = 1;
     pub const RESPONSE_CODE_STREAM_DOES_NOT_EXIST: u16 = 2;
@@ -48,6 +52,8 @@ pub mod responses {
 }
 
 // protocol version between client and server
+
+#[allow(unused)]
 pub mod version {
     pub const PROTOCOL_VERSION: u16 = 1;
 }
