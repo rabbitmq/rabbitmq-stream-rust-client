@@ -71,7 +71,7 @@ mod tests {
             Ok((
                 input,
                 CreateStreamCommand {
-                    correlation_id: correlation_id.into(),
+                    correlation_id,
                     stream_name: stream_name.unwrap(),
                     args,
                 },
