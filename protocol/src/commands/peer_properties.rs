@@ -141,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn open_response_test() {
+    fn peer_properties_response_test() {
         let mut buffer = vec![];
 
         let mut properties = HashMap::new();
