@@ -3,7 +3,7 @@ use std::io::Write;
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
-    protocol::commands::COMMAND_PEER_PROPERTIES,
+    protocol::commands::COMMAND_SASL_AUTHENTICATE,
     types::CorrelationId,
     ResponseCode,
 };
@@ -61,7 +61,7 @@ impl Decoder for SaslAuthenticateCommand {
 
 impl Command for SaslAuthenticateCommand {
     fn key(&self) -> u16 {
-        COMMAND_PEER_PROPERTIES
+        COMMAND_SASL_AUTHENTICATE
     }
 }
 
@@ -101,7 +101,7 @@ mod tests {
     use crate::ResponseCode;
 
     #[test]
-    fn peer_properties_request_test() {
+    fn sasl_authenticate_request_test() {
         let mut buffer = vec![];
 
         let peer_properties = SaslAuthenticateCommand {
@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn peer_properties_response_test() {
+    fn sasl_authenticate_response_test() {
         let mut buffer = vec![];
 
         let peer_properties_response = SaslAuthenticateResponse {
