@@ -45,6 +45,21 @@ where
 
         Ok((input, map))
     }
+
+    fn decode_string_vec(input: &[u8]) -> Result<(&[u8], Vec<String>), DecodeError> {
+        let (mut input, num_properties) = read_u32(input)?;
+        let mut vec: Vec<String> = Vec::new();
+        for _ in 0..num_properties {
+            let (input1, value) = Self::decode_str(input)?;
+
+            if let Some(v) = value {
+                vec.push(v)
+            }
+            input = input1;
+        }
+
+        Ok((input, vec))
+    }
 }
 
 fn check_len(input: &[u8], size: usize) -> Result<(), DecodeError> {
@@ -112,6 +127,22 @@ impl Encoder for HashMap<String, String> {
         for (k, v) in self {
             k.as_str().encode(writer)?;
             v.as_str().encode(writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl Encoder for Vec<String> {
+    fn encoded_size(&self) -> u32 {
+        4 + self
+            .iter()
+            .fold(0, |acc, v| acc + v.as_str().encoded_size())
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u32::<BigEndian>(self.len() as u32)?;
+        for x in self {
+            x.as_str().encode(writer)?;
         }
         Ok(())
     }
