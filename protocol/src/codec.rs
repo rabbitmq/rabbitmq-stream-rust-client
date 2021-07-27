@@ -170,6 +170,12 @@ impl Encoder for Header {
     }
 }
 
+impl Decoder for u32 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        let (input, v) = read_u32(input)?;
+        Ok((input, v))
+    }
+}
 
 impl Encoder for u32 {
     fn encoded_size(&self) -> u32 {
