@@ -5,7 +5,6 @@ use crate::{
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_SASL_AUTHENTICATE,
     types::CorrelationId,
-    ResponseCode,
 };
 
 use super::Command;
@@ -65,40 +64,12 @@ impl Command for SaslAuthenticateCommand {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct SaslAuthenticateResponse {
-    pub(crate) correlation_id: CorrelationId,
-    pub(crate) code: ResponseCode,
-    pub(crate) mechanism: String,
-}
-
-impl SaslAuthenticateResponse {}
-
-impl Decoder for SaslAuthenticateResponse {
-    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
-        let (input, code) = ResponseCode::decode(input)?;
-        let (input, mechanism) = Self::decode_str(input)?;
-
-        Ok((
-            input,
-            SaslAuthenticateResponse {
-                correlation_id,
-                code,
-                mechanism: mechanism.unwrap(),
-            },
-        ))
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
     use crate::codec::{Decoder, Encoder};
-    use crate::commands::sasl_authenticate::SaslAuthenticateResponse;
 
     use super::SaslAuthenticateCommand;
-    use crate::ResponseCode;
 
     #[test]
     fn sasl_authenticate_request_test() {
@@ -115,41 +86,6 @@ mod tests {
         let (remaining, decoded) = SaslAuthenticateCommand::decode(&buffer).unwrap();
 
         assert_eq!(auth, decoded);
-
-        assert!(remaining.is_empty());
-    }
-
-    impl Encoder for SaslAuthenticateResponse {
-        fn encoded_size(&self) -> u32 {
-            0
-        }
-
-        fn encode(
-            &self,
-            writer: &mut impl std::io::Write,
-        ) -> Result<(), crate::error::EncodeError> {
-            self.correlation_id.encode(writer)?;
-            self.code.encode(writer)?;
-            self.mechanism.as_str().encode(writer)?;
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn sasl_authenticate_response_test() {
-        let mut buffer = vec![];
-
-        let auth_response = SaslAuthenticateResponse {
-            correlation_id: 1.into(),
-            code: ResponseCode::Ok,
-            mechanism: "plain".to_owned(),
-        };
-
-        let _ = auth_response.encode(&mut buffer);
-
-        let (remaining, decoded) = SaslAuthenticateResponse::decode(&buffer).unwrap();
-
-        assert_eq!(auth_response, decoded);
 
         assert!(remaining.is_empty());
     }
