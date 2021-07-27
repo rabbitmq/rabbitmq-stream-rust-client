@@ -7,3 +7,8 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1"
+
+
+[dev-dependencies]
+fake = { version = "2.4", features=['derive']}
+rand = "0.8"
