@@ -177,14 +177,32 @@ impl Decoder for Header {
 }
 
 impl Encoder for Header {
+    fn encoded_size(&self) -> u32 {
+        2 + 2
+    }
+
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         writer.write_u16::<BigEndian>(self.key())?;
         writer.write_u16::<BigEndian>(self.version())?;
 
         Ok(())
     }
+}
 
+impl Decoder for u32 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        let (input, v) = read_u32(input)?;
+        Ok((input, v))
+    }
+}
+
+impl Encoder for u32 {
     fn encoded_size(&self) -> u32 {
-        2 + 2
+        4
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u32::<BigEndian>(*self)?;
+        Ok(())
     }
 }
