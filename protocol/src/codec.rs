@@ -147,6 +147,25 @@ impl Encoder for Vec<String> {
         Ok(())
     }
 }
+impl Encoder for Vec<u8> {
+    fn encoded_size(&self) -> u32 {
+        4 + self.len() as u32
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_i32::<BigEndian>(self.len() as i32)?;
+        writer.write_all(self)?;
+        Ok(())
+    }
+}
+
+impl Decoder for Vec<u8> {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, len) = read_i32(input)?;
+        let len = len as usize;
+        Ok((&input[len..], input[..len].to_vec()))
+    }
+}
 
 impl Decoder for Header {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
