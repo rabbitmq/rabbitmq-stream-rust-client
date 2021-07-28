@@ -26,8 +26,12 @@ impl Decoder for Header {
         let (input, key) = read_u16(input)?;
         let (input, version) = read_u16(input)?;
 
-        Ok((input, Header::new(key, version)))
+        Ok((input, Header::new(extract_response_code(key), version)))
     }
+}
+
+fn extract_response_code(code: u16) -> u16 {
+    code & 0b0111_1111_1111_1111
 }
 
 impl Decoder for Option<String> {

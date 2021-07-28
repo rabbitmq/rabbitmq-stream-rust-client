@@ -5,9 +5,18 @@ use crate::{
         decoder::{read_u16, read_u32},
         Decoder,
     },
-    commands::open::OpenResponse,
+    commands::{
+        generic::GenericResponse, open::OpenResponse, peer_properties::PeerPropertiesResponse,
+        sasl_handshake::SaslHandshakeResponse, tune::TunesCommand,
+    },
     error::DecodeError,
-    protocol::{commands::COMMAND_OPEN, responses::*},
+    protocol::{
+        commands::{
+            COMMAND_OPEN, COMMAND_PEER_PROPERTIES, COMMAND_SASL_AUTHENTICATE,
+            COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
+        },
+        responses::*,
+    },
     types::Header,
 };
 
@@ -36,23 +45,41 @@ pub enum ResponseCode {
 #[derive(Debug, PartialEq)]
 pub struct Response {
     header: Header,
-    kind: Option<ResponseKind>,
+    kind: ResponseKind,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum ResponseKind {
     Open(OpenResponse),
+    PeerProperties(PeerPropertiesResponse),
+    SaslHandshake(SaslHandshakeResponse),
+    Generic(GenericResponse),
+    Tunes(TunesCommand),
 }
 
 impl Decoder for Response {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
         let (input, _) = read_u32(input)?;
+
         let (input, header) = Header::decode(input)?;
 
         let (input, kind) = match header.key() {
             COMMAND_OPEN => {
-                OpenResponse::decode(input).map(|(i, kind)| (i, Some(ResponseKind::Open(kind))))?
+                OpenResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Open(kind)))?
             }
+
+            COMMAND_PEER_PROPERTIES => PeerPropertiesResponse::decode(input)
+                .map(|(i, kind)| (i, ResponseKind::PeerProperties(kind)))?,
+            COMMAND_SASL_HANDSHAKE => SaslHandshakeResponse::decode(input)
+                .map(|(i, kind)| (i, ResponseKind::SaslHandshake(kind)))?,
+
+            COMMAND_SASL_AUTHENTICATE => {
+                GenericResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Generic(kind)))?
+            }
+            COMMAND_TUNE => {
+                TunesCommand::decode(input).map(|(i, kind)| (i, ResponseKind::Tunes(kind)))?
+            }
+
             n => return Err(DecodeError::UsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
@@ -136,37 +163,34 @@ impl From<&ResponseCode> for u16 {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
 
     use byteorder::{BigEndian, WriteBytesExt};
 
     use crate::{
         codec::{Decoder, Encoder},
-        commands::open::OpenResponse,
-        protocol::{commands::COMMAND_OPEN, version::PROTOCOL_VERSION},
-        response::ResponseCode,
+        commands::{
+            generic::GenericResponse, open::OpenResponse, peer_properties::PeerPropertiesResponse,
+            sasl_handshake::SaslHandshakeResponse, tune::TunesCommand,
+        },
+        protocol::{
+            commands::{
+                COMMAND_OPEN, COMMAND_PEER_PROPERTIES, COMMAND_SASL_AUTHENTICATE,
+                COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
+            },
+            version::PROTOCOL_VERSION,
+        },
         types::Header,
     };
 
     use super::{Response, ResponseKind};
-    impl Encoder for ResponseCode {
-        fn encoded_size(&self) -> u32 {
-            2
-        }
-
-        fn encode(
-            &self,
-            writer: &mut impl std::io::Write,
-        ) -> Result<(), crate::error::EncodeError> {
-            writer.write_u16::<BigEndian>(self.into())?;
-
-            Ok(())
-        }
-    }
     impl Encoder for ResponseKind {
         fn encoded_size(&self) -> u32 {
             match self {
                 ResponseKind::Open(open) => open.encoded_size(),
+                ResponseKind::PeerProperties(peer_properties) => peer_properties.encoded_size(),
+                ResponseKind::SaslHandshake(handshake) => handshake.encoded_size(),
+                ResponseKind::Generic(generic) => generic.encoded_size(),
+                ResponseKind::Tunes(tune) => tune.encoded_size(),
             }
         }
 
@@ -176,19 +200,17 @@ mod tests {
         ) -> Result<(), crate::error::EncodeError> {
             match self {
                 ResponseKind::Open(open) => open.encode(writer),
+                ResponseKind::PeerProperties(peer_properties) => peer_properties.encode(writer),
+                ResponseKind::SaslHandshake(handshake) => handshake.encode(writer),
+                ResponseKind::Generic(generic) => generic.encode(writer),
+                ResponseKind::Tunes(tune) => tune.encode(writer),
             }
         }
     }
 
     impl Encoder for Response {
         fn encoded_size(&self) -> u32 {
-            self.header.encoded_size()
-                + 2
-                + self
-                    .kind
-                    .as_ref()
-                    .map(|kind| kind.encoded_size())
-                    .unwrap_or(0)
+            self.header.encoded_size() + 2 + self.kind.encoded_size()
         }
 
         fn encode(
@@ -197,39 +219,67 @@ mod tests {
         ) -> Result<(), crate::error::EncodeError> {
             writer.write_u32::<BigEndian>(self.encoded_size())?;
             self.header.encode(writer)?;
-
-            if let Some(kind) = &self.kind {
-                kind.encode(writer)?;
-            }
+            self.kind.encode(writer)?;
             Ok(())
         }
     }
 
+    macro_rules! response_test {
+        ($ty:ty, $variant:path, $cmd:expr) => {
+            use fake::{Fake, Faker};
+            let payload: $ty = Faker.fake();
+
+            let response = Response {
+                header: Header::new($cmd, PROTOCOL_VERSION),
+                kind: $variant(payload),
+            };
+
+            let mut buffer = vec![];
+
+            response.encode(&mut buffer).unwrap();
+
+            let (remaining, decoded) = Response::decode(&buffer).unwrap();
+
+            assert_eq!(response, decoded);
+
+            assert!(remaining.is_empty());
+        };
+    }
+
     #[test]
-    fn response_test() {
-        let mut properties = HashMap::new();
+    fn open_response_test() {
+        response_test!(OpenResponse, ResponseKind::Open, COMMAND_OPEN);
+    }
 
-        properties.insert("test".to_owned(), "test".to_owned());
+    #[test]
+    fn peer_properties_response_test() {
+        response_test!(
+            PeerPropertiesResponse,
+            ResponseKind::PeerProperties,
+            COMMAND_PEER_PROPERTIES
+        );
+    }
 
-        let open_response = OpenResponse {
-            connection_properties: properties,
-            correlation_id: 1.into(),
-            code: ResponseCode::Ok,
-        };
+    #[test]
+    fn sasl_handshake_response_test() {
+        response_test!(
+            SaslHandshakeResponse,
+            ResponseKind::SaslHandshake,
+            COMMAND_SASL_HANDSHAKE
+        );
+    }
 
-        let response = Response {
-            header: Header::new(COMMAND_OPEN, PROTOCOL_VERSION),
-            kind: Some(ResponseKind::Open(open_response)),
-        };
+    #[test]
+    fn generic_response_test() {
+        response_test!(
+            GenericResponse,
+            ResponseKind::Generic,
+            COMMAND_SASL_AUTHENTICATE
+        );
+    }
 
-        let mut buffer = vec![];
-
-        response.encode(&mut buffer).unwrap();
-
-        let (remaining, decoded) = Response::decode(&buffer).unwrap();
-
-        assert_eq!(response, decoded);
-
-        assert!(remaining.is_empty());
+    #[test]
+    fn tune_response_test() {
+        response_test!(TunesCommand, ResponseKind::Tunes, COMMAND_TUNE);
     }
 }
