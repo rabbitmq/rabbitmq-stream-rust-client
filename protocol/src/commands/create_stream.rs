@@ -8,6 +8,10 @@ use crate::{
 
 use super::Command;
 
+#[cfg(test)]
+use fake::Fake;
+
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct CreateStreamCommand {
     correlation_id: CorrelationId,
@@ -52,11 +56,11 @@ impl Command for CreateStreamCommand {
 
 #[cfg(test)]
 mod tests {
+
     use std::collections::HashMap;
 
     use crate::{
-        codec::{Decoder, Encoder},
-        error::DecodeError,
+        codec::Decoder, commands::tests::command_encode_decode_test, error::DecodeError,
         types::CorrelationId,
     };
 
@@ -65,8 +69,8 @@ mod tests {
     impl Decoder for CreateStreamCommand {
         fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
             let (input, correlation_id) = CorrelationId::decode(input)?;
-            let (input, stream_name) = Self::decode_str(input)?;
-            let (input, args) = Self::decode_map(input)?;
+            let (input, stream_name) = Option::decode(input)?;
+            let (input, args) = HashMap::decode(input)?;
 
             Ok((
                 input,
@@ -81,24 +85,6 @@ mod tests {
 
     #[test]
     fn create_stream_request_test() {
-        let mut buffer = vec![];
-
-        let mut stream_args = HashMap::new();
-        stream_args.insert("max-len".to_string(), "1GB".to_string());
-        stream_args.insert("max-age".to_string(), "1000".to_string());
-
-        let create_stream = CreateStreamCommand {
-            correlation_id: 1.into(),
-            stream_name: "my_stream".to_owned(),
-            args: stream_args.to_owned(),
-        };
-
-        let _ = create_stream.encode(&mut buffer);
-
-        let (remaining, decoded) = CreateStreamCommand::decode(&buffer).unwrap();
-
-        assert_eq!(create_stream, decoded);
-
-        assert!(remaining.is_empty());
+        command_encode_decode_test::<CreateStreamCommand>();
     }
 }

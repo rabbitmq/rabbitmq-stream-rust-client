@@ -10,6 +10,10 @@ use crate::{
 
 use super::Command;
 
+#[cfg(test)]
+use fake::Fake;
+
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct TunesCommand {
     correlation_id: CorrelationId,
@@ -65,6 +69,7 @@ impl Command for TunesCommand {
     }
 }
 
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct TunesResponse {
     pub(crate) correlation_id: CorrelationId,
@@ -103,31 +108,15 @@ impl Decoder for TunesResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        codec::{Decoder, Encoder},
-        ResponseCode,
-    };
+    use crate::codec::Encoder;
 
     use super::TunesCommand;
     use super::TunesResponse;
+    use crate::commands::tests::command_encode_decode_test;
 
     #[test]
     fn tune_request_test() {
-        let mut buffer = vec![];
-
-        let tune_command = TunesCommand {
-            correlation_id: 66.into(),
-            max_frame_size: 99999,
-            heartbeat: 66,
-        };
-
-        let _ = tune_command.encode(&mut buffer);
-
-        let (remaining, decoded) = TunesCommand::decode(&buffer).unwrap();
-
-        assert_eq!(tune_command, decoded);
-
-        assert!(remaining.is_empty());
+        command_encode_decode_test::<TunesCommand>()
     }
 
     impl Encoder for TunesResponse {
@@ -148,25 +137,6 @@ mod tests {
     }
     #[test]
     fn tune_response_test() {
-        let mut buffer = vec![];
-
-        let mut mechanisms: Vec<String> = Vec::new();
-        mechanisms.push(String::from("PLAIN"));
-        mechanisms.push(String::from("TEST"));
-
-        let tune_response = TunesResponse {
-            correlation_id: 77.into(),
-            code: ResponseCode::Ok,
-            max_frame_size: 88888,
-            heartbeat: 99,
-        };
-
-        let _ = tune_response.encode(&mut buffer);
-
-        let (remaining, decoded) = TunesResponse::decode(&buffer).unwrap();
-
-        assert_eq!(tune_response, decoded);
-
-        assert!(remaining.is_empty());
+        command_encode_decode_test::<TunesResponse>()
     }
 }

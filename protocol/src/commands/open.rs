@@ -10,6 +10,10 @@ use crate::{
 
 use super::Command;
 
+#[cfg(test)]
+use fake::Fake;
+
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct OpenCommand {
     correlation_id: CorrelationId,
@@ -33,7 +37,7 @@ impl Encoder for OpenCommand {
     }
 
     fn encoded_size(&self) -> u32 {
-        self.correlation_id.encoded_size() + self.virtual_host.len() as u32
+        self.correlation_id.encoded_size() + self.virtual_host.as_str().encoded_size()
     }
 }
 
@@ -43,6 +47,7 @@ impl Command for OpenCommand {
     }
 }
 
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct OpenResponse {
     pub(crate) correlation_id: CorrelationId,
@@ -61,7 +66,7 @@ impl Decoder for OpenResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = CorrelationId::decode(input)?;
         let (input, response_code) = ResponseCode::decode(input)?;
-        let (input, connection_properties) = Self::decode_map(input)?;
+        let (input, connection_properties) = HashMap::decode(input)?;
 
         Ok((
             input,
@@ -77,20 +82,18 @@ impl Decoder for OpenResponse {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
-
     use super::OpenCommand;
     use crate::{
-        codec::{read_u32, Decoder, Encoder},
-        commands::open::OpenResponse,
+        codec::{Decoder, Encoder},
+        commands::{open::OpenResponse, tests::command_encode_decode_test},
         error::DecodeError,
-        ResponseCode,
+        types::CorrelationId,
     };
 
     impl Decoder for OpenCommand {
         fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-            let (input, correlation_id) = read_u32(input)?;
-            let (input, virtual_host) = Self::decode_str(input)?;
+            let (input, correlation_id) = CorrelationId::decode(input)?;
+            let (input, virtual_host) = Option::decode(input)?;
 
             Ok((
                 input,
@@ -103,21 +106,8 @@ mod tests {
     }
 
     #[test]
-    fn open_request_test() {
-        let mut buffer = vec![];
-
-        let open = OpenCommand {
-            correlation_id: 1.into(),
-            virtual_host: "test".to_owned(),
-        };
-
-        let _ = open.encode(&mut buffer);
-
-        let (remaining, decoded) = OpenCommand::decode(&buffer).unwrap();
-
-        assert_eq!(open, decoded);
-
-        assert!(remaining.is_empty());
+    fn open_command_test() {
+        command_encode_decode_test::<OpenCommand>()
     }
 
     impl Encoder for OpenResponse {
@@ -138,24 +128,6 @@ mod tests {
 
     #[test]
     fn open_response_test() {
-        let mut buffer = vec![];
-
-        let mut properties = HashMap::new();
-
-        properties.insert("test".to_owned(), "test".to_owned());
-
-        let open_response = OpenResponse {
-            correlation_id: 1.into(),
-            code: ResponseCode::Ok,
-            connection_properties: properties,
-        };
-
-        let _ = open_response.encode(&mut buffer);
-
-        let (remaining, decoded) = OpenResponse::decode(&buffer).unwrap();
-
-        assert_eq!(open_response, decoded);
-
-        assert!(remaining.is_empty());
+        command_encode_decode_test::<OpenResponse>();
     }
 }

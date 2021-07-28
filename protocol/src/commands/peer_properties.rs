@@ -11,6 +11,10 @@ use crate::{
 
 use super::Command;
 
+#[cfg(test)]
+use fake::Fake;
+
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct PeerPropertiesCommand {
     correlation_id: CorrelationId,
@@ -41,7 +45,7 @@ impl Encoder for PeerPropertiesCommand {
 impl Decoder for PeerPropertiesCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = CorrelationId::decode(input)?;
-        let (input, client_properties) = Self::decode_map(input)?;
+        let (input, client_properties) = HashMap::decode(input)?;
 
         Ok((
             input,
@@ -59,6 +63,7 @@ impl Command for PeerPropertiesCommand {
     }
 }
 
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct PeerPropertiesResponse {
     pub(crate) correlation_id: CorrelationId,
@@ -76,7 +81,7 @@ impl Decoder for PeerPropertiesResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = CorrelationId::decode(input)?;
         let (input, code) = ResponseCode::decode(input)?;
-        let (input, server_properties) = Self::decode_map(input)?;
+        let (input, server_properties) = HashMap::decode(input)?;
 
         Ok((
             input,
@@ -91,37 +96,16 @@ impl Decoder for PeerPropertiesResponse {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
 
-    use crate::codec::{Decoder, Encoder};
+    use crate::codec::Encoder;
     use crate::commands::peer_properties::PeerPropertiesResponse;
+    use crate::commands::tests::command_encode_decode_test;
 
     use super::PeerPropertiesCommand;
-    use crate::ResponseCode;
 
     #[test]
     fn peer_properties_request_test() {
-        let mut buffer = vec![];
-
-        let mut peer_properties = HashMap::new();
-        peer_properties.insert("product".to_string(), "RabbitMQ Stream".to_string());
-        peer_properties.insert(
-            "information".to_string(),
-            "Licensed under the MPL 2.0.".to_string(),
-        );
-
-        let peer_properties = PeerPropertiesCommand {
-            correlation_id: 99.into(),
-            client_properties: peer_properties.to_owned(),
-        };
-
-        let _ = peer_properties.encode(&mut buffer);
-
-        let (remaining, decoded) = PeerPropertiesCommand::decode(&buffer).unwrap();
-
-        assert_eq!(peer_properties, decoded);
-
-        assert!(remaining.is_empty());
+        command_encode_decode_test::<PeerPropertiesCommand>()
     }
 
     impl Encoder for PeerPropertiesResponse {
@@ -142,24 +126,6 @@ mod tests {
 
     #[test]
     fn peer_properties_response_test() {
-        let mut buffer = vec![];
-
-        let mut properties = HashMap::new();
-        properties.insert("server".to_owned(), "RabbitMQ server".to_owned());
-        properties.insert("Version ".to_owned(), "5.5.5.5".to_owned());
-
-        let peer_properties_response = PeerPropertiesResponse {
-            correlation_id: 1.into(),
-            code: ResponseCode::Ok,
-            server_properties: properties,
-        };
-
-        let _ = peer_properties_response.encode(&mut buffer);
-
-        let (remaining, decoded) = PeerPropertiesResponse::decode(&buffer).unwrap();
-
-        assert_eq!(peer_properties_response, decoded);
-
-        assert!(remaining.is_empty());
+        command_encode_decode_test::<PeerPropertiesResponse>();
     }
 }

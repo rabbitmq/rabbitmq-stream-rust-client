@@ -42,10 +42,20 @@ impl<T: Encoder> Encoder for Request<T> {
 mod tests {
 
     use crate::{
-        codec::{read_u32, Decoder, Encoder},
-        commands::open::OpenCommand,
+        codec::{decoder::read_u32, Decoder, Encoder},
+        commands::{
+            create_stream::CreateStreamCommand, delete::Delete, open::OpenCommand,
+            peer_properties::PeerPropertiesCommand, sasl_authenticate::SaslAuthenticateCommand,
+            sasl_handshake::SaslHandshakeCommand, tune::TunesCommand, Command,
+        },
         request::Header,
     };
+
+    use std::fmt::Debug;
+
+    use fake::{Dummy, Fake, Faker};
+
+    use super::Request;
 
     impl<T: Decoder> Decoder for Request<T> {
         fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
@@ -56,15 +66,56 @@ mod tests {
             Ok((input, Request { header, command }))
         }
     }
-    use super::Request;
+
     #[test]
-    fn open_request_test() {
-        let request = Request::new(OpenCommand::new(1.into(), "test".into()));
+    fn request_open_test() {
+        request_encode_decode_test::<OpenCommand>()
+    }
+
+    #[test]
+    fn request_peer_properties_test() {
+        request_encode_decode_test::<PeerPropertiesCommand>()
+    }
+
+    #[test]
+    fn request_create_stream_test() {
+        request_encode_decode_test::<CreateStreamCommand>()
+    }
+
+    #[test]
+    fn request_delete_stream_test() {
+        request_encode_decode_test::<Delete>()
+    }
+
+    #[test]
+    fn request_sasl_authenticate_test() {
+        request_encode_decode_test::<SaslAuthenticateCommand>()
+    }
+
+    #[test]
+    fn request_sasl_handshake_test() {
+        request_encode_decode_test::<SaslHandshakeCommand>()
+    }
+
+    #[test]
+    fn request_tune_test() {
+        request_encode_decode_test::<TunesCommand>()
+    }
+
+    fn request_encode_decode_test<T>()
+    where
+        T: Dummy<Faker> + Encoder + Decoder + Debug + PartialEq + Command,
+    {
+        let command: T = Faker.fake();
+
+        let request = Request::new(command);
 
         let mut buffer = vec![];
         let _ = request.encode(&mut buffer).unwrap();
 
-        let (remaining, decoded) = Request::<OpenCommand>::decode(&buffer).unwrap();
+        let (remaining, decoded) = Request::<T>::decode(&buffer).unwrap();
+
+        assert_eq!(buffer[4..].len(), decoded.encoded_size() as usize);
 
         assert_eq!(request, decoded);
 

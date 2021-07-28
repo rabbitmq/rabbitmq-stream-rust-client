@@ -9,6 +9,10 @@ use crate::{
 
 use super::Command;
 
+#[cfg(test)]
+use fake::Fake;
+
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct SaslAuthenticateCommand {
     correlation_id: CorrelationId,
@@ -44,8 +48,8 @@ impl Encoder for SaslAuthenticateCommand {
 impl Decoder for SaslAuthenticateCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = CorrelationId::decode(input)?;
-        let (input, mechanism) = Self::decode_str(input)?;
-        let (input, sasl_data) = Vec::<u8>::decode(input)?;
+        let (input, mechanism) = Option::decode(input)?;
+        let (input, sasl_data) = Vec::decode(input)?;
 
         Ok((
             input,
@@ -67,26 +71,12 @@ impl Command for SaslAuthenticateCommand {
 #[cfg(test)]
 mod tests {
 
-    use crate::codec::{Decoder, Encoder};
+    use crate::commands::tests::command_encode_decode_test;
 
     use super::SaslAuthenticateCommand;
 
     #[test]
     fn sasl_authenticate_request_test() {
-        let mut buffer = vec![];
-
-        let auth = SaslAuthenticateCommand {
-            correlation_id: 99.into(),
-            mechanism: "plain".to_owned(),
-            sasl_data: vec![],
-        };
-
-        let _ = auth.encode(&mut buffer);
-
-        let (remaining, decoded) = SaslAuthenticateCommand::decode(&buffer).unwrap();
-
-        assert_eq!(auth, decoded);
-
-        assert!(remaining.is_empty());
+        command_encode_decode_test::<SaslAuthenticateCommand>()
     }
 }

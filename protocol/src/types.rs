@@ -1,5 +1,9 @@
 use std::ops::Deref;
 
+#[cfg(test)]
+use fake::Fake;
+
+#[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct CorrelationId(u32);
 
