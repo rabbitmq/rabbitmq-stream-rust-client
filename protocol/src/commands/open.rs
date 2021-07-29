@@ -79,31 +79,29 @@ impl Decoder for OpenResponse {
     }
 }
 
+impl Decoder for OpenCommand {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, virtual_host) = Option::decode(input)?;
+
+        Ok((
+            input,
+            OpenCommand {
+                correlation_id: correlation_id.into(),
+                virtual_host: virtual_host.unwrap(),
+            },
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     use super::OpenCommand;
     use crate::{
-        codec::{Decoder, Encoder},
+        codec::Encoder,
         commands::{open::OpenResponse, tests::command_encode_decode_test},
-        error::DecodeError,
-        types::CorrelationId,
     };
-
-    impl Decoder for OpenCommand {
-        fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-            let (input, correlation_id) = CorrelationId::decode(input)?;
-            let (input, virtual_host) = Option::decode(input)?;
-
-            Ok((
-                input,
-                OpenCommand {
-                    correlation_id: correlation_id.into(),
-                    virtual_host: virtual_host.unwrap(),
-                },
-            ))
-        }
-    }
 
     #[test]
     fn open_command_test() {

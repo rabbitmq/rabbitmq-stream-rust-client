@@ -27,13 +27,10 @@ impl TokioDecoder for RabbitMqStreamCodec {
     }
 }
 
-impl<T> TokioEncoder<Request<T>> for RabbitMqStreamCodec
-where
-    T: Encoder,
-{
+impl TokioEncoder<Request> for RabbitMqStreamCodec {
     type Error = EncodeError;
 
-    fn encode(&mut self, req: Request<T>, buf: &mut BytesMut) -> Result<(), EncodeError> {
+    fn encode(&mut self, req: Request, buf: &mut BytesMut) -> Result<(), EncodeError> {
         let len = req.encoded_size();
         buf.reserve(len as usize);
         let mut writer = buf.writer();
