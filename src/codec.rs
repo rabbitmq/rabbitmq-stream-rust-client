@@ -14,7 +14,7 @@ impl TokioDecoder for RabbitMqStreamCodec {
     type Error = RabbitMqStreamError;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Response>, RabbitMqStreamError> {
-        match Response::decode(&buf) {
+        match Response::decode(buf) {
             Ok((remaining, response)) => {
                 let len = remaining.len();
                 buf.advance(buf.len() - len);
