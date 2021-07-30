@@ -12,7 +12,7 @@ use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 
 use crate::{
-    broker::{Broker},
+    broker::Broker,
     channel::{channel, ChannelSender},
     codec::RabbitMqStreamCodec,
     dispatcher::Dispatcher,
