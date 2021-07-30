@@ -87,7 +87,7 @@ impl Decoder for OpenCommand {
         Ok((
             input,
             OpenCommand {
-                correlation_id: correlation_id.into(),
+                correlation_id,
                 virtual_host: virtual_host.unwrap(),
             },
         ))
