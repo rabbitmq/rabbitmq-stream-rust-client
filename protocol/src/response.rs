@@ -57,6 +57,18 @@ pub enum ResponseKind {
     Tunes(TunesCommand),
 }
 
+impl Response {
+    pub fn correlation_id(&self) -> Option<u32> {
+        match &self.kind {
+            ResponseKind::Open(open) => Some(*open.correlation_id),
+            ResponseKind::PeerProperties(peer_properties) => Some(*peer_properties.correlation_id),
+            ResponseKind::SaslHandshake(handshake) => Some(*handshake.correlation_id),
+            ResponseKind::Generic(generic) => Some(*generic.correlation_id),
+            ResponseKind::Tunes(_) => None,
+        }
+    }
+}
+
 impl Decoder for Response {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
         let (input, _) = read_u32(input)?;

@@ -13,7 +13,7 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct GenericResponse {
-    correlation_id: CorrelationId,
+    pub(crate) correlation_id: CorrelationId,
     code: ResponseCode,
 }
 

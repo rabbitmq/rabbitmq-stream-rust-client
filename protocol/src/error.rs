@@ -6,7 +6,6 @@ pub enum DecodeError {
     Utf8Error(FromUtf8Error),
     UnknownResponseCode(u16),
     UsupportedResponseType(u16),
-    Io(std::io::Error),
 }
 
 #[derive(Debug)]
@@ -23,11 +22,5 @@ impl From<std::io::Error> for EncodeError {
 impl From<FromUtf8Error> for DecodeError {
     fn from(err: FromUtf8Error) -> Self {
         DecodeError::Utf8Error(err)
-    }
-}
-
-impl From<std::io::Error> for DecodeError {
-    fn from(err: std::io::Error) -> Self {
-        DecodeError::Io(err)
     }
 }
