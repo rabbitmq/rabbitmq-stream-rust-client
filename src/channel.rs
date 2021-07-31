@@ -39,7 +39,7 @@ where
 }
 
 impl<T: Sink<Request> + Unpin> ChannelSender<T> {
-    pub async fn send(&mut self, item: Request) -> Result<(), T::Error> {
+    pub async fn send(&self, item: Request) -> Result<(), T::Error> {
         let mut channel = self.inner.lock().await;
         channel.send(item).await
     }

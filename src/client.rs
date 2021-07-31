@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use futures::{stream::SplitSink, StreamExt};
 use rabbitmq_stream_protocol::{
@@ -7,10 +7,11 @@ use rabbitmq_stream_protocol::{
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
         sasl_authenticate::SaslAuthenticateCommand,
         sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
+        tune::TunesCommand,
     },
-    Request,
+    Request, Response,
 };
-use tokio::net::TcpStream;
+use tokio::{net::TcpStream, sync::broadcast::Receiver};
 use tokio_util::codec::Framed;
 
 use crate::{
@@ -50,10 +51,27 @@ impl Client {
     }
 
     async fn initialize(&mut self) -> Result<(), RabbitMqStreamError> {
+        let channel = self.dispatcher.subscribe();
         self.server_properties = self.peer_properties().await?;
         self.authenticate().await?;
+
+        self.wait_for_tune_data(channel).await?;
         self.connection_properties = self.open().await?;
+
         Ok(())
+    }
+
+    async fn wait_for_tune_data(
+        &self,
+        mut channel: Receiver<Arc<Response>>,
+    ) -> Result<(), RabbitMqStreamError> {
+        let response = channel.recv().await.unwrap();
+
+        let tunes = response.get_ref::<TunesCommand>().unwrap();
+
+        self.channel
+            .send(TunesCommand::new(tunes.max_frame_size, tunes.heartbeat).into())
+            .await
     }
 
     async fn authenticate(&mut self) -> Result<(), RabbitMqStreamError> {

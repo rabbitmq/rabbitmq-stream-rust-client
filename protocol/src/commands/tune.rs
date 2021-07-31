@@ -4,6 +4,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_TUNE,
+    FromResponseRef,
 };
 
 use super::Command;
@@ -14,8 +15,17 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct TunesCommand {
-    max_frame_size: u32,
-    heartbeat: u32,
+    pub max_frame_size: u32,
+    pub heartbeat: u32,
+}
+
+impl FromResponseRef for TunesCommand {
+    fn from_response(response: &crate::Response) -> Option<&Self> {
+        match response.kind {
+            crate::ResponseKind::Tunes(ref tunes) => Some(tunes),
+            _ => None,
+        }
+    }
 }
 
 impl TunesCommand {
