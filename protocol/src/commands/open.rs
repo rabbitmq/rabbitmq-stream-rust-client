@@ -6,6 +6,7 @@ use crate::{
     protocol::commands::COMMAND_OPEN,
     response::ResponseCode,
     types::CorrelationId,
+    FromResponse,
 };
 
 use super::Command;
@@ -52,13 +53,22 @@ impl Command for OpenCommand {
 pub struct OpenResponse {
     pub(crate) correlation_id: CorrelationId,
     pub(crate) code: ResponseCode,
-    pub(crate) connection_properties: HashMap<String, String>,
+    pub connection_properties: HashMap<String, String>,
 }
 
 impl OpenResponse {
     /// Get a reference to the open response's connection properties.
     pub fn connection_properties(&self) -> &HashMap<String, String> {
         &self.connection_properties
+    }
+}
+
+impl FromResponse for OpenResponse {
+    fn from_response(response: crate::Response) -> Option<Self> {
+        match response.kind {
+            crate::ResponseKind::Open(open) => Some(open),
+            _ => None,
+        }
     }
 }
 

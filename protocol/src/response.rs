@@ -45,7 +45,7 @@ pub enum ResponseCode {
 #[derive(Debug, PartialEq)]
 pub struct Response {
     header: Header,
-    kind: ResponseKind,
+    pub(crate) kind: ResponseKind,
 }
 
 #[derive(Debug, PartialEq)]
@@ -66,6 +66,13 @@ impl Response {
             ResponseKind::Generic(generic) => Some(*generic.correlation_id),
             ResponseKind::Tunes(_) => None,
         }
+    }
+
+    pub fn get<T>(self) -> Option<T>
+    where
+        T: FromResponse,
+    {
+        T::from_response(self)
     }
 }
 
@@ -173,6 +180,12 @@ impl From<&ResponseCode> for u16 {
     }
 }
 
+pub trait FromResponse
+where
+    Self: Sized,
+{
+    fn from_response(response: Response) -> Option<Self>;
+}
 #[cfg(test)]
 mod tests {
 

@@ -3,8 +3,10 @@ use std::collections::HashMap;
 use futures::{stream::SplitSink, StreamExt};
 use rabbitmq_stream_protocol::{
     commands::{
-        open::OpenCommand, peer_properties::PeerPropertiesCommand,
-        sasl_authenticate::SaslAuthenticateCommand, sasl_handshake::SaslHandshakeCommand,
+        open::{OpenCommand, OpenResponse},
+        peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
+        sasl_authenticate::SaslAuthenticateCommand,
+        sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
     },
     Request,
 };
@@ -51,16 +53,15 @@ impl Client {
     }
 
     async fn authenticate(&mut self) -> Result<(), RabbitMqStreamError> {
-        let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
+        let mechanism = self.sasl_mechanism().await?;
 
-        self.channel
-            .send(SaslHandshakeCommand::new(correlation_id.into()).into())
-            .await?;
+        self.handle_authentication(mechanism).await
+    }
 
-        let response = receiver.recv().await;
-
-        dbg!(response);
-
+    async fn handle_authentication(
+        &mut self,
+        _mechanism: Vec<String>,
+    ) -> Result<(), RabbitMqStreamError> {
         let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
 
         let data = format!(
@@ -78,33 +79,46 @@ impl Client {
             )
             .await?;
 
-        let response = receiver.recv().await;
+        let _response = receiver.recv().await;
 
-        dbg!(response);
         Ok(())
     }
 
-    async fn open(&mut self) -> Result<(), RabbitMqStreamError> {
+    async fn sasl_mechanism(&mut self) -> Result<Vec<String>, RabbitMqStreamError> {
+        let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
+
+        self.channel
+            .send(SaslHandshakeCommand::new(correlation_id.into()).into())
+            .await?;
+
+        let response = receiver.recv().await.unwrap();
+
+        let handshake_response = response.get::<SaslHandshakeResponse>().expect("");
+
+        Ok(handshake_response.mechanisms)
+    }
+
+    async fn open(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
         let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
         self.channel
             .send(OpenCommand::new(correlation_id.into(), self.broker.v_host.clone()).into())
             .await?;
 
-        let response = receiver.recv().await;
+        let response = receiver.recv().await.unwrap();
 
-        dbg!(response);
-        Ok(())
+        let open_response = response.get::<OpenResponse>().expect("");
+        Ok(open_response.connection_properties)
     }
-    async fn peer_properties(&mut self) -> Result<(), RabbitMqStreamError> {
+    async fn peer_properties(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
         let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
 
         self.channel
             .send(PeerPropertiesCommand::new(correlation_id.into(), HashMap::new()).into())
             .await?;
 
-        let response = receiver.recv().await;
-        dbg!(response);
-        Ok(())
+        let response = receiver.recv().await.unwrap();
+        let peer_properties_properties = response.get::<PeerPropertiesResponse>().unwrap();
+        Ok(peer_properties_properties.server_properties)
     }
 
     async fn create_connection(
