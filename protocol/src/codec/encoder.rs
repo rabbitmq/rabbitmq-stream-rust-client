@@ -106,3 +106,14 @@ impl Encoder for u64 {
         Ok(())
     }
 }
+
+impl Encoder for u16 {
+    fn encoded_size(&self) -> u32 {
+        2
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u16::<BigEndian>(*self)?;
+        Ok(())
+    }
+}
