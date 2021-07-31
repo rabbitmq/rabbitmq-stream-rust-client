@@ -1,17 +1,8 @@
 use std::collections::HashMap;
 
 use super::Decoder;
-use crate::{
-    error::DecodeError,
-    types::{CorrelationId, Header},
-};
+use crate::{error::DecodeError, types::Header};
 use byteorder::ByteOrder;
-
-impl Decoder for CorrelationId {
-    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        read_u32(input).map(|(input, correlation_id)| (input, correlation_id.into()))
-    }
-}
 
 impl Decoder for Vec<u8> {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {

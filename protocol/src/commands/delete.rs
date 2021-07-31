@@ -4,7 +4,6 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_DELETE_STREAM,
-    types::CorrelationId,
 };
 
 use super::Command;
@@ -15,12 +14,12 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct Delete {
-    correlation_id: CorrelationId,
+    correlation_id: u32,
     stream: String,
 }
 
 impl Delete {
-    pub fn new(correlation_id: CorrelationId, stream: String) -> Self {
+    pub fn new(correlation_id: u32, stream: String) -> Self {
         Self {
             correlation_id,
             stream,
@@ -47,7 +46,7 @@ impl Command for Delete {
 }
 impl Decoder for Delete {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, stream) = Option::decode(input)?;
 
         Ok((
