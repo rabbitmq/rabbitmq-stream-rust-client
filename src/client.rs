@@ -27,6 +27,8 @@ pub struct Client {
     dispatcher: Dispatcher,
     channel: ChannelSender<SinkConnection>,
     broker: Broker,
+    server_properties: HashMap<String, String>,
+    connection_properties: HashMap<String, String>,
 }
 
 impl Client {
@@ -38,6 +40,8 @@ impl Client {
             dispatcher,
             channel: sender,
             broker,
+            server_properties: HashMap::new(),
+            connection_properties: HashMap::new(),
         };
 
         client.initialize().await?;
@@ -46,9 +50,9 @@ impl Client {
     }
 
     async fn initialize(&mut self) -> Result<(), RabbitMqStreamError> {
-        self.peer_properties().await?;
+        self.server_properties = self.peer_properties().await?;
         self.authenticate().await?;
-        self.open().await?;
+        self.connection_properties = self.open().await?;
         Ok(())
     }
 
@@ -109,6 +113,7 @@ impl Client {
         let open_response = response.get::<OpenResponse>().expect("");
         Ok(open_response.connection_properties)
     }
+
     async fn peer_properties(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
         let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
 
@@ -133,5 +138,15 @@ impl Client {
         let dispatcher = Dispatcher::create(rx).await;
 
         Ok((tx, dispatcher))
+    }
+
+    /// Get a reference to the client's server properties.
+    pub fn server_properties(&self) -> &HashMap<String, String> {
+        &self.server_properties
+    }
+
+    /// Get a reference to the client's connection properties.
+    pub fn connection_properties(&self) -> &HashMap<String, String> {
+        &self.connection_properties
     }
 }
