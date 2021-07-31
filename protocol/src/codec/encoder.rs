@@ -98,3 +98,25 @@ impl Encoder for u32 {
         Ok(())
     }
 }
+
+impl Encoder for u8 {
+    fn encoded_size(&self) -> u32 {
+        1
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u8(*self)?;
+        Ok(())
+    }
+}
+
+impl Encoder for u64 {
+    fn encoded_size(&self) -> u32 {
+        8
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u64::<BigEndian>(*self)?;
+        Ok(())
+    }
+}
