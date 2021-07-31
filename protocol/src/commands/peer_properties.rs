@@ -5,7 +5,6 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_PEER_PROPERTIES,
-    types::CorrelationId,
     ResponseCode,
 };
 
@@ -17,12 +16,12 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct PeerPropertiesCommand {
-    correlation_id: CorrelationId,
+    correlation_id: u32,
     client_properties: HashMap<String, String>,
 }
 
 impl PeerPropertiesCommand {
-    pub fn new(correlation_id: CorrelationId, client_properties: HashMap<String, String>) -> Self {
+    pub fn new(correlation_id: u32, client_properties: HashMap<String, String>) -> Self {
         Self {
             correlation_id,
             client_properties,
@@ -44,7 +43,7 @@ impl Encoder for PeerPropertiesCommand {
 
 impl Decoder for PeerPropertiesCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, client_properties) = HashMap::decode(input)?;
 
         Ok((
@@ -66,7 +65,7 @@ impl Command for PeerPropertiesCommand {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct PeerPropertiesResponse {
-    pub(crate) correlation_id: CorrelationId,
+    pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,
     pub(crate) server_properties: HashMap<String, String>,
 }
@@ -79,7 +78,7 @@ impl PeerPropertiesResponse {
 
 impl Decoder for PeerPropertiesResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, code) = ResponseCode::decode(input)?;
         let (input, server_properties) = HashMap::decode(input)?;
 

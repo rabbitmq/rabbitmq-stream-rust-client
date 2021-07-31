@@ -213,7 +213,7 @@ mod tests {
 
         let open_response = OpenResponse {
             connection_properties: properties,
-            correlation_id: 1.into(),
+            correlation_id: 1,
             code: ResponseCode::Ok,
         };
 

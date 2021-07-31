@@ -3,21 +3,7 @@ use std::{collections::HashMap, io::Write};
 use byteorder::{BigEndian, WriteBytesExt};
 
 use super::Encoder;
-use crate::{
-    error::EncodeError,
-    types::{CorrelationId, Header},
-};
-
-impl Encoder for CorrelationId {
-    fn encoded_size(&self) -> u32 {
-        4
-    }
-
-    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        writer.write_u32::<BigEndian>(**self)?;
-        Ok(())
-    }
-}
+use crate::{error::EncodeError, types::Header};
 
 impl Encoder for Header {
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
