@@ -88,6 +88,12 @@ impl Decoder for u64 {
     }
 }
 
+impl Decoder for u16 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        read_u16(input)
+    }
+}
+
 pub fn check_len(input: &[u8], size: usize) -> Result<(), DecodeError> {
     if input.len() < size {
         return Err(DecodeError::Incomplete(size));
