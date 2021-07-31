@@ -4,6 +4,7 @@ pub mod open;
 pub mod peer_properties;
 pub mod sasl_authenticate;
 pub mod sasl_handshake;
+pub mod store_offset;
 pub mod tune;
 
 pub trait Command {
