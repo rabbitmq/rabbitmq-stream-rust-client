@@ -1,4 +1,5 @@
 pub mod create_stream;
+pub mod declare_publisher;
 pub mod delete;
 pub mod open;
 pub mod peer_properties;
