@@ -5,7 +5,6 @@ use crate::{
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_TUNE,
     response::ResponseCode,
-    types::CorrelationId,
 };
 
 use super::Command;
@@ -16,13 +15,13 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct TunesCommand {
-    correlation_id: CorrelationId,
+    correlation_id: u32,
     max_frame_size: u32,
     heartbeat: u32,
 }
 
 impl TunesCommand {
-    pub fn new(correlation_id: CorrelationId, max_frame_size: u32, heartbeat: u32) -> Self {
+    pub fn new(correlation_id: u32, max_frame_size: u32, heartbeat: u32) -> Self {
         Self {
             correlation_id,
             max_frame_size,
@@ -48,7 +47,7 @@ impl Encoder for TunesCommand {
 
 impl Decoder for TunesCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, max_frame_size) = u32::decode(input)?;
         let (input, heartbeat) = u32::decode(input)?;
 
@@ -72,7 +71,7 @@ impl Command for TunesCommand {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct TunesResponse {
-    pub(crate) correlation_id: CorrelationId,
+    pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,
     pub(crate) max_frame_size: u32,
     pub(crate) heartbeat: u32,
@@ -90,7 +89,7 @@ impl TunesResponse {
 
 impl Decoder for TunesResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, response_code) = ResponseCode::decode(input)?;
         let (input, max_frame_size) = u32::decode(input)?;
         let (input, heartbeat) = u32::decode(input)?;

@@ -1,15 +1,30 @@
 use std::collections::HashMap;
 
 use super::Decoder;
-use crate::{
-    error::DecodeError,
-    types::{CorrelationId, Header},
-};
+use crate::{error::DecodeError, types::Header};
 use byteorder::ByteOrder;
 
-impl Decoder for CorrelationId {
-    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        read_u32(input).map(|(input, correlation_id)| (input, correlation_id.into()))
+impl Decoder for u8 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        read_u8(input)
+    }
+}
+
+impl Decoder for u16 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        read_u16(input)
+    }
+}
+
+impl Decoder for u32 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        read_u32(input)
+    }
+}
+
+impl Decoder for u64 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        read_u64(input)
     }
 }
 
@@ -79,24 +94,6 @@ impl Decoder for Vec<String> {
     }
 }
 
-impl Decoder for u32 {
-    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
-        read_u32(input)
-    }
-}
-
-impl Decoder for u8 {
-    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
-        read_u8(input)
-    }
-}
-
-impl Decoder for u64 {
-    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
-        read_u64(input)
-    }
-}
-
 pub fn check_len(input: &[u8], size: usize) -> Result<(), DecodeError> {
     if input.len() < size {
         return Err(DecodeError::Incomplete(size));
@@ -115,13 +112,13 @@ macro_rules! reader {
     };
 }
 
-reader!(read_u32, 4, u32);
-reader!(read_i32, 4, i32);
-reader!(read_i16, 2, i16);
-reader!(read_u16, 2, u16);
-reader!(read_u64, 8, u64);
-
 pub fn read_u8(input: &[u8]) -> Result<(&[u8], u8), DecodeError> {
     check_len(input, 1)?;
     Ok((&input[1..], input[0]))
 }
+
+reader!(read_i16, 2, i16);
+reader!(read_u16, 2, u16);
+reader!(read_u32, 4, u32);
+reader!(read_i32, 4, i32);
+reader!(read_u64, 8, u64);
