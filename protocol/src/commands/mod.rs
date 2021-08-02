@@ -1,6 +1,7 @@
 pub mod create_stream;
 pub mod declare_publisher;
 pub mod delete;
+pub mod delete_publisher;
 pub mod open;
 pub mod peer_properties;
 pub mod sasl_authenticate;
