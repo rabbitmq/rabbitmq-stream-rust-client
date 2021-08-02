@@ -65,7 +65,7 @@ impl Dispatcher {
     }
 
     pub async fn notify(&self, response: Response) {
-        self.sender.send(Arc::new(response)).unwrap();
+        let _ = self.sender.send(Arc::new(response));
     }
 
     pub fn subscribe(&self) -> BroadcastReceiver<Arc<Response>> {

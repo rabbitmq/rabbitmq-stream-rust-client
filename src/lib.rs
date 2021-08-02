@@ -1,9 +1,11 @@
-mod broker;
 mod channel;
 mod client;
 mod codec;
 mod dispatcher;
 pub mod error;
+mod options;
 
-pub use broker::Broker;
+pub type RabbitMQStreamResult<T> = Result<T, RabbitMqStreamError>;
 pub use client::Client;
+use error::RabbitMqStreamError;
+pub use options::ClientOptions;

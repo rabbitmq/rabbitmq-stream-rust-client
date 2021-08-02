@@ -1,55 +1,69 @@
 use std::{collections::HashMap, sync::Arc};
 
-use futures::{stream::SplitSink, StreamExt};
+use futures::{stream::SplitSink, StreamExt, TryFutureExt};
 use rabbitmq_stream_protocol::{
     commands::{
+        generic::GenericResponse,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
         sasl_authenticate::SaslAuthenticateCommand,
         sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
         tune::TunesCommand,
     },
-    Request, Response,
+    FromResponse, FromResponseRef, Request, Response,
 };
 use tokio::{net::TcpStream, sync::broadcast::Receiver};
 use tokio_util::codec::Framed;
 
 use crate::{
-    broker::Broker,
     channel::{channel, ChannelSender},
     codec::RabbitMqStreamCodec,
     dispatcher::Dispatcher,
     error::RabbitMqStreamError,
+    options::ClientOptions,
 };
 
 type SinkConnection = SplitSink<Framed<TcpStream, RabbitMqStreamCodec>, Request>;
 
-pub struct Client {
+pub struct ClientInternal {
     dispatcher: Dispatcher,
     channel: ChannelSender<SinkConnection>,
-    broker: Broker,
+    opts: ClientOptions,
     server_properties: HashMap<String, String>,
     connection_properties: HashMap<String, String>,
 }
+pub struct Client(Arc<ClientInternal>);
 
 impl Client {
-    pub async fn connect(broker: impl Into<Broker>) -> Result<Client, RabbitMqStreamError> {
-        let broker = broker.into();
-        let (sender, dispatcher) = Self::create_connection(&broker).await?;
+    pub async fn connect(opts: impl Into<ClientOptions>) -> Result<Client, RabbitMqStreamError> {
+        let broker = opts.into();
+        let (sender, dispatcher) = ClientInternal::create_connection(&broker).await?;
 
-        let mut client = Client {
+        let mut internal = ClientInternal {
             dispatcher,
             channel: sender,
-            broker,
+            opts: broker,
             server_properties: HashMap::new(),
             connection_properties: HashMap::new(),
         };
 
-        client.initialize().await?;
+        internal.initialize().await?;
 
-        Ok(client)
+        Ok(Client(Arc::new(internal)))
     }
 
+    /// Get a reference to the client's server properties.
+    pub fn server_properties(&self) -> &HashMap<String, String> {
+        &self.0.server_properties
+    }
+
+    /// Get a reference to the client's connection properties.
+    pub fn connection_properties(&self) -> &HashMap<String, String> {
+        &self.0.connection_properties
+    }
+}
+
+impl ClientInternal {
     async fn initialize(&mut self) -> Result<(), RabbitMqStreamError> {
         let channel = self.dispatcher.subscribe();
         self.server_properties = self.peer_properties().await?;
@@ -61,91 +75,119 @@ impl Client {
         Ok(())
     }
 
+    fn max_value(&self, client: u32, server: u32) -> u32 {
+        match (client, server) {
+            (client, server) if client == 0 || server == 0 => client.max(server),
+            (client, server) => client.max(server),
+        }
+    }
+
     async fn wait_for_tune_data(
-        &self,
+        &mut self,
         mut channel: Receiver<Arc<Response>>,
     ) -> Result<(), RabbitMqStreamError> {
         let response = channel.recv().await.unwrap();
 
-        let tunes = response.get_ref::<TunesCommand>().unwrap();
+        let tunes = self.handle_response_ref::<TunesCommand>(&response).await?;
+
+        self.opts.heartbeat = self.max_value(self.opts.heartbeat, tunes.heartbeat);
+        self.opts.max_frame_size = self.max_value(self.opts.max_frame_size, tunes.max_frame_size);
 
         self.channel
-            .send(TunesCommand::new(tunes.max_frame_size, tunes.heartbeat).into())
+            .send(TunesCommand::new(self.opts.max_frame_size, self.opts.heartbeat).into())
             .await
     }
 
-    async fn authenticate(&mut self) -> Result<(), RabbitMqStreamError> {
-        let mechanism = self.sasl_mechanism().await?;
-
-        self.handle_authentication(mechanism).await
+    async fn authenticate(&self) -> Result<(), RabbitMqStreamError> {
+        self.sasl_mechanism()
+            .and_then(|mechanisms| self.handle_authentication(mechanisms))
+            .await
     }
 
     async fn handle_authentication(
-        &mut self,
+        &self,
         _mechanism: Vec<String>,
     ) -> Result<(), RabbitMqStreamError> {
-        let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
+        let auth_data = format!("\u{0000}{}\u{0000}{}", self.opts.user, self.opts.password);
 
-        let data = format!(
-            "\u{0000}{}\u{0000}{}",
-            self.broker.user, self.broker.password
-        );
-        self.channel
-            .send(
-                SaslAuthenticateCommand::new(
-                    correlation_id.into(),
-                    "PLAIN".to_owned(),
-                    data.as_bytes().to_vec(),
-                )
-                .into(),
+        self.send::<GenericResponse, _, _>(|correlation_id| {
+            SaslAuthenticateCommand::new(
+                correlation_id.into(),
+                "PLAIN".to_owned(),
+                auth_data.as_bytes().to_vec(),
             )
-            .await?;
-
-        let _response = receiver.recv().await;
-
-        Ok(())
+        })
+        .await
+        .map(|_| ())
     }
 
-    async fn sasl_mechanism(&mut self) -> Result<Vec<String>, RabbitMqStreamError> {
+    async fn sasl_mechanism(&self) -> Result<Vec<String>, RabbitMqStreamError> {
+        self.send::<SaslHandshakeResponse, _, _>(|correlation_id| {
+            SaslHandshakeCommand::new(correlation_id.into())
+        })
+        .await
+        .map(|handshake| handshake.mechanisms)
+    }
+
+    async fn send<T, R, M>(&self, msg_factory: M) -> Result<T, RabbitMqStreamError>
+    where
+        R: Into<Request>,
+        T: FromResponse,
+        M: FnOnce(u32) -> R,
+    {
         let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
 
         self.channel
-            .send(SaslHandshakeCommand::new(correlation_id.into()).into())
+            .send(msg_factory(correlation_id).into())
             .await?;
 
         let response = receiver.recv().await.unwrap();
 
-        let handshake_response = response.get::<SaslHandshakeResponse>().expect("");
+        self.handle_response::<T>(response).await
+    }
 
-        Ok(handshake_response.mechanisms)
+    async fn handle_response<T: FromResponse>(
+        &self,
+        response: Response,
+    ) -> Result<T, RabbitMqStreamError> {
+        response.get::<T>().ok_or_else(|| {
+            RabbitMqStreamError::CastError(format!(
+                "Cannot cast response to {}",
+                std::any::type_name::<T>()
+            ))
+        })
+    }
+
+    async fn handle_response_ref<'a, T: FromResponseRef + 'a>(
+        &self,
+        response: &'a Response,
+    ) -> Result<&'a T, RabbitMqStreamError> {
+        response.get_ref::<T>().ok_or_else(|| {
+            RabbitMqStreamError::CastError(format!(
+                "Cannot cast response to {}",
+                std::any::type_name::<T>()
+            ))
+        })
     }
 
     async fn open(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
-        let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
-        self.channel
-            .send(OpenCommand::new(correlation_id.into(), self.broker.v_host.clone()).into())
-            .await?;
-
-        let response = receiver.recv().await.unwrap();
-
-        let open_response = response.get::<OpenResponse>().expect("");
-        Ok(open_response.connection_properties)
+        self.send::<OpenResponse, _, _>(|correlation_id| {
+            OpenCommand::new(correlation_id.into(), self.opts.v_host.clone())
+        })
+        .await
+        .map(|open| open.connection_properties)
     }
 
     async fn peer_properties(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
-        let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
-
-        self.channel
-            .send(PeerPropertiesCommand::new(correlation_id.into(), HashMap::new()).into())
-            .await?;
-
-        let response = receiver.recv().await.unwrap();
-        let peer_properties_properties = response.get::<PeerPropertiesResponse>().unwrap();
-        Ok(peer_properties_properties.server_properties)
+        self.send::<PeerPropertiesResponse, _, _>(|correlation_id| {
+            PeerPropertiesCommand::new(correlation_id.into(), HashMap::new())
+        })
+        .await
+        .map(|peer_properties| peer_properties.server_properties)
     }
 
     async fn create_connection(
-        broker: &Broker,
+        broker: &ClientOptions,
     ) -> Result<(ChannelSender<SinkConnection>, Dispatcher), RabbitMqStreamError> {
         let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
         let stream = Framed::new(stream, RabbitMqStreamCodec {});
@@ -156,15 +198,5 @@ impl Client {
         let dispatcher = Dispatcher::create(rx).await;
 
         Ok((tx, dispatcher))
-    }
-
-    /// Get a reference to the client's server properties.
-    pub fn server_properties(&self) -> &HashMap<String, String> {
-        &self.server_properties
-    }
-
-    /// Get a reference to the client's connection properties.
-    pub fn connection_properties(&self) -> &HashMap<String, String> {
-        &self.connection_properties
     }
 }

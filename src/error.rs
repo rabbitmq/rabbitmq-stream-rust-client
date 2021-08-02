@@ -4,6 +4,7 @@ use rabbitmq_stream_protocol::error::{DecodeError, EncodeError};
 pub enum RabbitMqStreamError {
     Io(std::io::Error),
     Protocol(ProtocolError),
+    CastError(String),
 }
 
 #[derive(Debug)]

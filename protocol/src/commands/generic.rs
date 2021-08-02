@@ -4,7 +4,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     types::CorrelationId,
-    ResponseCode,
+    FromResponse, ResponseCode, ResponseKind,
 };
 
 #[cfg(test)]
@@ -41,6 +41,15 @@ impl Decoder for GenericResponse {
                 code,
             },
         ))
+    }
+}
+
+impl FromResponse for GenericResponse {
+    fn from_response(response: crate::Response) -> Option<Self> {
+        match response.kind {
+            ResponseKind::Generic(generic) => Some(generic),
+            _ => None,
+        }
     }
 }
 
