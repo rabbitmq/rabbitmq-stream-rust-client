@@ -86,7 +86,7 @@ impl ClientInternal {
         &mut self,
         mut channel: Receiver<Arc<Response>>,
     ) -> Result<(), RabbitMqStreamError> {
-        let response = channel.recv().await.unwrap();
+        let response = channel.recv().await.expect("It should contain a message");
 
         let tunes = self.handle_response_ref::<TunesCommand>(&response).await?;
 
@@ -141,7 +141,7 @@ impl ClientInternal {
             .send(msg_factory(correlation_id).into())
             .await?;
 
-        let response = receiver.recv().await.unwrap();
+        let response = receiver.recv().await.expect("It should contain a response");
 
         self.handle_response::<T>(response).await
     }
