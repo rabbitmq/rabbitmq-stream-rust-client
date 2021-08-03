@@ -6,11 +6,14 @@ pub enum DecodeError {
     Utf8Error(FromUtf8Error),
     UnknownResponseCode(u16),
     UsupportedResponseType(u16),
+    MismatchSize(usize),
+    Empty,
 }
 
 #[derive(Debug)]
 pub enum EncodeError {
     Io(std::io::Error),
+    MaxSizeError(usize),
 }
 
 impl From<std::io::Error> for EncodeError {

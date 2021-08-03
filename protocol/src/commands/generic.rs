@@ -3,7 +3,6 @@ use std::io::Write;
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
-    types::CorrelationId,
     FromResponse, ResponseCode, ResponseKind,
 };
 
@@ -13,7 +12,7 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct GenericResponse {
-    pub(crate) correlation_id: CorrelationId,
+    pub(crate) correlation_id: u32,
     code: ResponseCode,
 }
 
@@ -31,7 +30,7 @@ impl Encoder for GenericResponse {
 
 impl Decoder for GenericResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, code) = ResponseCode::decode(input)?;
 
         Ok((

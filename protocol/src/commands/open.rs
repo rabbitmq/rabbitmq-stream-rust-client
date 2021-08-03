@@ -5,7 +5,6 @@ use crate::{
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_OPEN,
     response::ResponseCode,
-    types::CorrelationId,
     FromResponse,
 };
 
@@ -17,12 +16,12 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct OpenCommand {
-    correlation_id: CorrelationId,
+    correlation_id: u32,
     virtual_host: String,
 }
 
 impl OpenCommand {
-    pub fn new(correlation_id: CorrelationId, virtual_host: String) -> Self {
+    pub fn new(correlation_id: u32, virtual_host: String) -> Self {
         Self {
             correlation_id,
             virtual_host,
@@ -51,7 +50,7 @@ impl Command for OpenCommand {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct OpenResponse {
-    pub(crate) correlation_id: CorrelationId,
+    pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,
     pub connection_properties: HashMap<String, String>,
 }
@@ -74,7 +73,7 @@ impl FromResponse for OpenResponse {
 
 impl Decoder for OpenResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, response_code) = ResponseCode::decode(input)?;
         let (input, connection_properties) = HashMap::decode(input)?;
 
@@ -91,7 +90,7 @@ impl Decoder for OpenResponse {
 
 impl Decoder for OpenCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, virtual_host) = Option::decode(input)?;
 
         Ok((

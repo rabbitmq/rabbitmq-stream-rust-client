@@ -4,7 +4,6 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_SASL_AUTHENTICATE,
-    types::CorrelationId,
 };
 
 use super::Command;
@@ -15,13 +14,13 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct SaslAuthenticateCommand {
-    correlation_id: CorrelationId,
+    correlation_id: u32,
     mechanism: String,
     sasl_data: Vec<u8>,
 }
 
 impl SaslAuthenticateCommand {
-    pub fn new(correlation_id: CorrelationId, mechanism: String, sasl_data: Vec<u8>) -> Self {
+    pub fn new(correlation_id: u32, mechanism: String, sasl_data: Vec<u8>) -> Self {
         Self {
             correlation_id,
             mechanism,
@@ -47,7 +46,7 @@ impl Encoder for SaslAuthenticateCommand {
 
 impl Decoder for SaslAuthenticateCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, mechanism) = Option::decode(input)?;
         let (input, sasl_data) = Vec::decode(input)?;
 

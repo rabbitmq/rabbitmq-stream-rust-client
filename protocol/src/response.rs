@@ -60,10 +60,10 @@ pub enum ResponseKind {
 impl Response {
     pub fn correlation_id(&self) -> Option<u32> {
         match &self.kind {
-            ResponseKind::Open(open) => Some(*open.correlation_id),
-            ResponseKind::PeerProperties(peer_properties) => Some(*peer_properties.correlation_id),
-            ResponseKind::SaslHandshake(handshake) => Some(*handshake.correlation_id),
-            ResponseKind::Generic(generic) => Some(*generic.correlation_id),
+            ResponseKind::Open(open) => Some(open.correlation_id),
+            ResponseKind::PeerProperties(peer_properties) => Some(peer_properties.correlation_id),
+            ResponseKind::SaslHandshake(handshake) => Some(handshake.correlation_id),
+            ResponseKind::Generic(generic) => Some(generic.correlation_id),
             ResponseKind::Tunes(_) => None,
         }
     }

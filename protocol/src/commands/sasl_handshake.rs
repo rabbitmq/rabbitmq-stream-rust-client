@@ -5,7 +5,6 @@ use crate::{
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_SASL_HANDSHAKE,
     response::ResponseCode,
-    types::CorrelationId,
     FromResponse,
 };
 
@@ -17,11 +16,11 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct SaslHandshakeCommand {
-    correlation_id: CorrelationId,
+    correlation_id: u32,
 }
 
 impl SaslHandshakeCommand {
-    pub fn new(correlation_id: CorrelationId) -> Self {
+    pub fn new(correlation_id: u32) -> Self {
         Self { correlation_id }
     }
 }
@@ -39,7 +38,7 @@ impl Encoder for SaslHandshakeCommand {
 
 impl Decoder for SaslHandshakeCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
 
         Ok((input, SaslHandshakeCommand { correlation_id }))
     }
@@ -54,7 +53,7 @@ impl Command for SaslHandshakeCommand {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct SaslHandshakeResponse {
-    pub(crate) correlation_id: CorrelationId,
+    pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,
     pub mechanisms: Vec<String>,
 }
@@ -76,7 +75,7 @@ impl FromResponse for SaslHandshakeResponse {
 
 impl Decoder for SaslHandshakeResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = CorrelationId::decode(input)?;
+        let (input, correlation_id) = u32::decode(input)?;
         let (input, response_code) = ResponseCode::decode(input)?;
         let (input, mechanisms) = Vec::decode(input)?;
 
