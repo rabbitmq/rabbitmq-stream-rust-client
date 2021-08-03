@@ -1,9 +1,6 @@
 use std::io::Write;
 
-use crate::{
-    codec::Encoder, error::EncodeError, protocol::commands::COMMAND_DECLARE_PUBLISHER,
-    types::CorrelationId,
-};
+use crate::{codec::Encoder, error::EncodeError, protocol::commands::COMMAND_DECLARE_PUBLISHER};
 
 use super::Command;
 
@@ -13,17 +10,13 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct DeclarePublisherCommand {
-    correlation_id: CorrelationId,
+    correlation_id: u32,
     stream_name: String,
     publisher_reference: String,
 }
 
 impl DeclarePublisherCommand {
-    pub fn new(
-        correlation_id: CorrelationId,
-        stream_name: String,
-        publisher_reference: String,
-    ) -> Self {
+    pub fn new(correlation_id: u32, stream_name: String, publisher_reference: String) -> Self {
         Self {
             correlation_id,
             stream_name,
@@ -55,16 +48,13 @@ impl Command for DeclarePublisherCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        codec::Decoder, commands::tests::command_encode_decode_test, error::DecodeError,
-        types::CorrelationId,
-    };
+    use crate::{codec::Decoder, commands::tests::command_encode_decode_test, error::DecodeError};
 
     use super::DeclarePublisherCommand;
 
     impl Decoder for DeclarePublisherCommand {
         fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-            let (input, correlation_id) = CorrelationId::decode(input)?;
+            let (input, correlation_id) = u32::decode(input)?;
             let (input, stream_name) = Option::decode(input)?;
             let (input, publisher_reference) = Option::decode(input)?;
 

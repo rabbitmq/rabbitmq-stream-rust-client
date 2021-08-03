@@ -1,9 +1,6 @@
 use std::io::Write;
 
-use crate::{
-    codec::Encoder, error::EncodeError, protocol::commands::COMMAND_DELETE_PUBLISHER,
-    types::CorrelationId,
-};
+use crate::{codec::Encoder, error::EncodeError, protocol::commands::COMMAND_DELETE_PUBLISHER};
 
 use super::Command;
 
@@ -13,12 +10,12 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct DeletePublisherCommand {
-    correlation_id: CorrelationId,
+    correlation_id: u32,
     publisher_id: u8,
 }
 
 impl DeletePublisherCommand {
-    pub fn new(correlation_id: CorrelationId, publisher_id: u8) -> Self {
+    pub fn new(correlation_id: u32, publisher_id: u8) -> Self {
         Self {
             correlation_id,
             publisher_id,
@@ -46,16 +43,13 @@ impl Command for DeletePublisherCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        codec::Decoder, commands::tests::command_encode_decode_test, error::DecodeError,
-        types::CorrelationId,
-    };
+    use crate::{codec::Decoder, commands::tests::command_encode_decode_test, error::DecodeError};
 
     use super::DeletePublisherCommand;
 
     impl Decoder for DeletePublisherCommand {
         fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-            let (input, correlation_id) = CorrelationId::decode(input)?;
+            let (input, correlation_id) = u32::decode(input)?;
             let (input, publisher_id) = u8::decode(input)?;
 
             Ok((

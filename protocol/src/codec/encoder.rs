@@ -3,18 +3,48 @@ use std::{collections::HashMap, io::Write};
 use byteorder::{BigEndian, WriteBytesExt};
 
 use super::Encoder;
-use crate::{
-    error::EncodeError,
-    types::{CorrelationId, Header},
-};
+use crate::{error::EncodeError, types::Header};
 
-impl Encoder for CorrelationId {
+impl Encoder for u8 {
+    fn encoded_size(&self) -> u32 {
+        1
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u8(*self)?;
+        Ok(())
+    }
+}
+
+impl Encoder for u16 {
+    fn encoded_size(&self) -> u32 {
+        2
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u16::<BigEndian>(*self)?;
+        Ok(())
+    }
+}
+
+impl Encoder for u32 {
     fn encoded_size(&self) -> u32 {
         4
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        writer.write_u32::<BigEndian>(**self)?;
+        writer.write_u32::<BigEndian>(*self)?;
+        Ok(())
+    }
+}
+
+impl Encoder for u64 {
+    fn encoded_size(&self) -> u32 {
+        8
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u64::<BigEndian>(*self)?;
         Ok(())
     }
 }
@@ -84,39 +114,6 @@ impl Encoder for Vec<u8> {
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         writer.write_i32::<BigEndian>(self.len() as i32)?;
         writer.write_all(self)?;
-        Ok(())
-    }
-}
-
-impl Encoder for u32 {
-    fn encoded_size(&self) -> u32 {
-        4
-    }
-
-    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        writer.write_u32::<BigEndian>(*self)?;
-        Ok(())
-    }
-}
-
-impl Encoder for u8 {
-    fn encoded_size(&self) -> u32 {
-        1
-    }
-
-    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        writer.write_u8(*self)?;
-        Ok(())
-    }
-}
-
-impl Encoder for u64 {
-    fn encoded_size(&self) -> u32 {
-        8
-    }
-
-    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        writer.write_u64::<BigEndian>(*self)?;
         Ok(())
     }
 }
