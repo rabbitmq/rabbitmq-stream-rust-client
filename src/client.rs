@@ -112,7 +112,7 @@ impl ClientInternal {
 
         self.send::<GenericResponse, _, _>(|correlation_id| {
             SaslAuthenticateCommand::new(
-                correlation_id.into(),
+                correlation_id,
                 "PLAIN".to_owned(),
                 auth_data.as_bytes().to_vec(),
             )
@@ -123,7 +123,7 @@ impl ClientInternal {
 
     async fn sasl_mechanism(&self) -> Result<Vec<String>, RabbitMqStreamError> {
         self.send::<SaslHandshakeResponse, _, _>(|correlation_id| {
-            SaslHandshakeCommand::new(correlation_id.into())
+            SaslHandshakeCommand::new(correlation_id)
         })
         .await
         .map(|handshake| handshake.mechanisms)
@@ -172,7 +172,7 @@ impl ClientInternal {
 
     async fn open(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
         self.send::<OpenResponse, _, _>(|correlation_id| {
-            OpenCommand::new(correlation_id.into(), self.opts.v_host.clone())
+            OpenCommand::new(correlation_id, self.opts.v_host.clone())
         })
         .await
         .map(|open| open.connection_properties)
@@ -180,7 +180,7 @@ impl ClientInternal {
 
     async fn peer_properties(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
         self.send::<PeerPropertiesResponse, _, _>(|correlation_id| {
-            PeerPropertiesCommand::new(correlation_id.into(), HashMap::new())
+            PeerPropertiesCommand::new(correlation_id, HashMap::new())
         })
         .await
         .map(|peer_properties| peer_properties.server_properties)
