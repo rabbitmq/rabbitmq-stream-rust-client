@@ -10,6 +10,8 @@ pub mod sasl_authenticate;
 pub mod sasl_handshake;
 pub mod store_offset;
 pub mod tune;
+pub mod unsubscribe;
+
 pub trait Command {
     fn key(&self) -> u16;
 }
