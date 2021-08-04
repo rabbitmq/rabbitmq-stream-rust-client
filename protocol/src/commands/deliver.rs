@@ -15,7 +15,7 @@ use super::Command;
 #[derive(PartialEq, Debug)]
 pub struct DeliverCommand {
     correlation_id: u32,
-    subscription_id: u32,
+    subscription_id: u8,
     magic_version: i8,
     num_entries: u16,
     num_records: u32,
@@ -29,7 +29,7 @@ pub struct DeliverCommand {
 impl DeliverCommand {
     pub fn new(
         correlation_id: u32,
-        subscription_id: u32,
+        subscription_id: u8,
         magic_version: i8,
         num_entries: u16,
         num_records: u32,
@@ -86,7 +86,7 @@ impl Encoder for DeliverCommand {
 impl Decoder for DeliverCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
-        let (input, subscription_id) = u32::decode(input)?;
+        let (input, subscription_id) = u8::decode(input)?;
         let (input, magic_version) = i8::decode(input)?;
         let (input, num_entries) = u16::decode(input)?;
         let (input, num_records) = u32::decode(input)?;
