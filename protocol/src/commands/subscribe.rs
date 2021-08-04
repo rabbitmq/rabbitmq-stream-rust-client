@@ -16,7 +16,7 @@ use super::Command;
 #[derive(PartialEq, Debug)]
 pub struct SubscribeCommand {
     correlation_id: u32,
-    subscription_id: u32,
+    subscription_id: u8,
     stream_name: String,
     offset_specification: u16,
     offset: u64,
@@ -27,7 +27,7 @@ pub struct SubscribeCommand {
 impl SubscribeCommand {
     pub fn new(
         correlation_id: u32,
-        subscription_id: u32,
+        subscription_id: u8,
         stream_name: String,
         offset_specification: u16,
         offset: u64,
@@ -72,7 +72,7 @@ impl Encoder for SubscribeCommand {
 impl Decoder for SubscribeCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
-        let (input, subscription_id) = u32::decode(input)?;
+        let (input, subscription_id) = u8::decode(input)?;
         let (input, stream_name) = Option::decode(input)?;
         let (input, offset_specification) = u16::decode(input)?;
         let (input, offset) = u64::decode(input)?;
