@@ -10,7 +10,7 @@ pub trait Encoder {
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError>;
 }
 
-pub(crate) trait Decoder
+pub trait Decoder
 where
     Self: Sized,
 {

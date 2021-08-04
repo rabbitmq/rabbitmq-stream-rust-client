@@ -5,6 +5,7 @@ use crate::{
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_SASL_HANDSHAKE,
     response::ResponseCode,
+    FromResponse,
 };
 
 use super::Command;
@@ -54,12 +55,21 @@ impl Command for SaslHandshakeCommand {
 pub struct SaslHandshakeResponse {
     pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,
-    pub(crate) mechanisms: Vec<String>,
+    pub mechanisms: Vec<String>,
 }
 
 impl SaslHandshakeResponse {
     pub fn mechanisms(&self) -> &Vec<String> {
         &self.mechanisms
+    }
+}
+
+impl FromResponse for SaslHandshakeResponse {
+    fn from_response(response: crate::Response) -> Option<Self> {
+        match response.kind {
+            crate::ResponseKind::SaslHandshake(handshake) => Some(handshake),
+            _ => None,
+        }
     }
 }
 

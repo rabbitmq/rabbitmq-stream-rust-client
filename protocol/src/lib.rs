@@ -1,6 +1,6 @@
-mod codec;
+pub mod codec;
 pub mod commands;
-mod error;
+pub mod error;
 mod protocol;
 mod request;
 mod response;

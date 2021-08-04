@@ -5,7 +5,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_PEER_PROPERTIES,
-    ResponseCode,
+    FromResponse, ResponseCode,
 };
 
 use super::Command;
@@ -67,12 +67,21 @@ impl Command for PeerPropertiesCommand {
 pub struct PeerPropertiesResponse {
     pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,
-    pub(crate) server_properties: HashMap<String, String>,
+    pub server_properties: HashMap<String, String>,
 }
 
 impl PeerPropertiesResponse {
     pub fn server_properties(&self) -> &HashMap<String, String> {
         &self.server_properties
+    }
+}
+
+impl FromResponse for PeerPropertiesResponse {
+    fn from_response(response: crate::Response) -> Option<Self> {
+        match response.kind {
+            crate::ResponseKind::PeerProperties(peer_properties) => Some(peer_properties),
+            _ => None,
+        }
     }
 }
 

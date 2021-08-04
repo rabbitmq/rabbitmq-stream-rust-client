@@ -5,6 +5,7 @@ use crate::{
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_OPEN,
     response::ResponseCode,
+    FromResponse,
 };
 
 use super::Command;
@@ -51,13 +52,22 @@ impl Command for OpenCommand {
 pub struct OpenResponse {
     pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,
-    pub(crate) connection_properties: HashMap<String, String>,
+    pub connection_properties: HashMap<String, String>,
 }
 
 impl OpenResponse {
     /// Get a reference to the open response's connection properties.
     pub fn connection_properties(&self) -> &HashMap<String, String> {
         &self.connection_properties
+    }
+}
+
+impl FromResponse for OpenResponse {
+    fn from_response(response: crate::Response) -> Option<Self> {
+        match response.kind {
+            crate::ResponseKind::Open(open) => Some(open),
+            _ => None,
+        }
     }
 }
 
@@ -78,30 +88,29 @@ impl Decoder for OpenResponse {
     }
 }
 
+impl Decoder for OpenCommand {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, correlation_id) = u32::decode(input)?;
+        let (input, virtual_host) = Option::decode(input)?;
+
+        Ok((
+            input,
+            OpenCommand {
+                correlation_id,
+                virtual_host: virtual_host.unwrap(),
+            },
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     use super::OpenCommand;
     use crate::{
-        codec::{Decoder, Encoder},
+        codec::Encoder,
         commands::{open::OpenResponse, tests::command_encode_decode_test},
-        error::DecodeError,
     };
-
-    impl Decoder for OpenCommand {
-        fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-            let (input, correlation_id) = u32::decode(input)?;
-            let (input, virtual_host) = Option::decode(input)?;
-
-            Ok((
-                input,
-                OpenCommand {
-                    correlation_id: correlation_id.into(),
-                    virtual_host: virtual_host.unwrap(),
-                },
-            ))
-        }
-    }
 
     #[test]
     fn open_command_test() {

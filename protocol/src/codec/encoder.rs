@@ -3,7 +3,7 @@ use std::{collections::HashMap, io::Write};
 use byteorder::{BigEndian, WriteBytesExt};
 
 use super::Encoder;
-use crate::{error::EncodeError, types::Header};
+use crate::{error::EncodeError, types::Header, ResponseCode};
 
 impl Encoder for u8 {
     fn encoded_size(&self) -> u32 {
@@ -116,4 +116,18 @@ impl Encoder for Vec<u8> {
         writer.write_all(self)?;
         Ok(())
     }
+}
+
+impl Encoder for ResponseCode {
+    fn encoded_size(&self) -> u32 {
+        2
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u16::<BigEndian>(self.into())?;
+        Ok(())
+    }
+}
+pub fn encode_response_code(code: u16) -> u16 {
+    code | 0b1000_0000_0000_0000
 }

@@ -1,7 +1,11 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+mod channel;
+mod client;
+mod codec;
+mod dispatcher;
+pub mod error;
+mod options;
+
+pub type RabbitMQStreamResult<T> = Result<T, RabbitMqStreamError>;
+pub use client::Client;
+use error::RabbitMqStreamError;
+pub use options::ClientOptions;
