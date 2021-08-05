@@ -5,6 +5,28 @@ use byteorder::{BigEndian, WriteBytesExt};
 use super::Encoder;
 use crate::{error::EncodeError, types::Header, ResponseCode};
 
+impl Encoder for i8 {
+    fn encoded_size(&self) -> u32 {
+        1
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_i8(*self)?;
+        Ok(())
+    }
+}
+
+impl Encoder for i32 {
+    fn encoded_size(&self) -> u32 {
+        4
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_i32::<BigEndian>(*self)?;
+        Ok(())
+    }
+}
+
 impl Encoder for u8 {
     fn encoded_size(&self) -> u32 {
         1
@@ -50,15 +72,15 @@ impl Encoder for u64 {
 }
 
 impl Encoder for Header {
+    fn encoded_size(&self) -> u32 {
+        2 + 2
+    }
+
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         writer.write_u16::<BigEndian>(self.key())?;
         writer.write_u16::<BigEndian>(self.version())?;
 
         Ok(())
-    }
-
-    fn encoded_size(&self) -> u32 {
-        2 + 2
     }
 }
 impl Encoder for &str {
