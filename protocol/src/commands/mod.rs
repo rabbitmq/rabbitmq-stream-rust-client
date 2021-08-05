@@ -10,6 +10,7 @@ pub mod query_offset;
 pub mod sasl_authenticate;
 pub mod sasl_handshake;
 pub mod store_offset;
+pub mod subscribe;
 pub mod tune;
 
 pub trait Command {
