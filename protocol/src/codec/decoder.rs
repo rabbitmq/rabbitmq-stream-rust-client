@@ -4,6 +4,18 @@ use super::Decoder;
 use crate::{error::DecodeError, types::Header};
 use byteorder::ByteOrder;
 
+impl Decoder for i8 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        read_i8(input)
+    }
+}
+
+impl Decoder for i32 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        read_i32(input)
+    }
+}
+
 impl Decoder for u8 {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
         read_u8(input)
@@ -119,6 +131,11 @@ macro_rules! reader {
 pub fn read_u8(input: &[u8]) -> Result<(&[u8], u8), DecodeError> {
     check_len(input, 1)?;
     Ok((&input[1..], input[0]))
+}
+
+pub fn read_i8(input: &[u8]) -> Result<(&[u8], i8), DecodeError> {
+    check_len(input, 1)?;
+    Ok((&input[1..], input[0] as i8))
 }
 
 reader!(read_i16, 2, i16);
