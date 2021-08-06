@@ -3,9 +3,10 @@ use std::io::Write;
 use crate::{
     codec::{decoder::read_u32, Decoder, Encoder},
     commands::{
-        create_stream::CreateStreamCommand, delete::Delete, open::OpenCommand,
-        peer_properties::PeerPropertiesCommand, sasl_authenticate::SaslAuthenticateCommand,
-        sasl_handshake::SaslHandshakeCommand, tune::TunesCommand, Command,
+        create_stream::CreateStreamCommand, credit::CreditCommand, delete::Delete,
+        open::OpenCommand, peer_properties::PeerPropertiesCommand,
+        sasl_authenticate::SaslAuthenticateCommand, sasl_handshake::SaslHandshakeCommand,
+        subscribe::SubscribeCommand, tune::TunesCommand, Command,
     },
     error::{DecodeError, EncodeError},
     protocol::commands::{
@@ -32,6 +33,8 @@ pub enum RequestKind {
     Open(OpenCommand),
     Delete(Delete),
     CreateStream(CreateStreamCommand),
+    Subscribe(SubscribeCommand),
+    Credit(CreditCommand),
 }
 
 impl Encoder for RequestKind {
@@ -44,6 +47,8 @@ impl Encoder for RequestKind {
             RequestKind::Open(open) => open.encoded_size(),
             RequestKind::Delete(delete) => delete.encoded_size(),
             RequestKind::CreateStream(create_stream) => create_stream.encoded_size(),
+            RequestKind::Subscribe(subscribe) => subscribe.encoded_size(),
+            RequestKind::Credit(credit) => credit.encoded_size(),
         }
     }
 
@@ -56,6 +61,8 @@ impl Encoder for RequestKind {
             RequestKind::Open(open) => open.encode(writer),
             RequestKind::Delete(delete) => delete.encode(writer),
             RequestKind::CreateStream(create_stream) => create_stream.encode(writer),
+            RequestKind::Subscribe(subscribe) => subscribe.encode(writer),
+            RequestKind::Credit(credit) => credit.encode(writer),
         }
     }
 }
@@ -120,6 +127,18 @@ impl From<CreateStreamCommand> for RequestKind {
 impl From<Delete> for RequestKind {
     fn from(cmd: Delete) -> Self {
         RequestKind::Delete(cmd)
+    }
+}
+
+impl From<SubscribeCommand> for RequestKind {
+    fn from(cmd: SubscribeCommand) -> Self {
+        RequestKind::Subscribe(cmd)
+    }
+}
+
+impl From<CreditCommand> for RequestKind {
+    fn from(cmd: CreditCommand) -> Self {
+        RequestKind::Credit(cmd)
     }
 }
 impl Decoder for Request {

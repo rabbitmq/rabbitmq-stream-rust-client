@@ -3,11 +3,13 @@ use std::{collections::HashMap, sync::Arc};
 use futures::{stream::SplitSink, StreamExt, TryFutureExt};
 use rabbitmq_stream_protocol::{
     commands::{
+        credit::CreditCommand,
         generic::GenericResponse,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
         sasl_authenticate::SaslAuthenticateCommand,
         sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
+        subscribe::{OffsetSpecification, SubscribeCommand},
         tune::TunesCommand,
     },
     FromResponse, FromResponseRef, Request, Response,
@@ -21,6 +23,7 @@ use crate::{
     dispatcher::Dispatcher,
     error::RabbitMqStreamError,
     options::ClientOptions,
+    RabbitMQStreamResult,
 };
 
 type SinkConnection = SplitSink<Framed<TcpStream, RabbitMqStreamCodec>, Request>;
@@ -60,6 +63,38 @@ impl Client {
     /// Get a reference to the client's connection properties.
     pub fn connection_properties(&self) -> &HashMap<String, String> {
         &self.0.connection_properties
+    }
+
+    pub async fn subscribe(
+        &self,
+        subscription_id: u8,
+        stream: &str,
+        offset_specification: OffsetSpecification,
+        credit: u16,
+        properties: HashMap<String, String>,
+    ) -> RabbitMQStreamResult<GenericResponse> {
+        self.0
+            .send_and_receive(|correlation_id| {
+                SubscribeCommand::new(
+                    correlation_id,
+                    subscription_id,
+                    stream.to_owned(),
+                    offset_specification,
+                    credit,
+                    properties,
+                )
+            })
+            .await
+    }
+
+    pub async fn credit(&self, subscription_id: u8, credit: u16) -> RabbitMQStreamResult<()> {
+        self.0
+            .send(CreditCommand::new(subscription_id, credit))
+            .await
+    }
+
+    pub fn subscribe_messages(&self) -> Receiver<Arc<Response>> {
+        self.0.dispatcher.subscribe()
     }
 }
 
@@ -110,7 +145,7 @@ impl ClientInternal {
     ) -> Result<(), RabbitMqStreamError> {
         let auth_data = format!("\u{0000}{}\u{0000}{}", self.opts.user, self.opts.password);
 
-        self.send::<GenericResponse, _, _>(|correlation_id| {
+        self.send_and_receive::<GenericResponse, _, _>(|correlation_id| {
             SaslAuthenticateCommand::new(
                 correlation_id,
                 "PLAIN".to_owned(),
@@ -122,14 +157,14 @@ impl ClientInternal {
     }
 
     async fn sasl_mechanism(&self) -> Result<Vec<String>, RabbitMqStreamError> {
-        self.send::<SaslHandshakeResponse, _, _>(|correlation_id| {
+        self.send_and_receive::<SaslHandshakeResponse, _, _>(|correlation_id| {
             SaslHandshakeCommand::new(correlation_id)
         })
         .await
         .map(|handshake| handshake.mechanisms)
     }
 
-    async fn send<T, R, M>(&self, msg_factory: M) -> Result<T, RabbitMqStreamError>
+    async fn send_and_receive<T, R, M>(&self, msg_factory: M) -> Result<T, RabbitMqStreamError>
     where
         R: Into<Request>,
         T: FromResponse,
@@ -144,6 +179,14 @@ impl ClientInternal {
         let response = receiver.recv().await.expect("It should contain a response");
 
         self.handle_response::<T>(response).await
+    }
+
+    async fn send<R>(&self, msg: R) -> Result<(), RabbitMqStreamError>
+    where
+        R: Into<Request>,
+    {
+        self.channel.send(msg.into()).await?;
+        Ok(())
     }
 
     async fn handle_response<T: FromResponse>(
@@ -171,7 +214,7 @@ impl ClientInternal {
     }
 
     async fn open(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
-        self.send::<OpenResponse, _, _>(|correlation_id| {
+        self.send_and_receive::<OpenResponse, _, _>(|correlation_id| {
             OpenCommand::new(correlation_id, self.opts.v_host.clone())
         })
         .await
@@ -179,7 +222,7 @@ impl ClientInternal {
     }
 
     async fn peer_properties(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
-        self.send::<PeerPropertiesResponse, _, _>(|correlation_id| {
+        self.send_and_receive::<PeerPropertiesResponse, _, _>(|correlation_id| {
             PeerPropertiesCommand::new(correlation_id, HashMap::new())
         })
         .await

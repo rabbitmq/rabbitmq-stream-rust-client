@@ -1,10 +1,11 @@
+use core::panic;
+use futures::Stream;
+use rabbitmq_stream_protocol::Response;
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicU32, Arc},
 };
-
-use futures::Stream;
-use rabbitmq_stream_protocol::Response;
+use tracing::error;
 
 use tokio::sync::{
     broadcast::{self, Receiver as BroadcastReceiver, Sender as BroadcastSender},
@@ -85,7 +86,10 @@ where
                     Some(correlation_id) => dispatcher.dispatch(correlation_id, item).await,
                     None => dispatcher.notify(item).await,
                 },
-                Err(_) => todo!(),
+                Err(e) => {
+                    error!("Error from stream {:?}", e);
+                    panic!("Error from stream {:?}", e);
+                }
             }
         }
     });
