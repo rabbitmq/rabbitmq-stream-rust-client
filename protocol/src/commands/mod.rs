@@ -1,4 +1,5 @@
 pub mod create_stream;
+pub mod credit;
 pub mod declare_publisher;
 pub mod delete;
 pub mod delete_publisher;
@@ -10,6 +11,7 @@ pub mod sasl_authenticate;
 pub mod sasl_handshake;
 pub mod store_offset;
 pub mod tune;
+
 pub trait Command {
     fn key(&self) -> u16;
 }
