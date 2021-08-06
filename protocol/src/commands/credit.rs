@@ -15,15 +15,13 @@ use super::Command;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct CreditCommand {
-    correlation_id: u32,
     subscription_id: u8,
     credit: u16,
 }
 
 impl CreditCommand {
-    pub fn new(correlation_id: u32, subscription_id: u8, credit: u16) -> Self {
+    pub fn new(subscription_id: u8, credit: u16) -> Self {
         Self {
-            correlation_id,
             subscription_id,
             credit,
         }
@@ -32,13 +30,10 @@ impl CreditCommand {
 
 impl Encoder for CreditCommand {
     fn encoded_size(&self) -> u32 {
-        self.correlation_id.encoded_size()
-            + self.subscription_id.encoded_size()
-            + self.credit.encoded_size()
+        self.subscription_id.encoded_size() + self.credit.encoded_size()
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        self.correlation_id.encode(writer)?;
         self.subscription_id.encode(writer)?;
         self.credit.encode(writer)?;
         Ok(())
@@ -47,14 +42,12 @@ impl Encoder for CreditCommand {
 
 impl Decoder for CreditCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = u32::decode(input)?;
         let (input, subscription_id) = u8::decode(input)?;
         let (input, credit) = u16::decode(input)?;
 
         Ok((
             input,
             CreditCommand {
-                correlation_id,
                 subscription_id,
                 credit,
             },
@@ -71,21 +64,18 @@ impl Command for CreditCommand {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct CreditResponse {
-    pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,
     pub(crate) subscription_id: u8,
 }
 
 impl Decoder for CreditResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (input, correlation_id) = u32::decode(input)?;
         let (input, code) = ResponseCode::decode(input)?;
         let (input, subscription_id) = u8::decode(input)?;
 
         Ok((
             input,
             CreditResponse {
-                correlation_id,
                 code,
                 subscription_id,
             },
@@ -99,7 +89,6 @@ impl Encoder for CreditResponse {
     }
 
     fn encode(&self, writer: &mut impl std::io::Write) -> Result<(), crate::error::EncodeError> {
-        self.correlation_id.encode(writer)?;
         self.code.encode(writer)?;
         self.subscription_id.encode(writer)?;
         Ok(())
