@@ -1,4 +1,5 @@
 pub mod create_stream;
+pub mod credit;
 pub mod declare_publisher;
 pub mod delete;
 pub mod delete_publisher;
