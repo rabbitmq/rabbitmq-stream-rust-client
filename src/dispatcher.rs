@@ -14,7 +14,7 @@ use tokio::sync::{
 use crate::{channel::ChannelReceiver, error::RabbitMqStreamError, RabbitMQStreamResult};
 
 #[derive(Clone)]
-pub(crate) struct Dispatcher<T: ResponseHandler> {
+pub(crate) struct Dispatcher<T: MessageHandler> {
     requests: Arc<Mutex<HashMap<u32, Sender<Response>>>>,
     correlation_id: Arc<AtomicU32>,
     handler: T,
@@ -22,7 +22,7 @@ pub(crate) struct Dispatcher<T: ResponseHandler> {
 
 impl<H> Dispatcher<H>
 where
-    H: ResponseHandler,
+    H: MessageHandler,
 {
     pub async fn create<T>(handler: H, receiver: ChannelReceiver<T>) -> Dispatcher<H>
     where
@@ -71,13 +71,13 @@ where
     }
 
     pub async fn notify(&self, response: Response) {
-        let _ = self.handler.handle_response(response).await;
+        let _ = self.handler.handle_message(response).await;
     }
 }
 
 async fn handle_response<H, T>(dispatcher: Dispatcher<H>, mut stream: ChannelReceiver<T>)
 where
-    H: ResponseHandler,
+    H: MessageHandler,
     T: Stream<Item = Result<Response, RabbitMqStreamError>> + Unpin + Send,
     T: 'static,
 {
@@ -98,8 +98,8 @@ where
 }
 
 #[async_trait::async_trait]
-pub(crate) trait ResponseHandler: Clone + Send + Sync + 'static {
-    async fn handle_response(&self, item: Response) -> RabbitMQStreamResult<()>;
+pub(crate) trait MessageHandler: Clone + Send + Sync + 'static {
+    async fn handle_message(&self, item: Response) -> RabbitMQStreamResult<()>;
 }
 
 #[cfg(test)]
@@ -123,7 +123,7 @@ mod tests {
 
     use crate::channel::channel;
 
-    use super::{Dispatcher, ResponseHandler};
+    use super::{Dispatcher, MessageHandler};
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
@@ -144,8 +144,8 @@ mod tests {
     }
 
     #[async_trait::async_trait]
-    impl ResponseHandler for MockIO {
-        async fn handle_response(
+    impl MessageHandler for MockIO {
+        async fn handle_message(
             &self,
             item: rabbitmq_stream_protocol::Response,
         ) -> crate::RabbitMQStreamResult<()> {

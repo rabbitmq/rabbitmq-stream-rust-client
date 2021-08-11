@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use crate::{
     channel::{channel, ChannelSender},
     codec::RabbitMqStreamCodec,
-    dispatcher::{Dispatcher, ResponseHandler},
+    dispatcher::{Dispatcher, MessageHandler},
     error::RabbitMqStreamError,
     options::ClientOptions,
     RabbitMQStreamResult,
@@ -43,8 +43,8 @@ pub struct ClientInternalHandle {
 }
 
 #[async_trait::async_trait]
-impl ResponseHandler for ClientInternalHandle {
-    async fn handle_response(&self, item: Response) -> RabbitMQStreamResult<()> {
+impl MessageHandler for ClientInternalHandle {
+    async fn handle_message(&self, item: Response) -> RabbitMQStreamResult<()> {
         let _ = self.sender.send(Arc::new(item));
 
         Ok(())
