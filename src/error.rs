@@ -1,22 +1,22 @@
 use rabbitmq_stream_protocol::error::{DecodeError, EncodeError};
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum RabbitMqStreamError {
-    Io(std::io::Error),
-    Protocol(ProtocolError),
+    #[error("Io Error")]
+    Io(#[from] std::io::Error),
+    #[error("Protocol Error")]
+    Protocol(#[from] ProtocolError),
+    #[error("Cast Error")]
     CastError(String),
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ProtocolError {
+    #[error("Encode Error")]
     Encode(EncodeError),
+    #[error("Decode Error")]
     Decode(DecodeError),
-}
-
-impl From<std::io::Error> for RabbitMqStreamError {
-    fn from(err: std::io::Error) -> Self {
-        RabbitMqStreamError::Io(err)
-    }
 }
 
 impl From<EncodeError> for RabbitMqStreamError {

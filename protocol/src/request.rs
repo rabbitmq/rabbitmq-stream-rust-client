@@ -24,6 +24,18 @@ pub struct Request {
     header: Header,
     kind: RequestKind,
 }
+
+impl Request {
+    /// Get a reference to the request's kind.
+    pub fn kind(&self) -> &RequestKind {
+        &self.kind
+    }
+
+    /// Get a reference to the request's header.
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+}
 #[derive(Debug, PartialEq)]
 pub enum RequestKind {
     PeerProperties(PeerPropertiesCommand),

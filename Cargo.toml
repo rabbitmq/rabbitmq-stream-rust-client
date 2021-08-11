@@ -21,7 +21,8 @@ tokio-stream = "0.1.7"
 futures = "0.3.0"
 url = "2.2.2"
 tracing = "0.1"
-
+thiserror = "1.0"
+async-trait = "0.1.51"
 
 
 [dev-dependencies]

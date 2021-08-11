@@ -1,5 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
+use crate::{
+    channel::{channel, ChannelSender},
+    codec::RabbitMqStreamCodec,
+    dispatcher::{Dispatcher, ResponseHandler},
+    error::RabbitMqStreamError,
+    options::ClientOptions,
+    RabbitMQStreamResult,
+};
 use futures::{stream::SplitSink, StreamExt, TryFutureExt};
 use rabbitmq_stream_protocol::{
     commands::{
@@ -14,36 +22,55 @@ use rabbitmq_stream_protocol::{
     },
     FromResponse, FromResponseRef, Request, Response,
 };
+use tokio::sync::broadcast::{self, Receiver as BroadcastReceiver, Sender as BroadcastSender};
 use tokio::{net::TcpStream, sync::broadcast::Receiver};
 use tokio_util::codec::Framed;
-
-use crate::{
-    channel::{channel, ChannelSender},
-    codec::RabbitMqStreamCodec,
-    dispatcher::Dispatcher,
-    error::RabbitMqStreamError,
-    options::ClientOptions,
-    RabbitMQStreamResult,
-};
 
 type SinkConnection = SplitSink<Framed<TcpStream, RabbitMqStreamCodec>, Request>;
 
 pub struct ClientInternal {
-    dispatcher: Dispatcher,
+    dispatcher: Dispatcher<ClientInternalHandle>,
+    handle: ClientInternalHandle,
     channel: ChannelSender<SinkConnection>,
     opts: ClientOptions,
     server_properties: HashMap<String, String>,
     connection_properties: HashMap<String, String>,
+}
+
+#[derive(Clone)]
+pub struct ClientInternalHandle {
+    sender: BroadcastSender<Arc<Response>>,
+}
+
+#[async_trait::async_trait]
+impl ResponseHandler for ClientInternalHandle {
+    async fn handle_response(&self, item: Response) -> RabbitMQStreamResult<()> {
+        let _ = self.sender.send(Arc::new(item));
+
+        Ok(())
+    }
+}
+
+impl ClientInternalHandle {
+    pub fn subscribe(&self) -> BroadcastReceiver<Arc<Response>> {
+        self.sender.subscribe()
+    }
 }
 pub struct Client(Arc<ClientInternal>);
 
 impl Client {
     pub async fn connect(opts: impl Into<ClientOptions>) -> Result<Client, RabbitMqStreamError> {
         let broker = opts.into();
-        let (sender, dispatcher) = ClientInternal::create_connection(&broker).await?;
+
+        let (tx, _rx) = broadcast::channel(20);
+
+        let handle = ClientInternalHandle { sender: tx };
+        let (sender, dispatcher) =
+            ClientInternal::create_connection(&broker, handle.clone()).await?;
 
         let mut internal = ClientInternal {
             dispatcher,
+            handle,
             channel: sender,
             opts: broker,
             server_properties: HashMap::new(),
@@ -94,13 +121,13 @@ impl Client {
     }
 
     pub fn subscribe_messages(&self) -> Receiver<Arc<Response>> {
-        self.0.dispatcher.subscribe()
+        self.0.handle.subscribe()
     }
 }
 
 impl ClientInternal {
     async fn initialize(&mut self) -> Result<(), RabbitMqStreamError> {
-        let channel = self.dispatcher.subscribe();
+        let channel = self.handle.subscribe();
         self.server_properties = self.peer_properties().await?;
         self.authenticate().await?;
 
@@ -231,14 +258,21 @@ impl ClientInternal {
 
     async fn create_connection(
         broker: &ClientOptions,
-    ) -> Result<(ChannelSender<SinkConnection>, Dispatcher), RabbitMqStreamError> {
+        handle: ClientInternalHandle,
+    ) -> Result<
+        (
+            ChannelSender<SinkConnection>,
+            Dispatcher<ClientInternalHandle>,
+        ),
+        RabbitMqStreamError,
+    > {
         let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
         let stream = Framed::new(stream, RabbitMqStreamCodec {});
 
         let (sink, stream) = stream.split();
         let (tx, rx) = channel(sink, stream);
 
-        let dispatcher = Dispatcher::create(rx).await;
+        let dispatcher = Dispatcher::create(handle, rx).await;
 
         Ok((tx, dispatcher))
     }

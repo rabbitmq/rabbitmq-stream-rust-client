@@ -61,6 +61,10 @@ pub enum ResponseKind {
 }
 
 impl Response {
+    pub fn new(header: Header, kind: ResponseKind) -> Self {
+        Self { header, kind }
+    }
+
     pub fn correlation_id(&self) -> Option<u32> {
         match &self.kind {
             ResponseKind::Open(open) => Some(open.correlation_id),

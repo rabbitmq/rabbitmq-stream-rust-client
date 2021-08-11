@@ -4,7 +4,7 @@ pub mod error;
 mod protocol;
 mod request;
 mod response;
-mod types;
+pub mod types;
 
 pub use request::*;
 pub use response::*;
