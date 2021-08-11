@@ -65,6 +65,21 @@ impl Decoder for Vec<u32> {
     }
 }
 
+impl Decoder for Vec<u64> {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (mut input, len) = read_i32(input)?;
+        let len = len as usize;
+        let mut vec: Vec<u64> = Vec::new();
+        for _ in 0..len {
+            let (input1, value) = u64::decode(input)?;
+            vec.push(value);
+            input = input1;
+        }
+
+        Ok((input, vec))
+    }
+}
+
 impl Decoder for Header {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
         let (input, key) = read_u16(input)?;
