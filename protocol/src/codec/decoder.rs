@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
-use super::Decoder;
-use crate::{error::DecodeError, types::Header};
 use byteorder::ByteOrder;
+
+use crate::{error::DecodeError, types::Header};
+
+use super::Decoder;
 
 impl Decoder for i8 {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
@@ -45,6 +47,20 @@ impl Decoder for Vec<u8> {
         let (input, len) = read_i32(input)?;
         let len = len as usize;
         Ok((&input[len..], input[..len].to_vec()))
+    }
+}
+
+impl Decoder for Vec<u32> {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (mut input, len) = read_i32(input)?;
+        let len = len as usize;
+        let mut result: Vec<u32> = Vec::new();
+        for _ in 0..len {
+            let (input1, value) = u32::decode(input)?;
+            result.push(value);
+            input = input1
+        }
+        Ok((&input[len..], result))
     }
 }
 
