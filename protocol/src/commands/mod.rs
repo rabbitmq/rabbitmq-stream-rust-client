@@ -5,6 +5,7 @@ pub mod delete;
 pub mod delete_publisher;
 pub mod deliver;
 pub mod generic;
+pub mod heart_beat;
 pub mod open;
 pub mod peer_properties;
 pub mod query_offset;
