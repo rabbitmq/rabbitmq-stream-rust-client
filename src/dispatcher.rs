@@ -112,6 +112,7 @@ mod tests {
 
     use rabbitmq_stream_protocol::{
         commands::{
+            heart_beat::HeartbeatResponse,
             peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
             Command,
         },
@@ -148,7 +149,11 @@ mod tests {
             &self,
             item: rabbitmq_stream_protocol::Response,
         ) -> crate::RabbitMQStreamResult<()> {
-            todo!()
+            match self {
+                MockIO::Push(sender) => sender.send(item).await.unwrap(),
+                MockIO::Request(_) => todo!(),
+            };
+            Ok(())
         }
     }
 
@@ -159,7 +164,10 @@ mod tests {
             let this = unsafe { Pin::get_unchecked_mut(self) };
 
             match this {
-                MockIO::Push(_) => Poll::Ready(None),
+                MockIO::Push(_) => Poll::Ready(Some(Ok(Response::new(
+                    Header::new(23, 1),
+                    ResponseKind::Heartbeat(HeartbeatResponse {}),
+                )))),
                 MockIO::Request(request) => match request.lock().unwrap().take() {
                     Some(request) => match request.kind() {
                         RequestKind::PeerProperties(peer) => {
@@ -240,15 +248,15 @@ mod tests {
         assert_eq!(Some(correlation_id), response.correlation_id());
     }
 
-    // #[tokio::test]
-    // async fn should_dispatch_a_push_message() {
-    //     let (tx, mut receiver) = tokio_channel(1);
-    //     let mock_source = MockIO::push(tx);
-    //     let (_tx, rx) = channel(mock_source.clone(), mock_source.clone());
-    //     let _dispatcher = Dispatcher::create(mock_source.clone(), rx).await;
+    #[tokio::test]
+    async fn should_dispatch_a_push_message() {
+        let (tx, mut receiver) = tokio_channel(1);
+        let mock_source = MockIO::push(tx);
+        let (_tx, rx) = channel(mock_source.clone(), mock_source.clone());
+        let _dispatcher = Dispatcher::create(mock_source.clone(), rx).await;
 
-    //     let response = receiver.recv().await;
+        let response = receiver.recv().await;
 
-    //     dbg!(response);
-    // }
+        assert!(matches!(response, Some(..)));
+    }
 }

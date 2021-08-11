@@ -6,9 +6,9 @@ use crate::{
         Decoder,
     },
     commands::{
-        deliver::DeliverCommand, generic::GenericResponse, open::OpenResponse,
-        peer_properties::PeerPropertiesResponse, sasl_handshake::SaslHandshakeResponse,
-        tune::TunesCommand,
+        deliver::DeliverCommand, generic::GenericResponse, heart_beat::HeartbeatResponse,
+        open::OpenResponse, peer_properties::PeerPropertiesResponse,
+        sasl_handshake::SaslHandshakeResponse, tune::TunesCommand,
     },
     error::DecodeError,
     protocol::{
@@ -57,7 +57,7 @@ pub enum ResponseKind {
     Generic(GenericResponse),
     Tunes(TunesCommand),
     Deliver(DeliverCommand),
-    Heartbeat,
+    Heartbeat(HeartbeatResponse),
 }
 
 impl Response {
@@ -72,7 +72,7 @@ impl Response {
             ResponseKind::SaslHandshake(handshake) => Some(handshake.correlation_id),
             ResponseKind::Generic(generic) => Some(generic.correlation_id),
             ResponseKind::Tunes(_) => None,
-            ResponseKind::Heartbeat => None,
+            ResponseKind::Heartbeat(_) => None,
             ResponseKind::Deliver(_) => None,
         }
     }
@@ -117,8 +117,8 @@ impl Decoder for Response {
             COMMAND_DELIVER => DeliverCommand::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::Deliver(kind)))?,
 
-            COMMAND_HEARTBEAT => (input, ResponseKind::Heartbeat),
-
+            COMMAND_HEARTBEAT => HeartbeatResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::Heartbeat(kind)))?,
             n => return Err(DecodeError::UsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
@@ -243,7 +243,7 @@ mod tests {
                 ResponseKind::SaslHandshake(handshake) => handshake.encoded_size(),
                 ResponseKind::Generic(generic) => generic.encoded_size(),
                 ResponseKind::Tunes(tune) => tune.encoded_size(),
-                ResponseKind::Heartbeat => 0,
+                ResponseKind::Heartbeat(heartbeat) => heartbeat.encoded_size(),
                 ResponseKind::Deliver(deliver) => deliver.encoded_size(),
             }
         }
@@ -258,7 +258,7 @@ mod tests {
                 ResponseKind::SaslHandshake(handshake) => handshake.encode(writer),
                 ResponseKind::Generic(generic) => generic.encode(writer),
                 ResponseKind::Tunes(tune) => tune.encode(writer),
-                ResponseKind::Heartbeat => Ok(()),
+                ResponseKind::Heartbeat(heartbeat) => heartbeat.encode(writer),
                 ResponseKind::Deliver(deliver) => deliver.encode(writer),
             }
         }
