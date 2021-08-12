@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
-use super::Decoder;
-use crate::{error::DecodeError, types::Header};
 use byteorder::ByteOrder;
+
+use crate::types::PublishedMessage;
+use crate::{error::DecodeError, types::Header};
+
+use super::Decoder;
 
 impl Decoder for i8 {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
@@ -54,6 +57,27 @@ impl Decoder for Header {
         let (input, version) = read_u16(input)?;
 
         Ok((input, Header::new(extract_response_code(key), version)))
+    }
+}
+
+impl Decoder for PublishedMessage {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        let (input, publishing_id) = u64::decode(input)?;
+        let (input, message) = Vec::decode(input)?;
+        Ok((input, PublishedMessage::new(publishing_id, message)))
+    }
+}
+
+impl Decoder for Vec<PublishedMessage> {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        let (mut input, len) = u32::decode(input)?;
+        let mut result = Vec::new();
+        for _ in 0..len {
+            let (input1, published_message) = PublishedMessage::decode(input)?;
+            result.push(published_message);
+            input = input1
+        }
+        Ok((input, result))
     }
 }
 
