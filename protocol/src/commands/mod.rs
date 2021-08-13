@@ -8,6 +8,7 @@ pub mod generic;
 pub mod heart_beat;
 pub mod open;
 pub mod peer_properties;
+pub mod publish;
 pub mod query_offset;
 pub mod sasl_authenticate;
 pub mod sasl_handshake;
