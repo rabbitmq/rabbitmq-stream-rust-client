@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Write};
 
 use byteorder::{BigEndian, WriteBytesExt};
 
-use crate::{error::EncodeError, types::Header, ResponseCode};
+use crate::{error::EncodeError, types::Header, types::PublishedMessage, ResponseCode};
 
 use super::Encoder;
 
@@ -81,6 +81,32 @@ impl Encoder for Header {
         writer.write_u16::<BigEndian>(self.key())?;
         writer.write_u16::<BigEndian>(self.version())?;
 
+        Ok(())
+    }
+}
+
+impl Encoder for PublishedMessage {
+    fn encoded_size(&self) -> u32 {
+        8 + self.message.len() as u32
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        self.publishing_id.encode(writer)?;
+        self.message.encode(writer)?;
+        Ok(())
+    }
+}
+
+impl Encoder for Vec<PublishedMessage> {
+    fn encoded_size(&self) -> u32 {
+        4 + self.iter().fold(0, |acc, v| acc + v.encoded_size())
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u32::<BigEndian>(self.len() as u32)?;
+        for x in self {
+            x.encode(writer)?;
+        }
         Ok(())
     }
 }
