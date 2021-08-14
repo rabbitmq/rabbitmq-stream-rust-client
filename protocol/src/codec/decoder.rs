@@ -61,7 +61,7 @@ impl Decoder for Vec<u32> {
             result.push(value);
             input = input1
         }
-        Ok((&input[len..], result))
+        Ok((input, result))
     }
 }
 
