@@ -6,6 +6,7 @@ pub mod delete_publisher;
 pub mod deliver;
 pub mod generic;
 pub mod heart_beat;
+pub mod metadata;
 pub mod metadata_update;
 pub mod open;
 pub mod peer_properties;
