@@ -168,6 +168,30 @@ impl Decoder for Vec<String> {
     }
 }
 
+impl Decoder for (u64, u16) {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, publishing_id) = read_u64(input)?;
+        let (input, code) = read_u16(input)?;
+
+        Ok((input, (publishing_id, code)))
+    }
+}
+
+impl Decoder for Vec<(u64, u16)> {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (mut input, num_properties) = read_u32(input)?;
+        let mut vec: Vec<(u64, u16)> = Vec::new();
+        for _ in 0..num_properties {
+            let (input1, value) = <(u64, u16)>::decode(input)?;
+
+            vec.push(value);
+            input = input1;
+        }
+
+        Ok((input, vec))
+    }
+}
+
 pub fn check_len(input: &[u8], size: usize) -> Result<(), DecodeError> {
     if input.len() < size {
         return Err(DecodeError::Incomplete(size));
