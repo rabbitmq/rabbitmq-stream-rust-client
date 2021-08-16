@@ -84,11 +84,8 @@ impl Response {
         T::from_response(self)
     }
 
-    pub fn get_ref<T>(&self) -> Option<&T>
-    where
-        T: FromResponseRef,
-    {
-        T::from_response(self)
+    pub fn kind(&self) -> &ResponseKind {
+        &self.kind
     }
 }
 
@@ -207,12 +204,6 @@ where
     fn from_response(response: Response) -> Option<Self>;
 }
 
-pub trait FromResponseRef
-where
-    Self: Sized,
-{
-    fn from_response(response: &Response) -> Option<&Self>;
-}
 #[cfg(test)]
 mod tests {
 

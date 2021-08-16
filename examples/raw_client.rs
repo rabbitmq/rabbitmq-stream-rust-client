@@ -1,17 +1,22 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use rabbitmq_stream_client::{
     error::RabbitMqStreamError, offset_specification::OffsetSpecification, Client, ClientOptions,
 };
+use rabbitmq_stream_protocol::Response;
+use rabbitmq_stream_protocol::ResponseKind;
+use tokio::sync::Notify;
 use tracing::info;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-
 #[tokio::main]
 async fn main() -> Result<(), RabbitMqStreamError> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         .finish();
+
+    let notifier = Arc::new(Notify::new());
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
@@ -21,12 +26,25 @@ async fn main() -> Result<(), RabbitMqStreamError> {
         .subscribe(1, "test", OffsetSpecification::Next, 1, HashMap::new())
         .await?;
 
-    let mut channel = client.subscribe_messages();
-    loop {
-        let msg = channel.recv().await.unwrap();
+    let client_inner = client.clone();
+    let notifier_inner = notifier.clone();
 
-        info!("Got {:?}", msg);
+    let handler = move |response: Response| async move {
+        match response.kind() {
+            ResponseKind::Deliver(delivery) => {
+                info!("Got deliver message {:?}", &delivery);
+                client_inner.credit(1, 1).await.unwrap()
+            }
+            ResponseKind::Heartbeat(_) => notifier_inner.notify_one(),
+            _ => {
+                info!("Got  message {:?}", &response);
+            }
+        }
+        Ok(())
+    };
 
-        client.credit(1, 1).await.unwrap();
-    }
+    client.set_handler(handler).await;
+
+    notifier.notified().await;
+    Ok(())
 }

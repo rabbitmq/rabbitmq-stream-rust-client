@@ -4,7 +4,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_TUNE,
-    FromResponseRef,
+    FromResponse,
 };
 
 use super::Command;
@@ -19,10 +19,10 @@ pub struct TunesCommand {
     pub heartbeat: u32,
 }
 
-impl FromResponseRef for TunesCommand {
-    fn from_response(response: &crate::Response) -> Option<&Self> {
+impl FromResponse for TunesCommand {
+    fn from_response(response: crate::Response) -> Option<Self> {
         match response.kind {
-            crate::ResponseKind::Tunes(ref tunes) => Some(tunes),
+            crate::ResponseKind::Tunes(tunes) => Some(tunes),
             _ => None,
         }
     }

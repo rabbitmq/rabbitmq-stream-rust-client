@@ -1,3 +1,4 @@
+#[derive(Clone, Debug)]
 pub struct ClientOptions {
     pub(crate) host: String,
     pub(crate) port: u16,

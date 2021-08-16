@@ -1,14 +1,16 @@
-use std::{collections::HashMap, sync::Arc};
-
 use crate::{
-    channel::{channel, ChannelSender},
+    channel::{channel, ChannelReceiver, ChannelSender},
     codec::RabbitMqStreamCodec,
-    dispatcher::{Dispatcher, MessageHandler},
+    dispatcher::Dispatcher,
     error::RabbitMqStreamError,
+    handler::MessageHandler,
     options::ClientOptions,
     RabbitMQStreamResult,
 };
-use futures::{stream::SplitSink, StreamExt, TryFutureExt};
+use futures::{
+    stream::{SplitSink, SplitStream},
+    Stream, StreamExt, TryFutureExt,
+};
 use rabbitmq_stream_protocol::{
     commands::{
         credit::CreditCommand,
@@ -20,76 +22,110 @@ use rabbitmq_stream_protocol::{
         subscribe::{OffsetSpecification, SubscribeCommand},
         tune::TunesCommand,
     },
-    FromResponse, FromResponseRef, Request, Response,
+    FromResponse, Request, Response, ResponseKind,
 };
-use tokio::sync::broadcast::{self, Receiver as BroadcastReceiver, Sender as BroadcastSender};
-use tokio::{net::TcpStream, sync::broadcast::Receiver};
+use std::future::Future;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
+use tokio::{net::TcpStream, sync::Notify};
 use tokio_util::codec::Framed;
 
 type SinkConnection = SplitSink<Framed<TcpStream, RabbitMqStreamCodec>, Request>;
+type StreamConnection = SplitStream<Framed<TcpStream, RabbitMqStreamCodec>>;
 
-pub struct ClientInternal {
-    dispatcher: Dispatcher<ClientInternalHandle>,
-    handle: ClientInternalHandle,
-    channel: ChannelSender<SinkConnection>,
-    opts: ClientOptions,
+pub struct ClientState {
     server_properties: HashMap<String, String>,
     connection_properties: HashMap<String, String>,
-}
-
-#[derive(Clone)]
-pub struct ClientInternalHandle {
-    sender: BroadcastSender<Arc<Response>>,
+    handler: Option<Arc<Box<dyn MessageHandler>>>,
+    heartbeat: u32,
+    max_frame_size: u32,
 }
 
 #[async_trait::async_trait]
-impl MessageHandler for ClientInternalHandle {
+impl MessageHandler for Client {
     async fn handle_message(&self, item: Response) -> RabbitMQStreamResult<()> {
-        let _ = self.sender.send(Arc::new(item));
+        match item.kind() {
+            ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
+            _ => {
+                if let Some(handler) = self.state.read().await.handler.as_ref() {
+                    let handler = handler.clone();
+                    tokio::task::spawn(async move { handler.handle_message(item).await });
+                }
+            }
+        }
 
         Ok(())
     }
 }
 
-impl ClientInternalHandle {
-    pub fn subscribe(&self) -> BroadcastReceiver<Arc<Response>> {
-        self.sender.subscribe()
-    }
+#[derive(Clone)]
+pub struct Client {
+    dispatcher: Dispatcher<Client>,
+    channel: Arc<ChannelSender<SinkConnection>>,
+    state: Arc<RwLock<ClientState>>,
+    opts: ClientOptions,
+    tune_notifier: Arc<Notify>,
 }
-pub struct Client(Arc<ClientInternal>);
 
 impl Client {
     pub async fn connect(opts: impl Into<ClientOptions>) -> Result<Client, RabbitMqStreamError> {
         let broker = opts.into();
 
-        let (tx, _rx) = broadcast::channel(20);
+        let (sender, receiver) = Client::create_connection(&broker).await?;
 
-        let handle = ClientInternalHandle { sender: tx };
-        let (sender, dispatcher) =
-            ClientInternal::create_connection(&broker, handle.clone()).await?;
+        let dispatcher = Dispatcher::new();
 
-        let mut internal = ClientInternal {
-            dispatcher,
-            handle,
-            channel: sender,
-            opts: broker,
+        let state = ClientState {
             server_properties: HashMap::new(),
             connection_properties: HashMap::new(),
+            handler: None,
+            heartbeat: broker.heartbeat,
+            max_frame_size: broker.max_frame_size,
+        };
+        let mut client = Client {
+            dispatcher,
+            opts: broker,
+            channel: Arc::new(sender),
+            state: Arc::new(RwLock::new(state)),
+            tune_notifier: Arc::new(Notify::new()),
         };
 
-        internal.initialize().await?;
+        client.initialize(receiver).await?;
 
-        Ok(Client(Arc::new(internal)))
+        Ok(client)
     }
 
+    async fn create_connection(
+        broker: &ClientOptions,
+    ) -> Result<
+        (
+            ChannelSender<SinkConnection>,
+            ChannelReceiver<StreamConnection>,
+        ),
+        RabbitMqStreamError,
+    > {
+        let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+        let stream = Framed::new(stream, RabbitMqStreamCodec {});
+
+        let (sink, stream) = stream.split();
+        let (tx, rx) = channel(sink, stream);
+
+        Ok((tx, rx))
+    }
     /// Get a reference to the client's server properties.
-    pub fn server_properties(&self) -> &HashMap<String, String> {
-        &self.0.server_properties
+    pub async fn server_properties(&self) -> HashMap<String, String> {
+        self.state.read().await.server_properties.clone()
     }
 
     /// Get a reference to the client's connection properties.
-    pub fn connection_properties(&self) -> &HashMap<String, String> {
-        &self.0.connection_properties
+    pub async fn connection_properties(&self) -> HashMap<String, String> {
+        self.state.read().await.connection_properties.clone()
+    }
+
+    pub async fn set_handler<H: MessageHandler>(&self, handler: H) {
+        let mut state = self.state.write().await;
+
+        state.handler = Some(Arc::new(Box::new(handler)));
     }
 
     pub async fn subscribe(
@@ -100,39 +136,60 @@ impl Client {
         credit: u16,
         properties: HashMap<String, String>,
     ) -> RabbitMQStreamResult<GenericResponse> {
-        self.0
-            .send_and_receive(|correlation_id| {
-                SubscribeCommand::new(
-                    correlation_id,
-                    subscription_id,
-                    stream.to_owned(),
-                    offset_specification,
-                    credit,
-                    properties,
-                )
-            })
-            .await
+        self.send_and_receive(|correlation_id| {
+            SubscribeCommand::new(
+                correlation_id,
+                subscription_id,
+                stream.to_owned(),
+                offset_specification,
+                credit,
+                properties,
+            )
+        })
+        .await
     }
 
     pub async fn credit(&self, subscription_id: u8, credit: u16) -> RabbitMQStreamResult<()> {
-        self.0
-            .send(CreditCommand::new(subscription_id, credit))
-            .await
+        self.send(CreditCommand::new(subscription_id, credit)).await
     }
 
-    pub fn subscribe_messages(&self) -> Receiver<Arc<Response>> {
-        self.0.handle.subscribe()
-    }
-}
+    async fn initialize<T>(
+        &mut self,
+        receiver: ChannelReceiver<T>,
+    ) -> Result<(), RabbitMqStreamError>
+    where
+        T: Stream<Item = Result<Response, RabbitMqStreamError>> + Unpin + Send,
+        T: 'static,
+    {
+        self.dispatcher.set_handler(self.clone()).await;
+        self.dispatcher.start(receiver).await;
 
-impl ClientInternal {
-    async fn initialize(&mut self) -> Result<(), RabbitMqStreamError> {
-        let channel = self.handle.subscribe();
-        self.server_properties = self.peer_properties().await?;
+        self.with_state_lock(self.peer_properties(), |state, server_properties| {
+            state.server_properties = server_properties;
+        })
+        .await?;
         self.authenticate().await?;
 
-        self.wait_for_tune_data(channel).await?;
-        self.connection_properties = self.open().await?;
+        self.wait_for_tune_data().await?;
+
+        self.with_state_lock(self.open(), |state, connection_properties| {
+            state.connection_properties = connection_properties;
+        })
+        .await?;
+
+        Ok(())
+    }
+
+    async fn with_state_lock<T>(
+        &self,
+        task: impl Future<Output = RabbitMQStreamResult<T>>,
+        mut updater: impl FnMut(&mut ClientState, T),
+    ) -> RabbitMQStreamResult<()> {
+        let result = task.await?;
+
+        let mut state = self.state.write().await;
+
+        updater(&mut state, result);
 
         Ok(())
     }
@@ -144,20 +201,9 @@ impl ClientInternal {
         }
     }
 
-    async fn wait_for_tune_data(
-        &mut self,
-        mut channel: Receiver<Arc<Response>>,
-    ) -> Result<(), RabbitMqStreamError> {
-        let response = channel.recv().await.expect("It should contain a message");
-
-        let tunes = self.handle_response_ref::<TunesCommand>(&response).await?;
-
-        self.opts.heartbeat = self.max_value(self.opts.heartbeat, tunes.heartbeat);
-        self.opts.max_frame_size = self.max_value(self.opts.max_frame_size, tunes.max_frame_size);
-
-        self.channel
-            .send(TunesCommand::new(self.opts.max_frame_size, self.opts.heartbeat).into())
-            .await
+    async fn wait_for_tune_data(&mut self) -> Result<(), RabbitMqStreamError> {
+        self.tune_notifier.notified().await;
+        Ok(())
     }
 
     async fn authenticate(&self) -> Result<(), RabbitMqStreamError> {
@@ -228,19 +274,7 @@ impl ClientInternal {
         })
     }
 
-    async fn handle_response_ref<'a, T: FromResponseRef + 'a>(
-        &self,
-        response: &'a Response,
-    ) -> Result<&'a T, RabbitMqStreamError> {
-        response.get_ref::<T>().ok_or_else(|| {
-            RabbitMqStreamError::CastError(format!(
-                "Cannot cast response to {}",
-                std::any::type_name::<T>()
-            ))
-        })
-    }
-
-    async fn open(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
+    async fn open(&self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
         self.send_and_receive::<OpenResponse, _, _>(|correlation_id| {
             OpenCommand::new(correlation_id, self.opts.v_host.clone())
         })
@@ -248,7 +282,7 @@ impl ClientInternal {
         .map(|open| open.connection_properties)
     }
 
-    async fn peer_properties(&mut self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
+    async fn peer_properties(&self) -> Result<HashMap<String, String>, RabbitMqStreamError> {
         self.send_and_receive::<PeerPropertiesResponse, _, _>(|correlation_id| {
             PeerPropertiesCommand::new(correlation_id, HashMap::new())
         })
@@ -256,24 +290,20 @@ impl ClientInternal {
         .map(|peer_properties| peer_properties.server_properties)
     }
 
-    async fn create_connection(
-        broker: &ClientOptions,
-        handle: ClientInternalHandle,
-    ) -> Result<
-        (
-            ChannelSender<SinkConnection>,
-            Dispatcher<ClientInternalHandle>,
-        ),
-        RabbitMqStreamError,
-    > {
-        let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
-        let stream = Framed::new(stream, RabbitMqStreamCodec {});
+    async fn handle_tune_command(&self, tunes: &TunesCommand) {
+        let mut state = self.state.write().await;
+        state.heartbeat = self.max_value(self.opts.heartbeat, tunes.heartbeat);
+        state.max_frame_size = self.max_value(self.opts.max_frame_size, tunes.max_frame_size);
 
-        let (sink, stream) = stream.split();
-        let (tx, rx) = channel(sink, stream);
+        let heart_beat = state.heartbeat;
+        let max_frame_size = state.max_frame_size;
+        drop(state);
 
-        let dispatcher = Dispatcher::create(handle, rx).await;
+        let _ = self
+            .channel
+            .send(TunesCommand::new(max_frame_size, heart_beat).into())
+            .await;
 
-        Ok((tx, dispatcher))
+        self.tune_notifier.notify_one();
     }
 }
