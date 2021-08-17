@@ -13,8 +13,9 @@ use crate::{
     error::DecodeError,
     protocol::{
         commands::{
-            COMMAND_DELIVER, COMMAND_HEARTBEAT, COMMAND_OPEN, COMMAND_PEER_PROPERTIES,
-            COMMAND_SASL_AUTHENTICATE, COMMAND_SASL_HANDSHAKE, COMMAND_SUBSCRIBE, COMMAND_TUNE,
+            COMMAND_CREATE_STREAM, COMMAND_DELETE_STREAM, COMMAND_DELIVER, COMMAND_HEARTBEAT,
+            COMMAND_OPEN, COMMAND_PEER_PROPERTIES, COMMAND_SASL_AUTHENTICATE,
+            COMMAND_SASL_HANDSHAKE, COMMAND_SUBSCRIBE, COMMAND_TUNE,
         },
         responses::*,
     },
@@ -105,7 +106,10 @@ impl Decoder for Response {
             COMMAND_SASL_HANDSHAKE => SaslHandshakeResponse::decode(input)
                 .map(|(i, kind)| (i, ResponseKind::SaslHandshake(kind)))?,
 
-            COMMAND_SASL_AUTHENTICATE | COMMAND_SUBSCRIBE => {
+            COMMAND_SASL_AUTHENTICATE
+            | COMMAND_SUBSCRIBE
+            | COMMAND_CREATE_STREAM
+            | COMMAND_DELETE_STREAM => {
                 GenericResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Generic(kind)))?
             }
             COMMAND_TUNE => {
@@ -116,7 +120,7 @@ impl Decoder for Response {
 
             COMMAND_HEARTBEAT => HeartbeatResponse::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::Heartbeat(kind)))?,
-            n => return Err(DecodeError::UsupportedResponseType(n)),
+            n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
     }

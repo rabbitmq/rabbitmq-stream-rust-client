@@ -13,7 +13,9 @@ use futures::{
 };
 use rabbitmq_stream_protocol::{
     commands::{
+        create_stream::CreateStreamCommand,
         credit::CreditCommand,
+        delete::Delete,
         generic::GenericResponse,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
@@ -149,6 +151,17 @@ impl Client {
         .await
     }
 
+    pub async fn create_stream(&self, stream: &str) -> RabbitMQStreamResult<GenericResponse> {
+        self.send_and_receive(|correlation_id| {
+            CreateStreamCommand::new(correlation_id, stream.to_owned(), HashMap::new())
+        })
+        .await
+    }
+
+    pub async fn delete_stream(&self, stream: &str) -> RabbitMQStreamResult<GenericResponse> {
+        self.send_and_receive(|correlation_id| Delete::new(correlation_id, stream.to_owned()))
+            .await
+    }
     pub async fn credit(&self, subscription_id: u8, credit: u16) -> RabbitMQStreamResult<()> {
         self.send(CreditCommand::new(subscription_id, credit)).await
     }

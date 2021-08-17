@@ -5,7 +5,7 @@ use thiserror::Error;
 pub enum RabbitMqStreamError {
     #[error("Io Error")]
     Io(#[from] std::io::Error),
-    #[error("Protocol Error")]
+    #[error("Protocol Error {0}")]
     Protocol(#[from] ProtocolError),
     #[error("Cast Error")]
     CastError(String),
@@ -13,9 +13,9 @@ pub enum RabbitMqStreamError {
 
 #[derive(Error, Debug)]
 pub enum ProtocolError {
-    #[error("Encode Error")]
+    #[error("Encode Error {0:?}")]
     Encode(EncodeError),
-    #[error("Decode Error")]
+    #[error("Decode Error {0:?}")]
     Decode(DecodeError),
 }
 

@@ -27,3 +27,5 @@ async-trait = "0.1.51"
 
 [dev-dependencies]
 tracing-subscriber = "0.2.0"
+fake = { version = "2.4", features=['derive']}
+rand = "0.8"

@@ -120,6 +120,7 @@ where
                 },
                 Err(e) => {
                     error!("Error from stream {:?}", e);
+                    panic!("Error {}", e);
                 }
             }
         }
