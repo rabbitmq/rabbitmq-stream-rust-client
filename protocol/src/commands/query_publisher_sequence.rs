@@ -2,6 +2,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_QUERY_PUBLISHER_SEQUENCE,
+    ResponseCode,
 };
 use std::io::Write;
 
@@ -85,12 +86,12 @@ impl Decoder for QueryPublisherRequest {
 #[derive(PartialEq, Debug)]
 pub struct QueryPublisherResponse {
     correlation_id: u32,
-    response_code: u16,
+    response_code: ResponseCode,
     sequence: u64,
 }
 
 impl QueryPublisherResponse {
-    pub fn new(correlation_id: u32, response_code: u16, sequence: u64) -> Self {
+    pub fn new(correlation_id: u32, response_code: ResponseCode, sequence: u64) -> Self {
         Self {
             correlation_id,
             response_code,
@@ -117,7 +118,7 @@ impl Encoder for QueryPublisherResponse {
 impl Decoder for QueryPublisherResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
-        let (input, response_code) = u16::decode(input)?;
+        let (input, response_code) = ResponseCode::decode(input)?;
         let (input, sequence) = u64::decode(input)?;
         Ok((
             input,
