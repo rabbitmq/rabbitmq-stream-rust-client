@@ -4,6 +4,8 @@ use byteorder::{BigEndian, WriteBytesExt};
 
 use crate::{error::EncodeError, types::Header, types::PublishedMessage, ResponseCode};
 
+use crate::types::PublishingError;
+
 use super::Encoder;
 
 impl Encoder for i8 {
@@ -208,32 +210,6 @@ impl Encoder for Vec<u64> {
     }
 }
 
-impl Encoder for (u64, u16) {
-    fn encoded_size(&self) -> u32 {
-        8 + 2
-    }
-
-    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        self.0.encode(writer)?;
-        self.1.encode(writer)?;
-        Ok(())
-    }
-}
-
-impl Encoder for Vec<(u64, u16)> {
-    fn encoded_size(&self) -> u32 {
-        (8 + 2) + self.iter().fold(0, |acc, v| acc + v.encoded_size())
-    }
-
-    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
-        writer.write_i32::<BigEndian>(self.len() as i32)?;
-        for x in self {
-            x.encode(writer)?;
-        }
-        Ok(())
-    }
-}
-
 impl Encoder for ResponseCode {
     fn encoded_size(&self) -> u32 {
         2
@@ -247,4 +223,30 @@ impl Encoder for ResponseCode {
 
 pub fn encode_response_code(code: u16) -> u16 {
     code | 0b1000_0000_0000_0000
+}
+
+impl Encoder for PublishingError {
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        self.publishing_id.encode(writer)?;
+        self.error_code.encode(writer)?;
+        Ok(())
+    }
+
+    fn encoded_size(&self) -> u32 {
+        8 + 2
+    }
+}
+
+impl Encoder for Vec<PublishingError> {
+    fn encoded_size(&self) -> u32 {
+        4 + self.iter().fold(0, |acc, v| acc + v.encoded_size())
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_i32::<BigEndian>(self.len() as i32)?;
+        for x in self {
+            x.encode(writer)?;
+        }
+        Ok(())
+    }
 }

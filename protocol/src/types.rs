@@ -38,3 +38,19 @@ impl PublishedMessage {
         }
     }
 }
+
+#[cfg_attr(test, derive(fake::Dummy))]
+#[derive(Debug, PartialEq)]
+pub struct PublishingError {
+    pub(crate) publishing_id: u64,
+    pub(crate) error_code: u16,
+}
+
+impl PublishingError {
+    pub fn new(publishing_id: u64, error_code: u16) -> Self {
+        Self {
+            publishing_id,
+            error_code,
+        }
+    }
+}

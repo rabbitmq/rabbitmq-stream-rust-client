@@ -3,6 +3,9 @@ use crate::{
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_PUBLISH_ERROR,
 };
+
+use crate::types::PublishingError;
+
 use std::io::Write;
 
 use super::Command;
@@ -12,17 +15,17 @@ use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
-pub struct PublishError {
+pub struct PublishErrorResponse {
     publisher_id: u8,
-    publishing_error: Vec<(u64, u16)>,
+    publishing_error: Vec<PublishingError>,
     publishing_id: u64,
     code: u16,
 }
 
-impl PublishError {
+impl PublishErrorResponse {
     pub fn new(
         publisher_id: u8,
-        publishing_error: Vec<(u64, u16)>,
+        publishing_error: Vec<PublishingError>,
         publishing_id: u64,
         code: u16,
     ) -> Self {
@@ -35,7 +38,7 @@ impl PublishError {
     }
 }
 
-impl Encoder for PublishError {
+impl Encoder for PublishErrorResponse {
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.publisher_id.encode(writer)?;
         self.publishing_error.encode(writer)?;
@@ -52,22 +55,22 @@ impl Encoder for PublishError {
     }
 }
 
-impl Command for PublishError {
+impl Command for PublishErrorResponse {
     fn key(&self) -> u16 {
         COMMAND_PUBLISH_ERROR
     }
 }
 
-impl Decoder for PublishError {
+impl Decoder for PublishErrorResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, publisher_id) = u8::decode(input)?;
-        let (input, publishing_error) = Vec::<(u64, u16)>::decode(input)?;
+        let (input, publishing_error) = Vec::<PublishingError>::decode(input)?;
         let (input, publishing_id) = u64::decode(input)?;
         let (input, code) = u16::decode(input)?;
 
         Ok((
             input,
-            PublishError {
+            PublishErrorResponse {
                 publisher_id,
                 publishing_error,
                 publishing_id,
@@ -79,11 +82,11 @@ impl Decoder for PublishError {
 
 #[cfg(test)]
 mod tests {
-    use super::PublishError;
+    use super::PublishErrorResponse;
     use crate::commands::tests::command_encode_decode_test;
 
     #[test]
     fn publish_error_test() {
-        command_encode_decode_test::<PublishError>();
+        command_encode_decode_test::<PublishErrorResponse>();
     }
 }
