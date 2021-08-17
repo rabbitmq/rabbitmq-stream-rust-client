@@ -12,6 +12,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_CLOSE,
+    ResponseCode,
 };
 
 use super::Command;
@@ -78,11 +79,11 @@ impl Decoder for CloseRequest {
 #[derive(PartialEq, Debug)]
 pub struct CloseResponse {
     correlation_id: u32,
-    response_code: u16,
+    response_code: ResponseCode,
 }
 
 impl CloseResponse {
-    pub fn new(correlation_id: u32, response_code: u16) -> Self {
+    pub fn new(correlation_id: u32, response_code: ResponseCode) -> Self {
         Self {
             correlation_id,
             response_code,
@@ -105,7 +106,7 @@ impl Encoder for CloseResponse {
 impl Decoder for CloseResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
-        let (input, response_code) = u16::decode(input)?;
+        let (input, response_code) = ResponseCode::decode(input)?;
 
         Ok((
             input,
