@@ -72,6 +72,17 @@ impl Encoder for u64 {
     }
 }
 
+impl Encoder for i64 {
+    fn encoded_size(&self) -> u32 {
+        8
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_i64::<BigEndian>(*self)?;
+        Ok(())
+    }
+}
+
 impl Encoder for Header {
     fn encoded_size(&self) -> u32 {
         2 + 2

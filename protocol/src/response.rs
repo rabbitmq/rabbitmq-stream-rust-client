@@ -6,14 +6,15 @@ use crate::{
         Decoder,
     },
     commands::{
-        generic::GenericResponse, open::OpenResponse, peer_properties::PeerPropertiesResponse,
+        deliver::DeliverCommand, generic::GenericResponse, heart_beat::HeartbeatResponse,
+        open::OpenResponse, peer_properties::PeerPropertiesResponse,
         sasl_handshake::SaslHandshakeResponse, tune::TunesCommand,
     },
     error::DecodeError,
     protocol::{
         commands::{
-            COMMAND_OPEN, COMMAND_PEER_PROPERTIES, COMMAND_SASL_AUTHENTICATE,
-            COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
+            COMMAND_DELIVER, COMMAND_HEARTBEAT, COMMAND_OPEN, COMMAND_PEER_PROPERTIES,
+            COMMAND_SASL_AUTHENTICATE, COMMAND_SASL_HANDSHAKE, COMMAND_SUBSCRIBE, COMMAND_TUNE,
         },
         responses::*,
     },
@@ -55,9 +56,15 @@ pub enum ResponseKind {
     SaslHandshake(SaslHandshakeResponse),
     Generic(GenericResponse),
     Tunes(TunesCommand),
+    Deliver(DeliverCommand),
+    Heartbeat(HeartbeatResponse),
 }
 
 impl Response {
+    pub fn new(header: Header, kind: ResponseKind) -> Self {
+        Self { header, kind }
+    }
+
     pub fn correlation_id(&self) -> Option<u32> {
         match &self.kind {
             ResponseKind::Open(open) => Some(open.correlation_id),
@@ -65,6 +72,8 @@ impl Response {
             ResponseKind::SaslHandshake(handshake) => Some(handshake.correlation_id),
             ResponseKind::Generic(generic) => Some(generic.correlation_id),
             ResponseKind::Tunes(_) => None,
+            ResponseKind::Heartbeat(_) => None,
+            ResponseKind::Deliver(_) => None,
         }
     }
 
@@ -75,11 +84,8 @@ impl Response {
         T::from_response(self)
     }
 
-    pub fn get_ref<T>(&self) -> Option<&T>
-    where
-        T: FromResponseRef,
-    {
-        T::from_response(self)
+    pub fn kind(&self) -> &ResponseKind {
+        &self.kind
     }
 }
 
@@ -99,13 +105,17 @@ impl Decoder for Response {
             COMMAND_SASL_HANDSHAKE => SaslHandshakeResponse::decode(input)
                 .map(|(i, kind)| (i, ResponseKind::SaslHandshake(kind)))?,
 
-            COMMAND_SASL_AUTHENTICATE => {
+            COMMAND_SASL_AUTHENTICATE | COMMAND_SUBSCRIBE => {
                 GenericResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Generic(kind)))?
             }
             COMMAND_TUNE => {
                 TunesCommand::decode(input).map(|(i, kind)| (i, ResponseKind::Tunes(kind)))?
             }
+            COMMAND_DELIVER => DeliverCommand::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::Deliver(kind)))?,
 
+            COMMAND_HEARTBEAT => HeartbeatResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::Heartbeat(kind)))?,
             n => return Err(DecodeError::UsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
@@ -194,12 +204,6 @@ where
     fn from_response(response: Response) -> Option<Self>;
 }
 
-pub trait FromResponseRef
-where
-    Self: Sized,
-{
-    fn from_response(response: &Response) -> Option<&Self>;
-}
 #[cfg(test)]
 mod tests {
 
@@ -230,6 +234,8 @@ mod tests {
                 ResponseKind::SaslHandshake(handshake) => handshake.encoded_size(),
                 ResponseKind::Generic(generic) => generic.encoded_size(),
                 ResponseKind::Tunes(tune) => tune.encoded_size(),
+                ResponseKind::Heartbeat(heartbeat) => heartbeat.encoded_size(),
+                ResponseKind::Deliver(deliver) => deliver.encoded_size(),
             }
         }
 
@@ -243,6 +249,8 @@ mod tests {
                 ResponseKind::SaslHandshake(handshake) => handshake.encode(writer),
                 ResponseKind::Generic(generic) => generic.encode(writer),
                 ResponseKind::Tunes(tune) => tune.encode(writer),
+                ResponseKind::Heartbeat(heartbeat) => heartbeat.encode(writer),
+                ResponseKind::Deliver(deliver) => deliver.encode(writer),
             }
         }
     }

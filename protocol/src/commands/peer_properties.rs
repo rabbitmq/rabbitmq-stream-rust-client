@@ -27,6 +27,11 @@ impl PeerPropertiesCommand {
             client_properties,
         }
     }
+
+    /// Get a reference to the peer properties command's correlation id.
+    pub fn correlation_id(&self) -> u32 {
+        self.correlation_id
+    }
 }
 
 impl Encoder for PeerPropertiesCommand {
@@ -71,6 +76,18 @@ pub struct PeerPropertiesResponse {
 }
 
 impl PeerPropertiesResponse {
+    pub fn new(
+        correlation_id: u32,
+        code: ResponseCode,
+        server_properties: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            correlation_id,
+            code,
+            server_properties,
+        }
+    }
+
     pub fn server_properties(&self) -> &HashMap<String, String> {
         &self.server_properties
     }

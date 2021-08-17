@@ -42,6 +42,11 @@ impl Decoder for u64 {
         read_u64(input)
     }
 }
+impl Decoder for i64 {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
+        read_i64(input)
+    }
+}
 
 impl Decoder for Vec<u8> {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
@@ -181,3 +186,4 @@ reader!(read_u16, 2, u16);
 reader!(read_u32, 4, u32);
 reader!(read_i32, 4, i32);
 reader!(read_u64, 8, u64);
+reader!(read_i64, 8, i64);
