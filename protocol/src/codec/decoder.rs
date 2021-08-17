@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use byteorder::ByteOrder;
 
 use crate::types::PublishedMessage;
+use crate::types::PublishingError;
 use crate::{error::DecodeError, types::Header};
 
 use super::Decoder;
@@ -161,6 +162,30 @@ impl Decoder for Vec<String> {
             if let Some(v) = value {
                 vec.push(v)
             }
+            input = input1;
+        }
+
+        Ok((input, vec))
+    }
+}
+
+impl Decoder for PublishingError {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, publishing_id) = read_u64(input)?;
+        let (input, code) = read_u16(input)?;
+
+        Ok((input, PublishingError::new(publishing_id, code)))
+    }
+}
+
+impl Decoder for Vec<PublishingError> {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (mut input, num_properties) = read_u32(input)?;
+        let mut vec: Vec<PublishingError> = Vec::new();
+        for _ in 0..num_properties {
+            let (input1, value) = PublishingError::decode(input)?;
+
+            vec.push(value);
             input = input1;
         }
 
