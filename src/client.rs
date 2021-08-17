@@ -97,29 +97,12 @@ impl Client {
         Ok(client)
     }
 
-    async fn create_connection(
-        broker: &ClientOptions,
-    ) -> Result<
-        (
-            ChannelSender<SinkConnection>,
-            ChannelReceiver<StreamConnection>,
-        ),
-        RabbitMqStreamError,
-    > {
-        let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
-        let stream = Framed::new(stream, RabbitMqStreamCodec {});
-
-        let (sink, stream) = stream.split();
-        let (tx, rx) = channel(sink, stream);
-
-        Ok((tx, rx))
-    }
-    /// Get a reference to the client's server properties.
+    /// Get client's server properties.
     pub async fn server_properties(&self) -> HashMap<String, String> {
         self.state.read().await.server_properties.clone()
     }
 
-    /// Get a reference to the client's connection properties.
+    /// Get client's connection properties.
     pub async fn connection_properties(&self) -> HashMap<String, String> {
         self.state.read().await.connection_properties.clone()
     }
@@ -166,6 +149,23 @@ impl Client {
         self.send(CreditCommand::new(subscription_id, credit)).await
     }
 
+    async fn create_connection(
+        broker: &ClientOptions,
+    ) -> Result<
+        (
+            ChannelSender<SinkConnection>,
+            ChannelReceiver<StreamConnection>,
+        ),
+        RabbitMqStreamError,
+    > {
+        let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+        let stream = Framed::new(stream, RabbitMqStreamCodec {});
+
+        let (sink, stream) = stream.split();
+        let (tx, rx) = channel(sink, stream);
+
+        Ok((tx, rx))
+    }
     async fn initialize<T>(
         &mut self,
         receiver: ChannelReceiver<T>,
