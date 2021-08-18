@@ -153,7 +153,7 @@ impl Decoder for Response {
             COMMAND_QUERY_PUBLISHER_SEQUENCE => QueryPublisherResponse::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::QueryPublisherSequence(kind)))?,
 
-            n => return Err(DecodeError::UsupportedResponseType(n)),
+            n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
     }
