@@ -42,7 +42,9 @@ impl Encoder for StoreOffset {
     }
 
     fn encoded_size(&self) -> u32 {
-        1 + 8 + self.reference.len() as u32
+        self.reference.as_str().encoded_size()
+            + self.subscription_id.encoded_size()
+            + self.offset.encoded_size()
     }
 }
 
