@@ -174,7 +174,7 @@ impl Decoder for Request {
             COMMAND_CREATE_STREAM => {
                 CreateStreamCommand::decode(input).map(|(i, kind)| (i, kind.into()))?
             }
-            n => return Err(DecodeError::UsupportedResponseType(n)),
+            n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Request { header, kind: cmd }))
     }

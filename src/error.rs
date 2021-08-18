@@ -3,19 +3,19 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RabbitMqStreamError {
-    #[error("Io Error")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("Protocol Error")]
+    #[error(transparent)]
     Protocol(#[from] ProtocolError),
-    #[error("Cast Error")]
+    #[error("Cast Error: {0}")]
     CastError(String),
 }
 
 #[derive(Error, Debug)]
 pub enum ProtocolError {
-    #[error("Encode Error")]
+    #[error("Encode Error {0:?}")]
     Encode(EncodeError),
-    #[error("Decode Error")]
+    #[error("Decode Error {0:?}")]
     Decode(DecodeError),
 }
 

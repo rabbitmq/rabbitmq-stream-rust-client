@@ -5,7 +5,7 @@ pub enum DecodeError {
     Incomplete(usize),
     Utf8Error(FromUtf8Error),
     UnknownResponseCode(u16),
-    UsupportedResponseType(u16),
+    UnsupportedResponseType(u16),
     MismatchSize(usize),
     Empty,
 }

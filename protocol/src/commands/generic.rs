@@ -16,6 +16,13 @@ pub struct GenericResponse {
     code: ResponseCode,
 }
 
+impl GenericResponse {
+    /// Get a reference to the generic response's code.
+    pub fn code(&self) -> &ResponseCode {
+        &self.code
+    }
+}
+
 impl Encoder for GenericResponse {
     fn encoded_size(&self) -> u32 {
         self.correlation_id.encoded_size() + self.code.encoded_size()
