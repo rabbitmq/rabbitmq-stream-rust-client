@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fake::{Fake, Faker};
 use rabbitmq_stream_client::{Client, ClientOptions};
 use rabbitmq_stream_protocol::ResponseCode;
@@ -12,7 +14,7 @@ impl TestClient {
         let stream: String = Faker.fake();
         let client = Client::connect(ClientOptions::default()).await.unwrap();
 
-        let response = client.create_stream(&stream).await.unwrap();
+        let response = client.create_stream(&stream, HashMap::new()).await.unwrap();
 
         assert_eq!(&ResponseCode::Ok, response.code());
         TestClient { client, stream }

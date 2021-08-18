@@ -134,9 +134,13 @@ impl Client {
         .await
     }
 
-    pub async fn create_stream(&self, stream: &str) -> RabbitMQStreamResult<GenericResponse> {
+    pub async fn create_stream(
+        &self,
+        stream: &str,
+        options: HashMap<String, String>,
+    ) -> RabbitMQStreamResult<GenericResponse> {
         self.send_and_receive(|correlation_id| {
-            CreateStreamCommand::new(correlation_id, stream.to_owned(), HashMap::new())
+            CreateStreamCommand::new(correlation_id, stream.to_owned(), options)
         })
         .await
     }

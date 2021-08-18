@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fake::{Fake, Faker};
 use rabbitmq_stream_client::{Client, ClientOptions};
 use rabbitmq_stream_protocol::ResponseCode;
@@ -21,7 +23,11 @@ async fn client_create_stream_error_test() {
     let test = TestClient::create().await;
 
     // Second ko
-    let response = test.client.create_stream(&test.stream).await.unwrap();
+    let response = test
+        .client
+        .create_stream(&test.stream, HashMap::new())
+        .await
+        .unwrap();
     assert_eq!(&ResponseCode::StreamAlreadyExists, response.code());
 }
 
