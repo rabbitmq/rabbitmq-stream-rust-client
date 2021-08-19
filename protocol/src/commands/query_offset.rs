@@ -1,7 +1,8 @@
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
-    protocol::commands::COMMAND_STORE_OFFSET,
+    protocol::commands::COMMAND_QUERY_OFFSET,
+    ResponseCode,
 };
 use std::io::Write;
 
@@ -42,15 +43,15 @@ impl Encoder for QueryOffsetRequest {
     }
 
     fn encoded_size(&self) -> u32 {
-        let stream_len = self.stream.len() as u32;
-        let reference_len = self.reference.len() as u32;
-        self.correlation_id.encoded_size() + stream_len + reference_len
+        self.correlation_id.encoded_size()
+            + self.stream.as_str().encoded_size()
+            + self.reference.as_str().encoded_size()
     }
 }
 
 impl Command for QueryOffsetRequest {
     fn key(&self) -> u16 {
-        COMMAND_STORE_OFFSET
+        COMMAND_QUERY_OFFSET
     }
 }
 
@@ -84,13 +85,13 @@ impl Decoder for QueryOffsetRequest {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct QueryOffsetResponse {
-    correlation_id: u32,
-    response_code: u16,
+    pub(crate) correlation_id: u32,
+    response_code: ResponseCode,
     offset: u64,
 }
 
 impl QueryOffsetResponse {
-    pub fn new(correlation_id: u32, response_code: u16, offset: u64) -> Self {
+    pub fn new(correlation_id: u32, response_code: ResponseCode, offset: u64) -> Self {
         Self {
             correlation_id,
             response_code,
@@ -117,7 +118,7 @@ impl Encoder for QueryOffsetResponse {
 impl Decoder for QueryOffsetResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
-        let (input, response_code) = u16::decode(input)?;
+        let (input, response_code) = ResponseCode::decode(input)?;
         let (input, offset) = u64::decode(input)?;
         Ok((
             input,

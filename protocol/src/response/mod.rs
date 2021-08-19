@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 
 use crate::{
     codec::{
@@ -6,21 +6,19 @@ use crate::{
         Decoder,
     },
     commands::{
-        deliver::DeliverCommand, generic::GenericResponse, heart_beat::HeartbeatResponse,
-        open::OpenResponse, peer_properties::PeerPropertiesResponse,
-        sasl_handshake::SaslHandshakeResponse, tune::TunesCommand,
+        close::CloseResponse, deliver::DeliverCommand, generic::GenericResponse,
+        heart_beat::HeartbeatResponse, metadata::MetadataResponse,
+        metadata_update::MetadataUpdateCommand, open::OpenResponse,
+        peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
+        publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
+        query_publisher_sequence::QueryPublisherResponse, sasl_handshake::SaslHandshakeResponse,
+        tune::TunesCommand,
     },
     error::DecodeError,
-    protocol::{
-        commands::{
-            COMMAND_CREATE_STREAM, COMMAND_DELETE_STREAM, COMMAND_DELIVER, COMMAND_HEARTBEAT,
-            COMMAND_OPEN, COMMAND_PEER_PROPERTIES, COMMAND_SASL_AUTHENTICATE,
-            COMMAND_SASL_HANDSHAKE, COMMAND_SUBSCRIBE, COMMAND_TUNE,
-        },
-        responses::*,
-    },
+    protocol::commands::*,
     types::Header,
 };
+mod shims;
 
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
@@ -53,12 +51,19 @@ pub struct Response {
 #[derive(Debug, PartialEq)]
 pub enum ResponseKind {
     Open(OpenResponse),
+    Close(CloseResponse),
     PeerProperties(PeerPropertiesResponse),
     SaslHandshake(SaslHandshakeResponse),
     Generic(GenericResponse),
     Tunes(TunesCommand),
     Deliver(DeliverCommand),
     Heartbeat(HeartbeatResponse),
+    Metadata(MetadataResponse),
+    MetadataUpdate(MetadataUpdateCommand),
+    PublishConfirm(PublishConfirm),
+    PublishError(PublishErrorResponse),
+    QueryOffset(QueryOffsetResponse),
+    QueryPublisherSequence(QueryPublisherResponse),
 }
 
 impl Response {
@@ -69,9 +74,18 @@ impl Response {
     pub fn correlation_id(&self) -> Option<u32> {
         match &self.kind {
             ResponseKind::Open(open) => Some(open.correlation_id),
+            ResponseKind::Close(close) => Some(close.correlation_id),
             ResponseKind::PeerProperties(peer_properties) => Some(peer_properties.correlation_id),
             ResponseKind::SaslHandshake(handshake) => Some(handshake.correlation_id),
             ResponseKind::Generic(generic) => Some(generic.correlation_id),
+            ResponseKind::Metadata(metadata) => Some(metadata.correlation_id),
+            ResponseKind::QueryOffset(query_offset) => Some(query_offset.correlation_id),
+            ResponseKind::QueryPublisherSequence(query_publisher) => {
+                Some(query_publisher.correlation_id)
+            }
+            ResponseKind::MetadataUpdate(_) => None,
+            ResponseKind::PublishConfirm(_) => None,
+            ResponseKind::PublishError(_) => None,
             ResponseKind::Tunes(_) => None,
             ResponseKind::Heartbeat(_) => None,
             ResponseKind::Deliver(_) => None,
@@ -101,6 +115,9 @@ impl Decoder for Response {
                 OpenResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Open(kind)))?
             }
 
+            COMMAND_CLOSE => {
+                CloseResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Close(kind)))?
+            }
             COMMAND_PEER_PROPERTIES => PeerPropertiesResponse::decode(input)
                 .map(|(i, kind)| (i, ResponseKind::PeerProperties(kind)))?,
             COMMAND_SASL_HANDSHAKE => SaslHandshakeResponse::decode(input)
@@ -120,6 +137,22 @@ impl Decoder for Response {
 
             COMMAND_HEARTBEAT => HeartbeatResponse::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::Heartbeat(kind)))?,
+            COMMAND_METADATA => MetadataResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::Metadata(kind)))?,
+            COMMAND_METADATA_UPDATE => MetadataUpdateCommand::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::MetadataUpdate(kind)))?,
+            COMMAND_PUBLISH_CONFIRM => PublishConfirm::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::PublishConfirm(kind)))?,
+
+            COMMAND_PUBLISH_ERROR => PublishErrorResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::PublishError(kind)))?,
+
+            COMMAND_QUERY_OFFSET => QueryOffsetResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::QueryOffset(kind)))?,
+
+            COMMAND_QUERY_PUBLISHER_SEQUENCE => QueryPublisherResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::QueryPublisherSequence(kind)))?,
+
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
@@ -131,73 +164,6 @@ impl Decoder for ResponseCode {
         let (input, code) = read_u16(input)?;
 
         Ok((input, code.try_into()?))
-    }
-}
-
-impl TryFrom<u16> for ResponseCode {
-    type Error = DecodeError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            RESPONSE_CODE_OK => Ok(ResponseCode::Ok),
-            RESPONSE_CODE_STREAM_DOES_NOT_EXIST => Ok(ResponseCode::StreamDoesNotExist),
-            RESPONSE_CODE_SUBSCRIPTION_ID_ALREADY_EXISTS => {
-                Ok(ResponseCode::SubscriptionIdAlreadyExists)
-            }
-            RESPONSE_CODE_SUBSCRIPTION_ID_DOES_NOT_EXIST => {
-                Ok(ResponseCode::SubscriptionIdDoesNotExist)
-            }
-            RESPONSE_CODE_STREAM_ALREADY_EXISTS => Ok(ResponseCode::StreamAlreadyExists),
-            RESPONSE_CODE_STREAM_NOT_AVAILABLE => Ok(ResponseCode::StreamNotAvailable),
-            RESPONSE_CODE_SASL_MECHANISM_NOT_SUPPORTED => {
-                Ok(ResponseCode::SaslMechanismNotSupported)
-            }
-            RESPONSE_CODE_AUTHENTICATION_FAILURE => Ok(ResponseCode::AuthenticationFailure),
-            RESPONSE_CODE_SASL_ERROR => Ok(ResponseCode::SaslError),
-            RESPONSE_CODE_SASL_CHALLENGE => Ok(ResponseCode::SaslChallange),
-            RESPONSE_CODE_AUTHENTICATION_FAILURE_LOOPBACK => {
-                Ok(ResponseCode::AuthenticationFailureLoopback)
-            }
-            RESPONSE_CODE_VIRTUAL_HOST_ACCESS_FAILURE => Ok(ResponseCode::VirtualHostAccessFailure),
-            RESPONSE_CODE_UNKNOWN_FRAME => Ok(ResponseCode::UnknownFrame),
-            RESPONSE_CODE_FRAME_TOO_LARGE => Ok(ResponseCode::FrameTooLarge),
-            RESPONSE_CODE_INTERNAL_ERROR => Ok(ResponseCode::InternalError),
-            RESPONSE_CODE_ACCESS_REFUSED => Ok(ResponseCode::AccessRefused),
-            RESPONSE_CODE_PRECONDITION_FAILED => Ok(ResponseCode::PrecoditionFailed),
-            RESPONSE_CODE_PUBLISHER_DOES_NOT_EXIST => Ok(ResponseCode::PublisherDoesNotExist),
-            _ => Err(DecodeError::UnknownResponseCode(value)),
-        }
-    }
-}
-
-impl From<&ResponseCode> for u16 {
-    fn from(code: &ResponseCode) -> Self {
-        match code {
-            ResponseCode::Ok => RESPONSE_CODE_OK,
-            ResponseCode::StreamDoesNotExist => RESPONSE_CODE_STREAM_DOES_NOT_EXIST,
-            ResponseCode::SubscriptionIdAlreadyExists => {
-                RESPONSE_CODE_SUBSCRIPTION_ID_ALREADY_EXISTS
-            }
-            ResponseCode::SubscriptionIdDoesNotExist => {
-                RESPONSE_CODE_SUBSCRIPTION_ID_DOES_NOT_EXIST
-            }
-            ResponseCode::StreamAlreadyExists => RESPONSE_CODE_STREAM_ALREADY_EXISTS,
-            ResponseCode::StreamNotAvailable => RESPONSE_CODE_STREAM_NOT_AVAILABLE,
-            ResponseCode::SaslMechanismNotSupported => RESPONSE_CODE_SASL_MECHANISM_NOT_SUPPORTED,
-            ResponseCode::AuthenticationFailure => RESPONSE_CODE_AUTHENTICATION_FAILURE,
-            ResponseCode::SaslError => RESPONSE_CODE_SASL_ERROR,
-            ResponseCode::SaslChallange => RESPONSE_CODE_SASL_CHALLENGE,
-            ResponseCode::AuthenticationFailureLoopback => {
-                RESPONSE_CODE_AUTHENTICATION_FAILURE_LOOPBACK
-            }
-            ResponseCode::VirtualHostAccessFailure => RESPONSE_CODE_VIRTUAL_HOST_ACCESS_FAILURE,
-            ResponseCode::UnknownFrame => RESPONSE_CODE_UNKNOWN_FRAME,
-            ResponseCode::FrameTooLarge => RESPONSE_CODE_FRAME_TOO_LARGE,
-            ResponseCode::InternalError => RESPONSE_CODE_INTERNAL_ERROR,
-            ResponseCode::AccessRefused => RESPONSE_CODE_ACCESS_REFUSED,
-            ResponseCode::PrecoditionFailed => RESPONSE_CODE_PRECONDITION_FAILED,
-            ResponseCode::PublisherDoesNotExist => RESPONSE_CODE_PUBLISHER_DOES_NOT_EXIST,
-        }
     }
 }
 
@@ -216,12 +182,20 @@ mod tests {
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
-            generic::GenericResponse, open::OpenResponse, peer_properties::PeerPropertiesResponse,
+            close::CloseResponse, deliver::DeliverCommand, generic::GenericResponse,
+            heart_beat::HeartbeatResponse, metadata::MetadataResponse,
+            metadata_update::MetadataUpdateCommand, open::OpenResponse,
+            peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
+            publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
+            query_publisher_sequence::QueryPublisherResponse,
             sasl_handshake::SaslHandshakeResponse, tune::TunesCommand,
         },
         protocol::{
             commands::{
-                COMMAND_OPEN, COMMAND_PEER_PROPERTIES, COMMAND_SASL_AUTHENTICATE,
+                COMMAND_CLOSE, COMMAND_DELIVER, COMMAND_HEARTBEAT, COMMAND_METADATA,
+                COMMAND_METADATA_UPDATE, COMMAND_OPEN, COMMAND_PEER_PROPERTIES,
+                COMMAND_PUBLISH_CONFIRM, COMMAND_PUBLISH_ERROR, COMMAND_QUERY_OFFSET,
+                COMMAND_QUERY_PUBLISHER_SEQUENCE, COMMAND_SASL_AUTHENTICATE,
                 COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
             },
             version::PROTOCOL_VERSION,
@@ -234,12 +208,21 @@ mod tests {
         fn encoded_size(&self) -> u32 {
             match self {
                 ResponseKind::Open(open) => open.encoded_size(),
+                ResponseKind::Close(close) => close.encoded_size(),
                 ResponseKind::PeerProperties(peer_properties) => peer_properties.encoded_size(),
                 ResponseKind::SaslHandshake(handshake) => handshake.encoded_size(),
                 ResponseKind::Generic(generic) => generic.encoded_size(),
                 ResponseKind::Tunes(tune) => tune.encoded_size(),
                 ResponseKind::Heartbeat(heartbeat) => heartbeat.encoded_size(),
                 ResponseKind::Deliver(deliver) => deliver.encoded_size(),
+                ResponseKind::Metadata(metadata) => metadata.encoded_size(),
+                ResponseKind::MetadataUpdate(metadata) => metadata.encoded_size(),
+                ResponseKind::PublishConfirm(publish_confirm) => publish_confirm.encoded_size(),
+                ResponseKind::PublishError(publish_error) => publish_error.encoded_size(),
+                ResponseKind::QueryOffset(query_offset) => query_offset.encoded_size(),
+                ResponseKind::QueryPublisherSequence(query_publisher) => {
+                    query_publisher.encoded_size()
+                }
             }
         }
 
@@ -249,12 +232,21 @@ mod tests {
         ) -> Result<(), crate::error::EncodeError> {
             match self {
                 ResponseKind::Open(open) => open.encode(writer),
+                ResponseKind::Close(close) => close.encode(writer),
                 ResponseKind::PeerProperties(peer_properties) => peer_properties.encode(writer),
                 ResponseKind::SaslHandshake(handshake) => handshake.encode(writer),
                 ResponseKind::Generic(generic) => generic.encode(writer),
                 ResponseKind::Tunes(tune) => tune.encode(writer),
                 ResponseKind::Heartbeat(heartbeat) => heartbeat.encode(writer),
                 ResponseKind::Deliver(deliver) => deliver.encode(writer),
+                ResponseKind::Metadata(metadata) => metadata.encode(writer),
+                ResponseKind::MetadataUpdate(metadata) => metadata.encode(writer),
+                ResponseKind::PublishConfirm(publish_confirm) => publish_confirm.encode(writer),
+                ResponseKind::PublishError(publish_error) => publish_error.encode(writer),
+                ResponseKind::QueryOffset(query_offset) => query_offset.encode(writer),
+                ResponseKind::QueryPublisherSequence(query_publisher) => {
+                    query_publisher.encode(writer)
+                }
             }
         }
     }
@@ -332,5 +324,65 @@ mod tests {
     #[test]
     fn tune_response_test() {
         response_test!(TunesCommand, ResponseKind::Tunes, COMMAND_TUNE);
+    }
+    #[test]
+    fn metadata_response_test() {
+        response_test!(MetadataResponse, ResponseKind::Metadata, COMMAND_METADATA);
+    }
+    #[test]
+    fn close_response_test() {
+        response_test!(CloseResponse, ResponseKind::Close, COMMAND_CLOSE);
+    }
+    #[test]
+    fn deliver_response_test() {
+        response_test!(DeliverCommand, ResponseKind::Deliver, COMMAND_DELIVER);
+    }
+    #[test]
+    fn metadata_update_response_test() {
+        response_test!(
+            MetadataUpdateCommand,
+            ResponseKind::MetadataUpdate,
+            COMMAND_METADATA_UPDATE
+        );
+    }
+    #[test]
+    fn publish_confirm_response_test() {
+        response_test!(
+            PublishConfirm,
+            ResponseKind::PublishConfirm,
+            COMMAND_PUBLISH_CONFIRM
+        );
+    }
+    #[test]
+    fn publish_error_response_test() {
+        response_test!(
+            PublishErrorResponse,
+            ResponseKind::PublishError,
+            COMMAND_PUBLISH_ERROR
+        );
+    }
+    #[test]
+    fn query_offset_response_test() {
+        response_test!(
+            QueryOffsetResponse,
+            ResponseKind::QueryOffset,
+            COMMAND_QUERY_OFFSET
+        );
+    }
+    #[test]
+    fn query_publisher_response_test() {
+        response_test!(
+            QueryPublisherResponse,
+            ResponseKind::QueryPublisherSequence,
+            COMMAND_QUERY_PUBLISHER_SEQUENCE
+        );
+    }
+    #[test]
+    fn heartbeat_response_test() {
+        response_test!(
+            HeartbeatResponse,
+            ResponseKind::Heartbeat,
+            COMMAND_HEARTBEAT
+        );
     }
 }

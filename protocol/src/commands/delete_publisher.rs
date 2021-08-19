@@ -1,6 +1,10 @@
 use std::io::Write;
 
-use crate::{codec::Encoder, error::EncodeError, protocol::commands::COMMAND_DELETE_PUBLISHER};
+use crate::{
+    codec::{Decoder, Encoder},
+    error::{DecodeError, EncodeError},
+    protocol::commands::COMMAND_DELETE_PUBLISHER,
+};
 
 use super::Command;
 
@@ -41,26 +45,25 @@ impl Command for DeletePublisherCommand {
     }
 }
 
+impl Decoder for DeletePublisherCommand {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, correlation_id) = u32::decode(input)?;
+        let (input, publisher_id) = u8::decode(input)?;
+
+        Ok((
+            input,
+            DeletePublisherCommand {
+                correlation_id,
+                publisher_id,
+            },
+        ))
+    }
+}
 #[cfg(test)]
 mod tests {
-    use crate::{codec::Decoder, commands::tests::command_encode_decode_test, error::DecodeError};
+    use crate::commands::tests::command_encode_decode_test;
 
     use super::DeletePublisherCommand;
-
-    impl Decoder for DeletePublisherCommand {
-        fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-            let (input, correlation_id) = u32::decode(input)?;
-            let (input, publisher_id) = u8::decode(input)?;
-
-            Ok((
-                input,
-                DeletePublisherCommand {
-                    correlation_id,
-                    publisher_id,
-                },
-            ))
-        }
-    }
 
     #[test]
     fn create_stream_request_test() {

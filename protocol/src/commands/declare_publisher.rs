@@ -1,6 +1,10 @@
 use std::io::Write;
 
-use crate::{codec::Encoder, error::EncodeError, protocol::commands::COMMAND_DECLARE_PUBLISHER};
+use crate::{
+    codec::{Decoder, Encoder},
+    error::{DecodeError, EncodeError},
+    protocol::commands::COMMAND_DECLARE_PUBLISHER,
+};
 
 use super::Command;
 
@@ -46,28 +50,28 @@ impl Command for DeclarePublisherCommand {
     }
 }
 
+impl Decoder for DeclarePublisherCommand {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, correlation_id) = u32::decode(input)?;
+        let (input, stream_name) = Option::decode(input)?;
+        let (input, publisher_reference) = Option::decode(input)?;
+
+        Ok((
+            input,
+            DeclarePublisherCommand {
+                correlation_id,
+                stream_name: stream_name.unwrap(),
+                publisher_reference: publisher_reference.unwrap(),
+            },
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{codec::Decoder, commands::tests::command_encode_decode_test, error::DecodeError};
+    use crate::commands::tests::command_encode_decode_test;
 
     use super::DeclarePublisherCommand;
-
-    impl Decoder for DeclarePublisherCommand {
-        fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-            let (input, correlation_id) = u32::decode(input)?;
-            let (input, stream_name) = Option::decode(input)?;
-            let (input, publisher_reference) = Option::decode(input)?;
-
-            Ok((
-                input,
-                DeclarePublisherCommand {
-                    correlation_id,
-                    stream_name: stream_name.unwrap(),
-                    publisher_reference: publisher_reference.unwrap(),
-                },
-            ))
-        }
-    }
 
     #[test]
     fn create_stream_request_test() {

@@ -78,7 +78,7 @@ impl Decoder for CloseRequest {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct CloseResponse {
-    correlation_id: u32,
+    pub(crate) correlation_id: u32,
     response_code: ResponseCode,
 }
 

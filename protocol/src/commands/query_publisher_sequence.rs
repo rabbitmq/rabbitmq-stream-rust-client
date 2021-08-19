@@ -43,9 +43,9 @@ impl Encoder for QueryPublisherRequest {
     }
 
     fn encoded_size(&self) -> u32 {
-        let stream_len = self.stream.len() as u32;
-        let publisher_reference_len = self.publisher_reference.len() as u32;
-        self.correlation_id.encoded_size() + stream_len + publisher_reference_len
+        self.correlation_id.encoded_size()
+            + self.stream.as_str().encoded_size()
+            + self.publisher_reference.as_str().encoded_size()
     }
 }
 
@@ -85,7 +85,7 @@ impl Decoder for QueryPublisherRequest {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct QueryPublisherResponse {
-    correlation_id: u32,
+    pub(crate) correlation_id: u32,
     response_code: ResponseCode,
     sequence: u64,
 }
