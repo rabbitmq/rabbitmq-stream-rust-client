@@ -65,6 +65,7 @@ async fn client_metadata_test() {
     assert_eq!(
         Some(&StreamMetadata {
             stream: test.stream.clone(),
+            response_code: ResponseCode::Ok,
             leader: Broker {
                 host: String::from("localhost"),
                 port: 5552,
