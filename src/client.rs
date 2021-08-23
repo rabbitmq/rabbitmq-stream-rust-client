@@ -4,6 +4,7 @@ use crate::{
     dispatcher::Dispatcher,
     error::RabbitMqStreamError,
     handler::MessageHandler,
+    metadata::StreamMetadata,
     options::ClientOptions,
     RabbitMQStreamResult,
 };
@@ -17,6 +18,7 @@ use rabbitmq_stream_protocol::{
         credit::CreditCommand,
         delete::Delete,
         generic::GenericResponse,
+        metadata::MetadataCommand,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
         sasl_authenticate::SaslAuthenticateCommand,
@@ -151,6 +153,15 @@ impl Client {
     }
     pub async fn credit(&self, subscription_id: u8, credit: u16) -> RabbitMQStreamResult<()> {
         self.send(CreditCommand::new(subscription_id, credit)).await
+    }
+
+    pub async fn metadata(
+        &self,
+        streams: Vec<String>,
+    ) -> RabbitMQStreamResult<HashMap<String, StreamMetadata>> {
+        self.send_and_receive(|correlation_id| MetadataCommand::new(correlation_id, streams))
+            .await
+            .map(crate::metadata::from_response)
     }
 
     async fn create_connection(

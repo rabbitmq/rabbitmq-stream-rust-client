@@ -57,32 +57,35 @@ impl Decoder for Vec<u8> {
     }
 }
 
+pub fn read_vec<T: Decoder>(input: &[u8]) -> Result<(&[u8], Vec<T>), DecodeError> {
+    let (mut input, len) = read_i32(input)?;
+    let len = len as usize;
+    let mut result: Vec<T> = Vec::new();
+    for _ in 0..len {
+        let (input1, value) = T::decode(input)?;
+        result.push(value);
+        input = input1
+    }
+    Ok((input, result))
+}
+
 impl Decoder for Vec<u32> {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (mut input, len) = read_i32(input)?;
-        let len = len as usize;
-        let mut result: Vec<u32> = Vec::new();
-        for _ in 0..len {
-            let (input1, value) = u32::decode(input)?;
-            result.push(value);
-            input = input1
-        }
+        let (input, result) = read_vec(input)?;
+        Ok((input, result))
+    }
+}
+impl Decoder for Vec<u16> {
+    fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, result) = read_vec(input)?;
         Ok((input, result))
     }
 }
 
 impl Decoder for Vec<u64> {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
-        let (mut input, len) = read_i32(input)?;
-        let len = len as usize;
-        let mut vec: Vec<u64> = Vec::new();
-        for _ in 0..len {
-            let (input1, value) = u64::decode(input)?;
-            vec.push(value);
-            input = input1;
-        }
-
-        Ok((input, vec))
+        let (input, result) = read_vec(input)?;
+        Ok((input, result))
     }
 }
 

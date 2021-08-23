@@ -196,6 +196,19 @@ impl Encoder for Vec<u32> {
     }
 }
 
+impl Encoder for Vec<u16> {
+    fn encoded_size(&self) -> u32 {
+        4 + self.iter().fold(0, |acc, v| acc + v.encoded_size())
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_i32::<BigEndian>(self.len() as i32)?;
+        for x in self {
+            x.encode(writer)?;
+        }
+        Ok(())
+    }
+}
 impl Encoder for Vec<u64> {
     fn encoded_size(&self) -> u32 {
         4 + self.iter().fold(0, |acc, v| acc + v.encoded_size())

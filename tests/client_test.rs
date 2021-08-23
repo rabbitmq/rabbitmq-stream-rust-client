@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use fake::{Fake, Faker};
-use rabbitmq_stream_client::{Client, ClientOptions};
+use rabbitmq_stream_client::{
+    metadata::{Broker, StreamMetadata},
+    Client, ClientOptions,
+};
 use rabbitmq_stream_protocol::ResponseCode;
 mod common;
 
@@ -47,4 +50,28 @@ async fn client_delete_stream_error_test() {
 
     let response = client.delete_stream(&stream).await.unwrap();
     assert_eq!(&ResponseCode::StreamDoesNotExist, response.code());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_metadata_test() {
+    let test = TestClient::create().await;
+
+    let response = test
+        .client
+        .metadata(vec![test.stream.clone()])
+        .await
+        .unwrap();
+
+    assert_eq!(
+        Some(&StreamMetadata {
+            stream: test.stream.clone(),
+            response_code: ResponseCode::Ok,
+            leader: Broker {
+                host: String::from("localhost"),
+                port: 5552,
+            },
+            replicas: vec![]
+        }),
+        response.get(&test.stream)
+    );
 }
