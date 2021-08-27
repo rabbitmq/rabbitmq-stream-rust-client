@@ -1,9 +1,10 @@
 use std::io::Write;
 
-use byteorder::{BigEndian, WriteBytesExt};
 #[cfg(test)]
 use fake::Fake;
+use ntex_amqp_codec::Message;
 
+use crate::codec::decoder::read_vec;
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
@@ -26,8 +27,9 @@ pub struct DeliverCommand {
     chunk_crc: i32,
     trailer_length: u32,
     reserved: u32,
-    data: Vec<u8>,
+    messages: Vec<Message>,
 }
+
 #[allow(clippy::too_many_arguments)]
 impl DeliverCommand {
     pub fn new(
@@ -42,7 +44,7 @@ impl DeliverCommand {
         chunk_crc: i32,
         trailer_length: u32,
         reserved: u32,
-        data: Vec<u8>,
+        messages: Vec<Message>,
     ) -> Self {
         Self {
             subscription_id,
@@ -56,7 +58,7 @@ impl DeliverCommand {
             chunk_crc,
             trailer_length,
             reserved,
-            data,
+            messages,
         }
     }
 }
@@ -74,7 +76,7 @@ impl Encoder for DeliverCommand {
             + self.chunk_crc.encoded_size()
             + self.trailer_length.encoded_size()
             + self.reserved.encoded_size()
-            + self.data.encoded_size()
+        // + self.data.encoded_size()
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
@@ -87,10 +89,10 @@ impl Encoder for DeliverCommand {
         self.epoch.encode(writer)?;
         self.chunk_first_offset.encode(writer)?;
         self.chunk_crc.encode(writer)?;
-        writer.write_u32::<BigEndian>(self.data.len() as u32)?;
-        self.trailer_length.encode(writer)?;
-        self.reserved.encode(writer)?;
-        writer.write_all(&self.data)?;
+        // writer.write_u32::<BigEndian>(self.data.len() as u32)?;
+        // self.trailer_length.encode(writer)?;
+        // self.reserved.encode(writer)?;
+        // // writer.write_all(&self.data)?;
         Ok(())
     }
 }
@@ -106,14 +108,25 @@ impl Decoder for DeliverCommand {
         let (input, epoch) = u64::decode(input)?;
         let (input, chunk_first_offset) = u64::decode(input)?;
         let (input, chunk_crc) = i32::decode(input)?;
-        let (input, data_length) = u32::decode(input)?;
+        let (input, _data_length) = u32::decode(input)?;
         let (input, trailer_length) = u32::decode(input)?;
-        let (input, reserved) = u32::decode(input)?;
+        let (mut input, reserved) = u32::decode(input)?;
 
-        let (input, data) = (
-            &input[data_length as usize..],
-            input[..data_length as usize].to_vec(),
-        );
+        let mut i = 0;
+        let mut messages = Vec::new();
+        while i < num_records {
+            let (input1, result) = read_vec(input)?;
+            let x = <Message as ntex_amqp_codec::Decode>::decode(&result);
+            messages.push(x.unwrap().1);
+            input = input1;
+            // info!("{}", x.unwrap().1.properties().unwrap().reply_to.unwrap());
+            i += 1;
+        }
+
+        // let (input, data) = (
+        //     &input[data_length as usize..],
+        //     input[..data_length as usize].to_vec(),
+        // );
 
         Ok((
             input,
@@ -129,7 +142,7 @@ impl Decoder for DeliverCommand {
                 chunk_crc,
                 trailer_length,
                 reserved,
-                data,
+                messages,
             },
         ))
     }

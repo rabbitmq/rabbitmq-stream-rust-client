@@ -7,6 +7,8 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1"
+ntex-amqp-codec = "0.7.2"
+tracing = "0.1"
 
 
 [dev-dependencies]

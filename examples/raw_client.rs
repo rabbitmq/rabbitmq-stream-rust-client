@@ -22,8 +22,10 @@ async fn main() -> Result<(), RabbitMqStreamError> {
 
     let client = Client::connect(ClientOptions::default()).await?;
 
+    // let _ = client.create_stream("test", HashMap::new()).await?;
+
     let _ = client
-        .subscribe(1, "test", OffsetSpecification::Next, 1, HashMap::new())
+        .subscribe(1, "test", OffsetSpecification::First, 1, HashMap::new())
         .await?;
 
     let client_inner = client.clone();
