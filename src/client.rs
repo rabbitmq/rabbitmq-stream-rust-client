@@ -25,6 +25,7 @@ use rabbitmq_stream_protocol::{
         sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
         subscribe::{OffsetSpecification, SubscribeCommand},
         tune::TunesCommand,
+        unsubscribe::UnSubscribeCommand,
     },
     FromResponse, Request, Response, ResponseKind,
 };
@@ -132,6 +133,13 @@ impl Client {
                 credit,
                 properties,
             )
+        })
+        .await
+    }
+
+    pub async fn unsubscribe(&self, subscription_id: u8) -> RabbitMQStreamResult<GenericResponse> {
+        self.send_and_receive(|correlation_id| {
+            UnSubscribeCommand::new(correlation_id, subscription_id)
         })
         .await
     }

@@ -19,3 +19,6 @@ rabbitmq-server:
 		-e RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost" \
 		--pull always \
 		pivotalrabbitmq/rabbitmq-stream
+
+help:
+	cat Makefile

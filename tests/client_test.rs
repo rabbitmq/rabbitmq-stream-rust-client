@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
 use fake::{Fake, Faker};
-use rabbitmq_stream_client::{
-    metadata::{Broker, StreamMetadata},
-    Client, ClientOptions,
-};
+use rabbitmq_stream_client::metadata::{Broker, StreamMetadata};
+use rabbitmq_stream_client::{offset_specification::OffsetSpecification, Client, ClientOptions};
 use rabbitmq_stream_protocol::ResponseCode;
 mod common;
 
@@ -74,4 +72,27 @@ async fn client_metadata_test() {
         }),
         response.get(&test.stream)
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_create_subscribe_test() {
+    let test = TestClient::create().await;
+
+    let response = test
+        .client
+        .subscribe(
+            1,
+            &test.stream,
+            OffsetSpecification::Next,
+            1,
+            HashMap::new(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response = test.client.unsubscribe(1).await.unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
 }

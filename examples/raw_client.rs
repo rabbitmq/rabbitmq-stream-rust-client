@@ -46,5 +46,7 @@ async fn main() -> Result<(), RabbitMqStreamError> {
     client.set_handler(handler).await;
 
     notifier.notified().await;
+
+    client.unsubscribe(1).await?;
     Ok(())
 }
