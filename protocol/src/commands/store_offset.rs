@@ -14,15 +14,15 @@ use fake::Fake;
 #[derive(PartialEq, Debug)]
 pub struct StoreOffset {
     reference: String,
-    subscription_id: u64,
+    stream: String,
     offset: u64,
 }
 
 impl StoreOffset {
-    pub fn new(reference: String, subscription_id: u64, offset: u64) -> Self {
+    pub fn new(reference: String, stream: String, offset: u64) -> Self {
         Self {
             reference,
-            subscription_id,
+            stream,
             offset,
         }
     }
@@ -36,14 +36,14 @@ impl Encoder for StoreOffset {
         }
 
         self.reference.as_str().encode(writer)?;
-        self.subscription_id.encode(writer)?;
+        self.stream.as_str().encode(writer)?;
         self.offset.encode(writer)?;
         Ok(())
     }
 
     fn encoded_size(&self) -> u32 {
         self.reference.as_str().encoded_size()
-            + self.subscription_id.encoded_size()
+            + self.stream.as_str().encoded_size()
             + self.offset.encoded_size()
     }
 }
@@ -56,17 +56,17 @@ impl Command for StoreOffset {
 impl Decoder for StoreOffset {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, opt_reference) = Option::decode(input)?;
-        if let Some(reference) = opt_reference {
+        let (input, opt_stream) = Option::decode(input)?;
+        if let (Some(reference), Some(stream)) = (opt_reference, opt_stream) {
             match reference.len() {
                 0..=255 => {
-                    let (input, subscription_id) = u64::decode(input)?;
                     let (input, offset) = u64::decode(input)?;
 
                     return Ok((
                         input,
                         StoreOffset {
                             reference,
-                            subscription_id,
+                            stream,
                             offset,
                         },
                     ));

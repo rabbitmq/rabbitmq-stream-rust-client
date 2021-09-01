@@ -21,8 +21,10 @@ use rabbitmq_stream_protocol::{
         metadata::MetadataCommand,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
+        query_offset::{QueryOffsetRequest, QueryOffsetResponse},
         sasl_authenticate::SaslAuthenticateCommand,
         sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
+        store_offset::StoreOffset,
         subscribe::{OffsetSpecification, SubscribeCommand},
         tune::TunesCommand,
         unsubscribe::UnSubscribeCommand,
@@ -170,6 +172,32 @@ impl Client {
         self.send_and_receive(|correlation_id| MetadataCommand::new(correlation_id, streams))
             .await
             .map(crate::metadata::from_response)
+    }
+
+    pub async fn store_offset(
+        &self,
+        reference: &str,
+        stream: &str,
+        offset: u64,
+    ) -> RabbitMQStreamResult<()> {
+        self.send(StoreOffset::new(
+            reference.to_owned(),
+            stream.to_owned(),
+            offset,
+        ))
+        .await
+    }
+
+    pub async fn query_offset(
+        &self,
+        reference: String,
+        stream: &str,
+    ) -> Result<u64, RabbitMqStreamError> {
+        self.send_and_receive::<QueryOffsetResponse, _, _>(|correlation_id| {
+            QueryOffsetRequest::new(correlation_id, reference, stream.to_owned())
+        })
+        .await
+        .map(|query_offset| query_offset.from_response())
     }
 
     async fn create_connection(

@@ -96,3 +96,24 @@ async fn client_create_subscribe_test() {
 
     assert_eq!(&ResponseCode::Ok, response.code());
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_store_and_query_offset_test() {
+    let test = TestClient::create().await;
+
+    let offset: u64 = Faker.fake();
+    let reference: String = Faker.fake();
+
+    test.client
+        .store_offset(&reference, &test.stream, offset)
+        .await
+        .unwrap();
+
+    let response = test
+        .client
+        .query_offset(reference.clone(), &test.stream)
+        .await
+        .unwrap();
+
+    assert_eq!(offset, response);
+}

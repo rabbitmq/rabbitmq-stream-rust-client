@@ -2,7 +2,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_QUERY_OFFSET,
-    ResponseCode,
+    FromResponse, ResponseCode,
 };
 use std::io::Write;
 
@@ -98,6 +98,10 @@ impl QueryOffsetResponse {
             offset,
         }
     }
+
+    pub fn from_response(&self) -> u64 {
+        self.offset
+    }
 }
 
 impl Encoder for QueryOffsetResponse {
@@ -128,6 +132,15 @@ impl Decoder for QueryOffsetResponse {
                 offset,
             },
         ))
+    }
+}
+
+impl FromResponse for QueryOffsetResponse {
+    fn from_response(response: crate::Response) -> Option<Self> {
+        match response.kind {
+            crate::ResponseKind::QueryOffset(query_offset) => Some(query_offset),
+            _ => None,
+        }
     }
 }
 
