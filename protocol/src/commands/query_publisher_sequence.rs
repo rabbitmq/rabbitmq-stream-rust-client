@@ -2,7 +2,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_QUERY_PUBLISHER_SEQUENCE,
-    ResponseCode,
+    FromResponse, ResponseCode,
 };
 use std::io::Write;
 
@@ -98,6 +98,10 @@ impl QueryPublisherResponse {
             sequence,
         }
     }
+
+    pub fn from_response(&self) -> u64 {
+        self.sequence
+    }
 }
 
 impl Encoder for QueryPublisherResponse {
@@ -128,6 +132,15 @@ impl Decoder for QueryPublisherResponse {
                 sequence,
             },
         ))
+    }
+}
+
+impl FromResponse for QueryPublisherResponse {
+    fn from_response(response: crate::Response) -> Option<Self> {
+        match response.kind {
+            crate::ResponseKind::QueryPublisherSequence(query_offset) => Some(query_offset),
+            _ => None,
+        }
     }
 }
 
