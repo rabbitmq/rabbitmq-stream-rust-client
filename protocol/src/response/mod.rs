@@ -123,7 +123,9 @@ impl Decoder for Response {
             COMMAND_SASL_HANDSHAKE => SaslHandshakeResponse::decode(input)
                 .map(|(i, kind)| (i, ResponseKind::SaslHandshake(kind)))?,
 
-            COMMAND_SASL_AUTHENTICATE
+            COMMAND_DECLARE_PUBLISHER
+            | COMMAND_DELETE_PUBLISHER
+            | COMMAND_SASL_AUTHENTICATE
             | COMMAND_SUBSCRIBE
             | COMMAND_UNSUBSCRIBE
             | COMMAND_CREATE_STREAM

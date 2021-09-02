@@ -16,12 +16,15 @@ use rabbitmq_stream_protocol::{
     commands::{
         create_stream::CreateStreamCommand,
         credit::CreditCommand,
+        declare_publisher::DeclarePublisherCommand,
         delete::Delete,
+        delete_publisher::DeletePublisherCommand,
         generic::GenericResponse,
         metadata::MetadataCommand,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
         query_offset::{QueryOffsetRequest, QueryOffsetResponse},
+        query_publisher_sequence::{QueryPublisherRequest, QueryPublisherResponse},
         sasl_authenticate::SaslAuthenticateCommand,
         sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
         store_offset::StoreOffset,
@@ -161,6 +164,7 @@ impl Client {
         self.send_and_receive(|correlation_id| Delete::new(correlation_id, stream.to_owned()))
             .await
     }
+
     pub async fn credit(&self, subscription_id: u8, credit: u16) -> RabbitMQStreamResult<()> {
         self.send(CreditCommand::new(subscription_id, credit)).await
     }
@@ -198,6 +202,45 @@ impl Client {
         })
         .await
         .map(|query_offset| query_offset.from_response())
+    }
+
+    pub async fn declare_publisher(
+        &self,
+        publisher_id: u8,
+        publisher_reference: &str,
+        stream: &str,
+    ) -> RabbitMQStreamResult<GenericResponse> {
+        self.send_and_receive(|correlation_id| {
+            DeclarePublisherCommand::new(
+                correlation_id,
+                publisher_id,
+                publisher_reference.to_owned(),
+                stream.to_owned(),
+            )
+        })
+        .await
+    }
+
+    pub async fn delete_publisher(
+        &self,
+        publisher_id: u8,
+    ) -> RabbitMQStreamResult<GenericResponse> {
+        self.send_and_receive(|correlation_id| {
+            DeletePublisherCommand::new(correlation_id, publisher_id)
+        })
+        .await
+    }
+
+    pub async fn query_publisher_sequence(
+        &self,
+        reference: &str,
+        stream: &str,
+    ) -> Result<u64, RabbitMqStreamError> {
+        self.send_and_receive::<QueryPublisherResponse, _, _>(|correlation_id| {
+            QueryPublisherRequest::new(correlation_id, reference.to_owned(), stream.to_owned())
+        })
+        .await
+        .map(|sequence| sequence.from_response())
     }
 
     async fn create_connection(

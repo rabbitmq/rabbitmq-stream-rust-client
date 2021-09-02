@@ -117,3 +117,53 @@ async fn client_store_and_query_offset_test() {
 
     assert_eq!(offset, response);
 }
+
+/*
+ * Do not close a stream with a publisher declared.
+ * It turns out to unparsable response
+ */
+#[tokio::test(flavor = "multi_thread")]
+async fn client_declare_delete_publisher() {
+    let test = TestClient::create().await;
+
+    let reference: String = Faker.fake();
+
+    let response = test
+        .client
+        .declare_publisher(1, &reference, &test.stream)
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response = test.client.delete_publisher(1).await.unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_query_publisher() {
+    let test = TestClient::create().await;
+
+    let reference: String = Faker.fake();
+
+    let response = test
+        .client
+        .declare_publisher(1, &reference, &test.stream)
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response = test
+        .client
+        .query_publisher_sequence(&reference, &test.stream)
+        .await
+        .unwrap();
+
+    assert_eq!(0, response);
+
+    let response = test.client.delete_publisher(1).await.unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+}

@@ -15,16 +15,23 @@ use fake::Fake;
 #[derive(PartialEq, Debug)]
 pub struct DeclarePublisherCommand {
     correlation_id: u32,
-    stream_name: String,
+    publisher_id: u8,
     publisher_reference: String,
+    stream_name: String,
 }
 
 impl DeclarePublisherCommand {
-    pub fn new(correlation_id: u32, stream_name: String, publisher_reference: String) -> Self {
+    pub fn new(
+        correlation_id: u32,
+        publisher_id: u8,
+        publisher_reference: String,
+        stream_name: String,
+    ) -> Self {
         Self {
             correlation_id,
-            stream_name,
+            publisher_id,
             publisher_reference,
+            stream_name,
         }
     }
 }
@@ -32,14 +39,16 @@ impl DeclarePublisherCommand {
 impl Encoder for DeclarePublisherCommand {
     fn encoded_size(&self) -> u32 {
         self.correlation_id.encoded_size()
-            + self.stream_name.as_str().encoded_size()
+            + self.publisher_id.encoded_size()
             + self.publisher_reference.as_str().encoded_size()
+            + self.stream_name.as_str().encoded_size()
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.correlation_id.encode(writer)?;
-        self.stream_name.as_str().encode(writer)?;
+        self.publisher_id.encode(writer)?;
         self.publisher_reference.as_str().encode(writer)?;
+        self.stream_name.as_str().encode(writer)?;
         Ok(())
     }
 }
@@ -53,15 +62,17 @@ impl Command for DeclarePublisherCommand {
 impl Decoder for DeclarePublisherCommand {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
-        let (input, stream_name) = Option::decode(input)?;
+        let (input, publisher_id) = u8::decode(input)?;
         let (input, publisher_reference) = Option::decode(input)?;
+        let (input, stream_name) = Option::decode(input)?;
 
         Ok((
             input,
             DeclarePublisherCommand {
                 correlation_id,
-                stream_name: stream_name.unwrap(),
+                publisher_id,
                 publisher_reference: publisher_reference.unwrap(),
+                stream_name: stream_name.unwrap(),
             },
         ))
     }

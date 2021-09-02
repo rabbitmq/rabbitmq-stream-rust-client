@@ -11,7 +11,10 @@ build: fmt clippy
 	cargo build
 
 test: build
-	cargo test --all
+	cargo test --all -- --nocapture
+
+watch: build
+	cargo watch -x 'test --all -- --nocapture'
 
 rabbitmq-server:
 	docker run -it --rm --name rabbitmq-stream-go-client-test \
