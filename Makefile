@@ -13,6 +13,9 @@ build: fmt clippy
 test: build
 	cargo test --all -- --nocapture
 
+watch: build
+	cargo watch -x 'test --all -- --nocapture'
+
 rabbitmq-server:
 	docker run -it --rm --name rabbitmq-stream-go-client-test \
 		-p 5552:5552 -p 5672:5672 -p 15672:15672 \
