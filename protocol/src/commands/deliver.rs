@@ -1,17 +1,16 @@
 use std::io::Write;
 
-#[cfg(test)]
-use fake::Fake;
-use ntex_amqp_codec::Message;
-
+use super::Command;
 use crate::codec::decoder::read_vec;
+use crate::message::Message;
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_DELIVER,
 };
-
-use super::Command;
+use byteorder::{BigEndian, WriteBytesExt};
+#[cfg(test)]
+use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
@@ -20,7 +19,6 @@ pub struct DeliverCommand {
     magic_version: i8,
     chunk_type: u8,
     num_entries: u16,
-    num_records: u32,
     timestamp: u64,
     epoch: u64,
     chunk_first_offset: u64,
@@ -37,7 +35,6 @@ impl DeliverCommand {
         magic_version: i8,
         chunk_type: u8,
         num_entries: u16,
-        num_records: u32,
         timestamp: u64,
         epoch: u64,
         chunk_first_offset: u64,
@@ -51,7 +48,6 @@ impl DeliverCommand {
             magic_version,
             chunk_type,
             num_entries,
-            num_records,
             timestamp,
             epoch,
             chunk_first_offset,
@@ -69,14 +65,17 @@ impl Encoder for DeliverCommand {
             + self.magic_version.encoded_size()
             + self.chunk_type.encoded_size()
             + self.num_entries.encoded_size()
-            + self.num_records.encoded_size()
+            + 4 // num records
             + self.timestamp.encoded_size()
             + self.epoch.encoded_size()
             + self.chunk_first_offset.encoded_size()
             + self.chunk_crc.encoded_size()
             + self.trailer_length.encoded_size()
             + self.reserved.encoded_size()
-        // + self.data.encoded_size()
+            + 4 // vec of messages
+            + self.messages.iter().fold(0, |acc, message| {
+                acc + 1 +  message.encoded_size()
+            }) as u32
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
@@ -84,15 +83,25 @@ impl Encoder for DeliverCommand {
         self.magic_version.encode(writer)?;
         self.chunk_type.encode(writer)?;
         self.num_entries.encode(writer)?;
-        self.num_records.encode(writer)?;
+        u32::encode(&(self.messages.len() as u32), writer)?;
         self.timestamp.encode(writer)?;
         self.epoch.encode(writer)?;
         self.chunk_first_offset.encode(writer)?;
         self.chunk_crc.encode(writer)?;
-        // writer.write_u32::<BigEndian>(self.data.len() as u32)?;
-        // self.trailer_length.encode(writer)?;
-        // self.reserved.encode(writer)?;
-        // // writer.write_all(&self.data)?;
+
+        let size = self
+            .messages
+            .iter()
+            .fold(0, |acc, message| acc + 1 + message.encoded_size());
+
+        writer.write_u32::<BigEndian>(size as u32)?;
+        self.trailer_length.encode(writer)?;
+        self.reserved.encode(writer)?;
+
+        for message in &self.messages {
+            message.encoded_size().encode(writer)?;
+            message.encode(writer)?;
+        }
         Ok(())
     }
 }
@@ -112,21 +121,13 @@ impl Decoder for DeliverCommand {
         let (input, trailer_length) = u32::decode(input)?;
         let (mut input, reserved) = u32::decode(input)?;
 
-        let mut i = 0;
         let mut messages = Vec::new();
-        while i < num_records {
+        for _ in 0..num_records {
             let (input1, result) = read_vec(input)?;
-            let x = <Message as ntex_amqp_codec::Decode>::decode(&result);
-            messages.push(x.unwrap().1);
+            let (_, message) = Message::decode(&result)?;
+            messages.push(message);
             input = input1;
-            // info!("{}", x.unwrap().1.properties().unwrap().reply_to.unwrap());
-            i += 1;
         }
-
-        // let (input, data) = (
-        //     &input[data_length as usize..],
-        //     input[..data_length as usize].to_vec(),
-        // );
 
         Ok((
             input,
@@ -135,7 +136,6 @@ impl Decoder for DeliverCommand {
                 magic_version,
                 chunk_type,
                 num_entries,
-                num_records,
                 timestamp,
                 epoch,
                 chunk_first_offset,
@@ -156,9 +156,17 @@ impl Command for DeliverCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::commands::tests::command_encode_decode_test;
+    use fake::{Dummy, Faker};
 
-    use super::DeliverCommand;
+    use crate::commands::tests::command_encode_decode_test;
+    use ntex_amqp_codec::Message as AmpqMessage;
+
+    use super::{DeliverCommand, Message};
+    impl Dummy<Faker> for Message {
+        fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &Faker, _rng: &mut R) -> Self {
+            Message(AmpqMessage::default())
+        }
+    }
 
     #[test]
     fn deliver_request_test() {
