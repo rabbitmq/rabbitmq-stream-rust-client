@@ -22,7 +22,7 @@ async fn main() -> Result<(), RabbitMqStreamError> {
 
     let client = Client::connect(ClientOptions::default()).await?;
 
-    // let _ = client.create_stream("test", HashMap::new()).await?;
+    let _ = client.create_stream("test", HashMap::new()).await?;
 
     let _ = client
         .subscribe(1, "test", OffsetSpecification::First, 1, HashMap::new())
