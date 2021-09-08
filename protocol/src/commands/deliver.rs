@@ -13,9 +13,9 @@ use byteorder::{BigEndian, WriteBytesExt};
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct DeliverCommand {
-    subscription_id: u8,
+    pub subscription_id: u8,
     magic_version: i8,
     chunk_type: u8,
     num_entries: u16,
@@ -25,7 +25,7 @@ pub struct DeliverCommand {
     chunk_crc: i32,
     trailer_length: u32,
     reserved: u32,
-    messages: Vec<Message>,
+    pub messages: Vec<Message>,
 }
 
 #[allow(clippy::too_many_arguments)]

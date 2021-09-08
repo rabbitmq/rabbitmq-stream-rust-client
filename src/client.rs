@@ -23,6 +23,7 @@ use rabbitmq_stream_protocol::{
         metadata::MetadataCommand,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
+        publish::PublishCommand,
         query_offset::{QueryOffsetRequest, QueryOffsetResponse},
         query_publisher_sequence::{QueryPublisherRequest, QueryPublisherResponse},
         sasl_authenticate::SaslAuthenticateCommand,
@@ -32,10 +33,15 @@ use rabbitmq_stream_protocol::{
         tune::TunesCommand,
         unsubscribe::UnSubscribeCommand,
     },
+    message::Message,
+    types::PublishedMessage,
     FromResponse, Request, Response, ResponseKind,
 };
 use std::future::Future;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicU64, Arc},
+};
 use tokio::sync::RwLock;
 use tokio::{net::TcpStream, sync::Notify};
 use tokio_util::codec::Framed;
@@ -75,6 +81,7 @@ pub struct Client {
     state: Arc<RwLock<ClientState>>,
     opts: ClientOptions,
     tune_notifier: Arc<Notify>,
+    publish_sequence: Arc<AtomicU64>,
 }
 
 impl Client {
@@ -98,6 +105,7 @@ impl Client {
             channel: Arc::new(sender),
             state: Arc::new(RwLock::new(state)),
             tune_notifier: Arc::new(Notify::new()),
+            publish_sequence: Arc::new(AtomicU64::new(1)),
         };
 
         client.initialize(receiver).await?;
@@ -229,6 +237,30 @@ impl Client {
             DeletePublisherCommand::new(correlation_id, publisher_id)
         })
         .await
+    }
+
+    pub async fn publish(
+        &self,
+        publisher_id: u8,
+        messages: impl Into<Vec<Message>>,
+    ) -> RabbitMQStreamResult<Vec<u64>> {
+        let messages = messages.into();
+        let mut messages_to_publish = Vec::with_capacity(messages.len());
+        let mut sequences = Vec::with_capacity(messages.len());
+
+        // TODO batch publish with max frame size check
+        for message in messages {
+            let publishing_id = self
+                .publish_sequence
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+            sequences.push(publishing_id);
+            messages_to_publish.push(PublishedMessage::new(publishing_id, message));
+        }
+        self.send(PublishCommand::new(publisher_id, messages_to_publish))
+            .await?;
+
+        Ok(sequences)
     }
 
     pub async fn query_publisher_sequence(
