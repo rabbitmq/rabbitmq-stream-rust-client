@@ -7,6 +7,7 @@ pub enum DecodeError {
     UnknownResponseCode(u16),
     UnsupportedResponseType(u16),
     MismatchSize(usize),
+    MessageParse(String),
     Empty,
 }
 
