@@ -23,15 +23,17 @@ impl Header {
 #[cfg(test)]
 use fake::Fake;
 
+use crate::message::Message;
+
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct PublishedMessage {
     pub(crate) publishing_id: u64,
-    pub(crate) message: Vec<u8>,
+    pub(crate) message: Message,
 }
 
 impl PublishedMessage {
-    pub fn new(publishing_id: u64, message: Vec<u8>) -> Self {
+    pub fn new(publishing_id: u64, message: Message) -> Self {
         Self {
             publishing_id,
             message,

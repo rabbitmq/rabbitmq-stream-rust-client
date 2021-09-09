@@ -100,11 +100,12 @@ impl Encoder for Header {
 
 impl Encoder for PublishedMessage {
     fn encoded_size(&self) -> u32 {
-        self.publishing_id.encoded_size() + self.message.encoded_size()
+        self.publishing_id.encoded_size() + 4 + self.message.encoded_size()
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.publishing_id.encode(writer)?;
+        self.message.encoded_size().encode(writer)?;
         self.message.encode(writer)?;
         Ok(())
     }

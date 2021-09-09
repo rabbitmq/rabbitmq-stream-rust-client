@@ -3,10 +3,12 @@ use std::collections::HashMap;
 use fake::{Fake, Faker};
 use rabbitmq_stream_client::metadata::{Broker, StreamMetadata};
 use rabbitmq_stream_client::{offset_specification::OffsetSpecification, Client, ClientOptions};
-use rabbitmq_stream_protocol::ResponseCode;
+use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};
 mod common;
 
 use common::TestClient;
+use rabbitmq_stream_protocol::message::Message;
+use tokio::sync::mpsc::channel;
 #[tokio::test]
 async fn client_connection_test() {
     let client = Client::connect(ClientOptions::default()).await.unwrap();
@@ -166,4 +168,60 @@ async fn client_query_publisher() {
     let response = test.client.delete_publisher(1).await.unwrap();
 
     assert_eq!(&ResponseCode::Ok, response.code());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_publish() {
+    let test = TestClient::create().await;
+
+    let (tx, mut rx) = channel(1);
+    let reference: String = Faker.fake();
+
+    let handler = move |response: Response| async move {
+        match response.kind() {
+            ResponseKind::Deliver(delivery) => {
+                tx.send(delivery.clone()).await.unwrap();
+            }
+            _ => {}
+        }
+        Ok(())
+    };
+    let _ = test
+        .client
+        .subscribe(
+            1,
+            &test.stream,
+            OffsetSpecification::First,
+            1,
+            HashMap::new(),
+        )
+        .await
+        .unwrap();
+
+    test.client.set_handler(handler).await;
+
+    let _ = test
+        .client
+        .declare_publisher(1, &reference, &test.stream)
+        .await
+        .unwrap();
+
+    let sequences = test
+        .client
+        .publish(1, Message::builder().body(b"message".to_vec()).build())
+        .await
+        .unwrap();
+
+    assert_eq!(1, sequences.len());
+    let delivery = rx.recv().await.unwrap();
+
+    let _ = test.client.unsubscribe(1).await.unwrap();
+    let _ = test.client.delete_publisher(1).await.unwrap();
+
+    assert_eq!(1, delivery.subscription_id);
+    assert_eq!(1, delivery.messages.len());
+    assert_eq!(
+        Some(b"message".as_ref()),
+        delivery.messages.get(0).unwrap().data()
+    );
 }

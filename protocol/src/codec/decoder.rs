@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use byteorder::ByteOrder;
 
+use crate::message::Message;
 use crate::types::PublishedMessage;
 use crate::types::PublishingError;
 use crate::{error::DecodeError, types::Header};
@@ -101,7 +102,8 @@ impl Decoder for Header {
 impl Decoder for PublishedMessage {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
         let (input, publishing_id) = u64::decode(input)?;
-        let (input, message) = Vec::decode(input)?;
+        let (input, body) = read_vec::<u8>(input)?;
+        let (_, message) = Message::decode(&body)?;
         Ok((input, PublishedMessage::new(publishing_id, message)))
     }
 }
