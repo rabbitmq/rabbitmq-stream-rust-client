@@ -21,7 +21,7 @@ use crate::{
 mod shims;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ResponseCode {
     Ok,
     StreamDoesNotExist,

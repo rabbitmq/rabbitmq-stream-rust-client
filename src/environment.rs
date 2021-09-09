@@ -1,7 +1,11 @@
-use crate::{Client, ClientOptions, RabbitMQStreamResult};
+use crate::{
+    error::StreamDeleteError, stream_creator::StreamCreator, Client, ClientOptions,
+    RabbitMQStreamResult,
+};
 
+#[derive(Clone)]
 pub struct Environment {
-    options: EnvironmentOptions,
+    pub(crate) options: EnvironmentOptions,
 }
 
 impl Environment {
@@ -12,6 +16,27 @@ impl Environment {
     async fn boostrap(options: EnvironmentOptions) -> RabbitMQStreamResult<Self> {
         Client::connect(options.client_options.clone()).await?;
         Ok(Environment { options })
+    }
+
+    pub fn stream_creator(&self) -> StreamCreator {
+        StreamCreator { env: self.clone() }
+    }
+
+    pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {
+        Client::connect(self.options.client_options.clone()).await
+    }
+
+    pub async fn delete_stream(&self, stream: &str) -> Result<(), StreamDeleteError> {
+        let response = self.create_client().await?.delete_stream(stream).await?;
+
+        if response.is_ok() {
+            Ok(())
+        } else {
+            Err(StreamDeleteError::DeleteError {
+                stream: stream.to_owned(),
+                status: response.code().clone(),
+            })
+        }
     }
 }
 
@@ -46,8 +71,9 @@ impl EnvironmentBuilder {
         self
     }
 }
-struct EnvironmentOptions {
-    client_options: ClientOptions,
+#[derive(Clone)]
+pub struct EnvironmentOptions {
+    pub(crate) client_options: ClientOptions,
 }
 
 impl Default for EnvironmentOptions {

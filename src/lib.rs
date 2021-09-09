@@ -2,9 +2,10 @@ mod client;
 mod environment;
 pub mod error;
 pub mod offset_specification;
-pub type RabbitMQStreamResult<T> = Result<T, RabbitMqStreamError>;
+pub mod stream_creator;
+pub type RabbitMQStreamResult<T> = Result<T, ClientError>;
 
-pub use client::{Client, ClientOptions};
-use error::RabbitMqStreamError;
+pub use client::{Broker, Client, ClientOptions, StreamMetadata};
+use error::ClientError;
 
 pub use environment::{Environment, EnvironmentBuilder};

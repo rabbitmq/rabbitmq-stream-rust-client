@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 
-use rabbitmq_stream_client::{
-    error::RabbitMqStreamError, offset_specification::OffsetSpecification, Client, ClientOptions,
-};
+use rabbitmq_stream_client::{offset_specification::OffsetSpecification, Client, ClientOptions};
 use rabbitmq_stream_protocol::message::Message;
 use rabbitmq_stream_protocol::Response;
 use rabbitmq_stream_protocol::ResponseKind;
@@ -13,7 +11,7 @@ use tracing::info;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 #[tokio::main]
-async fn main() -> Result<(), RabbitMqStreamError> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         .finish();
@@ -55,7 +53,7 @@ async fn start_subscriber(
     stream: &str,
     client: &Client,
     notifier: Arc<Notify>,
-) -> Result<(), RabbitMqStreamError> {
+) -> Result<(), Box<dyn std::error::Error>> {
     let _ = client
         .subscribe(1, stream, OffsetSpecification::Next, 1, HashMap::new())
         .await?;
