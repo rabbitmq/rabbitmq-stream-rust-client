@@ -60,7 +60,7 @@ type StreamConnection = SplitStream<Framed<TcpStream, RabbitMqStreamCodec>>;
 pub struct ClientState {
     server_properties: HashMap<String, String>,
     connection_properties: HashMap<String, String>,
-    handler: Option<Arc<Box<dyn MessageHandler>>>,
+    handler: Option<Arc<dyn MessageHandler>>,
     heartbeat: u32,
     max_frame_size: u32,
 }
@@ -134,7 +134,7 @@ impl Client {
     pub async fn set_handler<H: MessageHandler>(&self, handler: H) {
         let mut state = self.state.write().await;
 
-        state.handler = Some(Arc::new(Box::new(handler)));
+        state.handler = Some(Arc::new(handler));
     }
 
     pub async fn subscribe(
