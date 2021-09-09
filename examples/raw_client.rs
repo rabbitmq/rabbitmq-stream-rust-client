@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 
 use rabbitmq_stream_client::{
     error::RabbitMqStreamError, offset_specification::OffsetSpecification, Client, ClientOptions,
 };
+use rabbitmq_stream_protocol::message::Message;
 use rabbitmq_stream_protocol::Response;
 use rabbitmq_stream_protocol::ResponseKind;
 use tokio::sync::Notify;
@@ -18,37 +20,76 @@ async fn main() -> Result<(), RabbitMqStreamError> {
 
     let notifier = Arc::new(Notify::new());
 
+    let messages = 10;
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let client = Client::connect(ClientOptions::default()).await?;
 
-    let _ = client.create_stream("test", HashMap::new()).await?;
+    let stream = "test";
 
+    let _ = client.delete_stream(stream).await?;
+
+    let _ = client.create_stream(stream, HashMap::new()).await?;
+
+    start_subscriber(stream, &client, notifier.clone()).await?;
+
+    client.declare_publisher(1, "my_publisher", stream).await?;
+    for i in 0..messages {
+        let _ = client
+            .publish(
+                1,
+                Message::builder()
+                    .body(format!("message {}", i).as_bytes().to_vec())
+                    .build(),
+            )
+            .await
+            .unwrap();
+    }
+    notifier.notified().await;
+
+    client.delete_publisher(1).await?;
+    Ok(())
+}
+
+async fn start_subscriber(
+    stream: &str,
+    client: &Client,
+    notifier: Arc<Notify>,
+) -> Result<(), RabbitMqStreamError> {
     let _ = client
-        .subscribe(1, "test", OffsetSpecification::First, 1, HashMap::new())
+        .subscribe(1, stream, OffsetSpecification::Next, 1, HashMap::new())
         .await?;
 
     let client_inner = client.clone();
     let notifier_inner = notifier.clone();
+    let counter = Arc::new(AtomicI32::new(0));
 
     let handler = move |response: Response| async move {
         match response.kind() {
             ResponseKind::Deliver(delivery) => {
-                info!("Got deliver message {:?}", &delivery);
-                client_inner.credit(1, 1).await.unwrap()
+                for message in &delivery.messages {
+                    info!(
+                        "Got message {:?}",
+                        message.data().map(|data| String::from_utf8(data.to_vec()))
+                    );
+                }
+                let len = delivery.messages.len();
+                let current = counter.fetch_add(len as i32, std::sync::atomic::Ordering::Relaxed)
+                    + len as i32;
+                if current == 10 {
+                    client_inner.unsubscribe(1).await.unwrap();
+                    notifier_inner.notify_one();
+                } else {
+                    client_inner.credit(1, 1).await.unwrap();
+                }
             }
-            ResponseKind::Heartbeat(_) => notifier_inner.notify_one(),
             _ => {
-                info!("Got  message {:?}", &response);
+                info!("Got response {:?}", &response);
             }
         }
         Ok(())
     };
 
     client.set_handler(handler).await;
-
-    notifier.notified().await;
-
-    client.unsubscribe(1).await?;
     Ok(())
 }
