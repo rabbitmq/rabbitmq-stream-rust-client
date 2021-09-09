@@ -9,5 +9,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     environment.stream_creator().create("test").await?;
+
+    environment.delete_stream("test").await?;
     Ok(())
 }
