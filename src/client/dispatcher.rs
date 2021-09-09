@@ -11,8 +11,9 @@ use tokio::sync::{
     Mutex, RwLock,
 };
 
-use crate::handler::MessageHandler;
-use crate::{channel::ChannelReceiver, error::RabbitMqStreamError};
+use crate::error::RabbitMqStreamError;
+
+use super::{channel::ChannelReceiver, handler::MessageHandler};
 
 #[derive(Clone)]
 pub(crate) struct Dispatcher<T>(DispatcherState<T>);

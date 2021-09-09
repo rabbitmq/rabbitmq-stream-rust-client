@@ -1,17 +1,16 @@
-use crate::{
-    channel::{channel, ChannelReceiver, ChannelSender},
-    codec::RabbitMqStreamCodec,
-    dispatcher::Dispatcher,
-    error::RabbitMqStreamError,
-    handler::MessageHandler,
-    metadata::StreamMetadata,
-    options::ClientOptions,
-    RabbitMQStreamResult,
-};
+mod channel;
+mod codec;
+mod dispatcher;
+mod handler;
+mod metadata;
+mod options;
+
+use crate::{error::RabbitMqStreamError, RabbitMQStreamResult};
 use futures::{
     stream::{SplitSink, SplitStream},
     Stream, StreamExt, TryFutureExt,
 };
+pub use options::ClientOptions;
 use rabbitmq_stream_protocol::{
     commands::{
         create_stream::CreateStreamCommand,
@@ -37,6 +36,15 @@ use rabbitmq_stream_protocol::{
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseKind,
 };
+
+use self::{
+    channel::{channel, ChannelReceiver, ChannelSender},
+    codec::RabbitMqStreamCodec,
+    dispatcher::Dispatcher,
+    handler::MessageHandler,
+    metadata::StreamMetadata,
+};
+
 use std::future::Future;
 use std::{
     collections::HashMap,
@@ -183,7 +191,7 @@ impl Client {
     ) -> RabbitMQStreamResult<HashMap<String, StreamMetadata>> {
         self.send_and_receive(|correlation_id| MetadataCommand::new(correlation_id, streams))
             .await
-            .map(crate::metadata::from_response)
+            .map(metadata::from_response)
     }
 
     pub async fn store_offset(
