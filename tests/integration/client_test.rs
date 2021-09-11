@@ -5,11 +5,11 @@ use rabbitmq_stream_client::{
     offset_specification::OffsetSpecification, Broker, Client, ClientOptions, StreamMetadata,
 };
 use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};
-mod common;
 
-use common::TestClient;
 use rabbitmq_stream_protocol::message::Message;
 use tokio::sync::mpsc::channel;
+
+use crate::common::TestClient;
 #[tokio::test]
 async fn client_connection_test() {
     let client = Client::connect(ClientOptions::default()).await.unwrap();

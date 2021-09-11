@@ -1,11 +1,16 @@
 use std::collections::HashMap;
 
 use fake::{Fake, Faker};
-use rabbitmq_stream_client::{Client, ClientOptions};
+use rabbitmq_stream_client::{Client, ClientOptions, Environment};
 use rabbitmq_stream_protocol::ResponseCode;
 
 pub struct TestClient {
     pub client: Client,
+    pub stream: String,
+}
+
+pub struct TestEnvironment {
+    pub env: Environment,
     pub stream: String,
 }
 
@@ -27,5 +32,15 @@ impl Drop for TestClient {
             tokio::runtime::Handle::current()
                 .block_on(async { self.client.delete_stream(&self.stream).await.unwrap() })
         });
+    }
+}
+
+impl TestEnvironment {
+    pub async fn create() -> TestEnvironment {
+        let stream: String = Faker.fake();
+
+        let env = Environment::builder().build().await.unwrap();
+
+        TestEnvironment { env, stream }
     }
 }
