@@ -19,7 +19,7 @@ impl Environment {
     }
 
     pub fn stream_creator(&self) -> StreamCreator {
-        StreamCreator { env: self.clone() }
+        StreamCreator::new(self.clone())
     }
 
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {

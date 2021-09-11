@@ -1,3 +1,4 @@
+pub mod byte_capacity;
 mod client;
 mod environment;
 pub mod error;
