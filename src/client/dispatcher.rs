@@ -11,8 +11,9 @@ use tokio::sync::{
     Mutex, RwLock,
 };
 
-use crate::handler::MessageHandler;
-use crate::{channel::ChannelReceiver, error::RabbitMqStreamError};
+use crate::error::ClientError;
+
+use super::{channel::ChannelReceiver, handler::MessageHandler};
 
 #[derive(Clone)]
 pub(crate) struct Dispatcher<T>(DispatcherState<T>);
@@ -77,7 +78,7 @@ impl<T: MessageHandler> Dispatcher<T> {
     }
     pub async fn start<R>(&self, stream: ChannelReceiver<R>)
     where
-        R: Stream<Item = Result<Response, RabbitMqStreamError>> + Unpin + Send,
+        R: Stream<Item = Result<Response, ClientError>> + Unpin + Send,
         R: 'static,
     {
         handle_response(self.0.clone(), stream).await
@@ -107,7 +108,7 @@ impl<T: MessageHandler> DispatcherState<T> {
 async fn handle_response<H, T>(state: DispatcherState<H>, mut stream: ChannelReceiver<T>)
 where
     H: MessageHandler,
-    T: Stream<Item = Result<Response, RabbitMqStreamError>> + Unpin + Send,
+    T: Stream<Item = Result<Response, ClientError>> + Unpin + Send,
     T: 'static,
 {
     tokio::spawn(async move {
@@ -146,7 +147,7 @@ mod tests {
     };
     use tokio::sync::mpsc::channel as tokio_channel;
 
-    use crate::channel::channel;
+    use super::super::channel::channel;
 
     use super::Dispatcher;
     use std::pin::Pin;
@@ -202,7 +203,7 @@ mod tests {
     }
 
     impl futures::Sink<Request> for MockIO {
-        type Error = crate::error::RabbitMqStreamError;
+        type Error = crate::error::ClientError;
 
         fn poll_ready(
             self: Pin<&mut Self>,

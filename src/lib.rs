@@ -1,15 +1,12 @@
-mod channel;
+pub mod byte_capacity;
 mod client;
-mod codec;
-mod dispatcher;
+mod environment;
 pub mod error;
-pub mod handler;
-pub mod metadata;
 pub mod offset_specification;
-mod options;
+pub mod stream_creator;
+pub type RabbitMQStreamResult<T> = Result<T, ClientError>;
 
-pub type RabbitMQStreamResult<T> = Result<T, RabbitMqStreamError>;
+pub use client::{Broker, Client, ClientOptions, StreamMetadata};
+use error::ClientError;
 
-pub use client::Client;
-use error::RabbitMqStreamError;
-pub use options::ClientOptions;
+pub use environment::{Environment, EnvironmentBuilder};

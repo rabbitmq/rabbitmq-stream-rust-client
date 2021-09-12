@@ -21,6 +21,10 @@ impl GenericResponse {
     pub fn code(&self) -> &ResponseCode {
         &self.code
     }
+
+    pub fn is_ok(&self) -> bool {
+        self.code == ResponseCode::Ok
+    }
 }
 
 impl Encoder for GenericResponse {

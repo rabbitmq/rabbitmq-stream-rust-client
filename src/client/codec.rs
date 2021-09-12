@@ -4,16 +4,16 @@ use tokio_util::codec::{Decoder as TokioDecoder, Encoder as TokioEncoder};
 
 use rabbitmq_stream_protocol::codec::{Decoder, Encoder};
 
-use crate::error::RabbitMqStreamError;
+use crate::error::ClientError;
 
 #[derive(Debug)]
 pub(crate) struct RabbitMqStreamCodec {}
 
 impl TokioDecoder for RabbitMqStreamCodec {
     type Item = Response;
-    type Error = RabbitMqStreamError;
+    type Error = ClientError;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Response>, RabbitMqStreamError> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Response>, ClientError> {
         match Response::decode(buf) {
             Ok((remaining, response)) => {
                 let len = remaining.len();
@@ -27,9 +27,9 @@ impl TokioDecoder for RabbitMqStreamCodec {
 }
 
 impl TokioEncoder<Request> for RabbitMqStreamCodec {
-    type Error = RabbitMqStreamError;
+    type Error = ClientError;
 
-    fn encode(&mut self, req: Request, buf: &mut BytesMut) -> Result<(), RabbitMqStreamError> {
+    fn encode(&mut self, req: Request, buf: &mut BytesMut) -> Result<(), ClientError> {
         let len = req.encoded_size();
         buf.reserve(len as usize);
         let mut writer = buf.writer();

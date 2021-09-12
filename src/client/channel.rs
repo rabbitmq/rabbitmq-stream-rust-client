@@ -8,12 +8,12 @@ use rabbitmq_stream_protocol::{Request, Response};
 
 use tokio::sync::Mutex;
 
-use crate::error::RabbitMqStreamError;
+use crate::error::ClientError;
 
 pub fn channel<S, T>(sink: S, stream: T) -> (ChannelSender<S>, ChannelReceiver<T>)
 where
     S: Sink<Request>,
-    T: Stream<Item = Result<Response, RabbitMqStreamError>>,
+    T: Stream<Item = Result<Response, ClientError>>,
 {
     (
         ChannelSender {
@@ -33,7 +33,7 @@ where
 
 pub struct ChannelReceiver<T>
 where
-    T: Stream<Item = Result<Response, RabbitMqStreamError>>,
+    T: Stream<Item = Result<Response, ClientError>>,
 {
     inner: T,
 }
@@ -45,8 +45,8 @@ impl<T: Sink<Request> + Unpin> ChannelSender<T> {
     }
 }
 
-impl<T: Stream<Item = Result<Response, RabbitMqStreamError>> + Unpin> ChannelReceiver<T> {
-    pub async fn next(&mut self) -> Option<Result<Response, RabbitMqStreamError>> {
+impl<T: Stream<Item = Result<Response, ClientError>> + Unpin> ChannelReceiver<T> {
+    pub async fn next(&mut self) -> Option<Result<Response, ClientError>> {
         self.inner.next().await
     }
 }

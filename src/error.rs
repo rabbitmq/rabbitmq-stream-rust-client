@@ -1,8 +1,11 @@
-use rabbitmq_stream_protocol::error::{DecodeError, EncodeError};
+use rabbitmq_stream_protocol::{
+    error::{DecodeError, EncodeError},
+    ResponseCode,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum RabbitMqStreamError {
+pub enum ClientError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -19,14 +22,36 @@ pub enum ProtocolError {
     Decode(DecodeError),
 }
 
-impl From<EncodeError> for RabbitMqStreamError {
+impl From<EncodeError> for ClientError {
     fn from(err: EncodeError) -> Self {
-        RabbitMqStreamError::Protocol(ProtocolError::Encode(err))
+        ClientError::Protocol(ProtocolError::Encode(err))
     }
 }
 
-impl From<DecodeError> for RabbitMqStreamError {
+impl From<DecodeError> for ClientError {
     fn from(err: DecodeError) -> Self {
-        RabbitMqStreamError::Protocol(ProtocolError::Decode(err))
+        ClientError::Protocol(ProtocolError::Decode(err))
     }
+}
+
+#[derive(Error, Debug)]
+pub enum StreamCreateError {
+    #[error("Failed to create stream {stream} status: {status:?}")]
+    CreateError {
+        stream: String,
+        status: ResponseCode,
+    },
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+}
+
+#[derive(Error, Debug)]
+pub enum StreamDeleteError {
+    #[error("Failed to delete stream {stream} status: {status:?}")]
+    DeleteError {
+        stream: String,
+        status: ResponseCode,
+    },
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
 }
