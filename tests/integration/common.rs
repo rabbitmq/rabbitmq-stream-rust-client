@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use fake::{Fake, Faker};
-use rabbitmq_stream_client::{Client, ClientOptions, Environment};
+use rabbitmq_stream_client::prelude::{Client, ClientOptions, Environment};
 use rabbitmq_stream_protocol::ResponseCode;
 
 pub struct TestClient {
