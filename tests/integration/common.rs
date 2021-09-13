@@ -38,9 +38,18 @@ impl Drop for TestClient {
 impl TestEnvironment {
     pub async fn create() -> TestEnvironment {
         let stream: String = Faker.fake();
-
         let env = Environment::builder().build().await.unwrap();
+        let _ = env.stream_creator().create(&stream).await.unwrap();
 
         TestEnvironment { env, stream }
+    }
+}
+
+impl Drop for TestEnvironment {
+    fn drop(&mut self) {
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(async { self.env.delete_stream(&self.stream).await.unwrap() })
+        });
     }
 }

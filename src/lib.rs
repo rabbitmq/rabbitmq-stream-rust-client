@@ -3,6 +3,7 @@ mod client;
 mod environment;
 pub mod error;
 pub mod offset_specification;
+pub mod producer;
 pub mod stream_creator;
 pub type RabbitMQStreamResult<T> = Result<T, ClientError>;
 

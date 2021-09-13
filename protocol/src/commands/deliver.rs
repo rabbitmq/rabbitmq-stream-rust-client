@@ -164,7 +164,10 @@ mod tests {
     use super::{DeliverCommand, Message};
     impl Dummy<Faker> for Message {
         fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &Faker, _rng: &mut R) -> Self {
-            Message(AmpqMessage::default())
+            Message {
+                message: AmpqMessage::default(),
+                publishing_id: None,
+            }
         }
     }
 
