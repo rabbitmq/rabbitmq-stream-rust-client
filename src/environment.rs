@@ -1,6 +1,9 @@
 use crate::{
-    error::StreamDeleteError, producer::ProducerBuilder, stream_creator::StreamCreator, Client,
-    ClientOptions, RabbitMQStreamResult,
+    client::{Client, ClientOptions},
+    error::StreamDeleteError,
+    producer::ProducerBuilder,
+    stream_creator::StreamCreator,
+    RabbitMQStreamResult,
 };
 
 #[derive(Clone)]

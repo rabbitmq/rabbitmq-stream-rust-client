@@ -10,11 +10,12 @@ use tokio::sync::{
     Mutex,
 };
 
-use crate::{client::MessageHandler, RabbitMQStreamResult};
 use crate::{
+    client::Client,
+    environment::Environment,
     error::{ProducerCloseError, ProducerCreateError, ProducerPublishError},
-    Client, Environment,
 };
+use crate::{client::MessageHandler, RabbitMQStreamResult};
 
 type WaiterMap = Arc<Mutex<HashMap<u64, ProducerMessageWaiter>>>;
 

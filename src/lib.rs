@@ -7,7 +7,12 @@ pub mod producer;
 pub mod stream_creator;
 pub type RabbitMQStreamResult<T> = Result<T, ClientError>;
 
-pub use client::{Broker, Client, ClientOptions, StreamMetadata};
 use error::ClientError;
 
-pub use environment::{Environment, EnvironmentBuilder};
+pub mod prelude {
+
+    pub use crate::client::{Broker, Client, ClientOptions, StreamMetadata};
+    pub use rabbitmq_stream_protocol::message::Message;
+
+    pub use crate::environment::{Environment, EnvironmentBuilder};
+}
