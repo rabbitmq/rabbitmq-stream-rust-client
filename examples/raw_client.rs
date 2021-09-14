@@ -63,7 +63,7 @@ async fn start_subscriber(
     let counter = Arc::new(AtomicI32::new(0));
 
     let handler = move |response: Response| async move {
-        match response.kind() {
+        match response.kind_ref() {
             ResponseKind::Deliver(delivery) => {
                 for message in &delivery.messages {
                     info!(

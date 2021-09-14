@@ -84,7 +84,29 @@ pub enum ProducerPublishError {
 #[derive(Error, Debug)]
 pub enum ProducerCloseError {
     #[error("Failed to close producer for stream {stream} status {status:?}")]
+    CloseError {
+        stream: String,
+        status: ResponseCode,
+    },
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+}
+
+#[derive(Error, Debug)]
+pub enum ConsumerCreateError {
+    #[error("Failed to create producer for stream {stream} status {status:?}")]
     CreateError {
+        stream: String,
+        status: ResponseCode,
+    },
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+}
+
+#[derive(Error, Debug)]
+pub enum ConsumerCloseError {
+    #[error("Failed to close consumer for stream {stream} status {status:?}")]
+    CloseError {
         stream: String,
         status: ResponseCode,
     },

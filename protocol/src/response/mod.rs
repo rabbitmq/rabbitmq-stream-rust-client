@@ -99,8 +99,11 @@ impl Response {
         T::from_response(self)
     }
 
-    pub fn kind(&self) -> &ResponseKind {
+    pub fn kind_ref(&self) -> &ResponseKind {
         &self.kind
+    }
+    pub fn kind(self) -> ResponseKind {
+        self.kind
     }
 }
 

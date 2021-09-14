@@ -1,5 +1,8 @@
+use crate::types::OffsetSpecification;
+
 use crate::{
     client::{Client, ClientOptions},
+    consumer::ConsumerBuilder,
     error::StreamDeleteError,
     producer::ProducerBuilder,
     stream_creator::StreamCreator,
@@ -29,6 +32,13 @@ impl Environment {
         ProducerBuilder {
             environment: self.clone(),
             name: None,
+        }
+    }
+
+    pub fn consumer(&self) -> ConsumerBuilder {
+        ConsumerBuilder {
+            environment: self.clone(),
+            offset_specification: OffsetSpecification::Next,
         }
     }
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {
