@@ -14,8 +14,8 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct PublishConfirm {
-    publisher_id: u8,
-    publishing_ids: Vec<u64>,
+    pub publisher_id: u8,
+    pub publishing_ids: Vec<u64>,
 }
 
 impl PublishConfirm {

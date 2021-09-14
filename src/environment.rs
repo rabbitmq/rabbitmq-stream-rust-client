@@ -1,5 +1,8 @@
 use crate::{
-    error::StreamDeleteError, stream_creator::StreamCreator, Client, ClientOptions,
+    client::{Client, ClientOptions},
+    error::StreamDeleteError,
+    producer::ProducerBuilder,
+    stream_creator::StreamCreator,
     RabbitMQStreamResult,
 };
 
@@ -22,6 +25,12 @@ impl Environment {
         StreamCreator::new(self.clone())
     }
 
+    pub fn producer(&self) -> ProducerBuilder {
+        ProducerBuilder {
+            environment: self.clone(),
+            name: None,
+        }
+    }
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {
         Client::connect(self.options.client_options.clone()).await
     }

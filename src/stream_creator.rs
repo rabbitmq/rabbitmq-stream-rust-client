@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use crate::{byte_capacity::ByteCapacity, error::StreamCreateError, Environment};
+use crate::{byte_capacity::ByteCapacity, environment::Environment, error::StreamCreateError};
 
 pub struct StreamCreator {
     pub(crate) env: Environment,

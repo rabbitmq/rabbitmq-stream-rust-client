@@ -23,7 +23,7 @@ impl Header {
 #[cfg(test)]
 use fake::Fake;
 
-use crate::message::Message;
+use crate::{message::Message, ResponseCode};
 
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
@@ -44,12 +44,12 @@ impl PublishedMessage {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(Debug, PartialEq)]
 pub struct PublishingError {
-    pub(crate) publishing_id: u64,
-    pub(crate) error_code: u16,
+    pub publishing_id: u64,
+    pub error_code: ResponseCode,
 }
 
 impl PublishingError {
-    pub fn new(publishing_id: u64, error_code: u16) -> Self {
+    pub fn new(publishing_id: u64, error_code: ResponseCode) -> Self {
         Self {
             publishing_id,
             error_code,

@@ -16,24 +16,15 @@ use fake::Fake;
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Debug)]
 pub struct PublishErrorResponse {
-    publisher_id: u8,
-    publishing_error: Vec<PublishingError>,
-    publishing_id: u64,
-    code: u16,
+    pub publisher_id: u8,
+    pub publishing_errors: Vec<PublishingError>,
 }
 
 impl PublishErrorResponse {
-    pub fn new(
-        publisher_id: u8,
-        publishing_error: Vec<PublishingError>,
-        publishing_id: u64,
-        code: u16,
-    ) -> Self {
+    pub fn new(publisher_id: u8, publishing_errors: Vec<PublishingError>) -> Self {
         Self {
             publisher_id,
-            publishing_error,
-            publishing_id,
-            code,
+            publishing_errors,
         }
     }
 }
@@ -41,17 +32,14 @@ impl PublishErrorResponse {
 impl Encoder for PublishErrorResponse {
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.publisher_id.encode(writer)?;
-        self.publishing_error.encode(writer)?;
-        self.publishing_id.encode(writer)?;
-        self.code.encode(writer)?;
+        self.publishing_errors.encode(writer)?;
         Ok(())
     }
 
     fn encoded_size(&self) -> u32 {
         self.publisher_id.encoded_size()
-            + self.publishing_error.encoded_size()
+            + self.publishing_errors.encoded_size()
             + self.publisher_id.encoded_size()
-            + self.code.encoded_size()
     }
 }
 
@@ -64,17 +52,13 @@ impl Command for PublishErrorResponse {
 impl Decoder for PublishErrorResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, publisher_id) = u8::decode(input)?;
-        let (input, publishing_error) = Vec::<PublishingError>::decode(input)?;
-        let (input, publishing_id) = u64::decode(input)?;
-        let (input, code) = u16::decode(input)?;
+        let (input, publishing_errors) = Vec::<PublishingError>::decode(input)?;
 
         Ok((
             input,
             PublishErrorResponse {
                 publisher_id,
-                publishing_error,
-                publishing_id,
-                code,
+                publishing_errors,
             },
         ))
     }

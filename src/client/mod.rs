@@ -38,11 +38,11 @@ use rabbitmq_stream_protocol::{
     FromResponse, Request, Response, ResponseKind,
 };
 
+pub use self::handler::MessageHandler;
 use self::{
     channel::{channel, ChannelReceiver, ChannelSender},
     codec::RabbitMqStreamCodec,
     dispatcher::Dispatcher,
-    handler::MessageHandler,
 };
 
 use std::future::Future;
@@ -254,10 +254,12 @@ impl Client {
 
         // TODO batch publish with max frame size check
         for message in messages {
-            let publishing_id = self
-                .publish_sequence
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
+            let publishing_id = match message.publishing_id() {
+                Some(publishing_id) => *publishing_id,
+                None => self
+                    .publish_sequence
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            };
             sequences.push(publishing_id);
             messages_to_publish.push(PublishedMessage::new(publishing_id, message));
         }

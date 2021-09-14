@@ -55,3 +55,36 @@ pub enum StreamDeleteError {
     #[error(transparent)]
     ClientError(#[from] ClientError),
 }
+
+#[derive(Error, Debug)]
+pub enum ProducerCreateError {
+    #[error("Failed to create producer for stream {stream} status {status:?}")]
+    CreateError {
+        stream: String,
+        status: ResponseCode,
+    },
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+}
+
+#[derive(Error, Debug)]
+pub enum ProducerPublishError {
+    #[error("Failed to publish message for stream {stream} status {status:?}")]
+    CreateError {
+        stream: String,
+        publisher_id: u8,
+        status: ResponseCode,
+    },
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+}
+#[derive(Error, Debug)]
+pub enum ProducerCloseError {
+    #[error("Failed to close producer for stream {stream} status {status:?}")]
+    CreateError {
+        stream: String,
+        status: ResponseCode,
+    },
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+}

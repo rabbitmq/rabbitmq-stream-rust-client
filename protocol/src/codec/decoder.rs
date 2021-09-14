@@ -5,6 +5,7 @@ use byteorder::ByteOrder;
 use crate::message::Message;
 use crate::types::PublishedMessage;
 use crate::types::PublishingError;
+use crate::ResponseCode;
 use crate::{error::DecodeError, types::Header};
 
 use super::Decoder;
@@ -177,7 +178,7 @@ impl Decoder for Vec<String> {
 impl Decoder for PublishingError {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, publishing_id) = read_u64(input)?;
-        let (input, code) = read_u16(input)?;
+        let (input, code) = ResponseCode::decode(input)?;
 
         Ok((input, PublishingError::new(publishing_id, code)))
     }
