@@ -94,7 +94,7 @@ pub enum ProducerCloseError {
 
 #[derive(Error, Debug)]
 pub enum ConsumerCreateError {
-    #[error("Failed to create producer for stream {stream} status {status:?}")]
+    #[error("Failed to create consumer for stream {stream} status {status:?}")]
     CreateError {
         stream: String,
         status: ResponseCode,
