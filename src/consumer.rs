@@ -116,7 +116,14 @@ impl MessageHandler for ConsumerMessageHandler {
     async fn handle_message(&self, item: Response) -> crate::RabbitMQStreamResult<()> {
         if let ResponseKind::Deliver(delivery) = item.kind() {
             for message in delivery.messages {
-                let _ = self.0.sender.send(Delivery { message }).await;
+                let _ = self
+                    .0
+                    .sender
+                    .send(Delivery {
+                        subscription_id: self.0.subscription_id,
+                        message,
+                    })
+                    .await;
                 let _ = self.0.client.credit(self.0.subscription_id, 1).await;
             }
         }
@@ -125,5 +132,6 @@ impl MessageHandler for ConsumerMessageHandler {
 }
 #[derive(Debug)]
 pub struct Delivery {
+    pub subscription_id: u8,
     pub message: Message,
 }
