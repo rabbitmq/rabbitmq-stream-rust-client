@@ -1,6 +1,6 @@
 use rabbitmq_stream_client::{
-    byte_capacity::ByteCapacity,
-    prelude::{Environment, Message},
+    types::{ByteCapacity, Message},
+    Environment,
 };
 
 #[tokio::main]
@@ -25,11 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for i in 0..10 {
         producer
-            .send(
-                Message::builder()
-                    .body(format!("message{}", i).as_bytes().to_vec())
-                    .build(),
-            )
+            .send(Message::builder().body(format!("message{}", i)).build())
             .await?;
     }
 

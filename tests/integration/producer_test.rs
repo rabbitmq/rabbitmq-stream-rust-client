@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use fake::{Fake, Faker};
-use rabbitmq_stream_client::offset_specification::OffsetSpecification;
-use rabbitmq_stream_protocol::{message::Message, Response, ResponseKind};
+use rabbitmq_stream_client::types::{Message, OffsetSpecification};
+use rabbitmq_stream_protocol::{Response, ResponseKind};
 use tokio::sync::mpsc::channel;
 
 use crate::common::{TestClient, TestEnvironment};
@@ -64,10 +64,11 @@ async fn producer_send_ok() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn producer_send_error() {
+async fn producer_send_with_callback() {
     let env = TestEnvironment::create().await;
     let reference: String = Faker.fake();
 
+    let (tx, mut rx) = channel(1);
     let producer = env
         .env
         .producer()
@@ -77,9 +78,21 @@ async fn producer_send_error() {
         .unwrap();
 
     let _ = producer
-        .send(Message::builder().body(b"message".to_vec()).build())
+        .send_with_callback(
+            Message::builder().body(b"message".to_vec()).build(),
+            move |confirm_result| {
+                let inner_tx = tx.clone();
+                async move {
+                    let _ = inner_tx.send(confirm_result).await;
+                }
+            },
+        )
         .await
         .unwrap();
+
+    let result = rx.recv().await.unwrap();
+
+    assert_eq!(1, result.unwrap());
 
     producer.close().await.unwrap();
 }

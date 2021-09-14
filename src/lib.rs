@@ -1,18 +1,20 @@
-pub mod byte_capacity;
+mod byte_capacity;
 mod client;
 mod environment;
 pub mod error;
-pub mod offset_specification;
-pub mod producer;
+mod offset_specification;
+mod producer;
 pub mod stream_creator;
-pub type RabbitMQStreamResult<T> = Result<T, ClientError>;
+pub type RabbitMQStreamResult<T> = Result<T, error::ClientError>;
 
-use error::ClientError;
+pub use crate::client::{Client, ClientOptions};
 
-pub mod prelude {
+pub use crate::environment::Environment;
+pub use crate::producer::Producer;
+pub mod types {
 
-    pub use crate::client::{Broker, Client, ClientOptions, StreamMetadata};
+    pub use crate::byte_capacity::ByteCapacity;
+    pub use crate::client::{Broker, StreamMetadata};
+    pub use crate::offset_specification::OffsetSpecification;
     pub use rabbitmq_stream_protocol::message::Message;
-
-    pub use crate::environment::{Environment, EnvironmentBuilder};
 }

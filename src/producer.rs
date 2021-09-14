@@ -5,6 +5,7 @@ use std::{
 
 use futures::{future::BoxFuture, FutureExt};
 use rabbitmq_stream_protocol::{message::Message, Response, ResponseCode, ResponseKind};
+use std::future::Future;
 use tokio::sync::{
     oneshot::{channel, Receiver, Sender},
     Mutex,
@@ -13,7 +14,7 @@ use tokio::sync::{
 use crate::{
     client::Client,
     environment::Environment,
-    error::{ProducerCloseError, ProducerCreateError, ProducerPublishError},
+    error::{ClientError, ProducerCloseError, ProducerCreateError, ProducerPublishError},
 };
 use crate::{client::MessageHandler, RabbitMQStreamResult};
 
@@ -94,10 +95,45 @@ impl Producer {
         drop(waiting_confirmation);
         self.0.client.publish(self.0.producer_id, message).await?;
 
-        let _ = rx.await;
-        Ok(publishing_id)
+        rx.await
+            .map_err(|err| ClientError::GenericError(Box::new(err)))?
+            .map(|_| publishing_id)
     }
 
+    pub async fn send_with_callback<Fut>(
+        &self,
+        mut message: Message,
+        cb: impl Fn(Result<u64, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+    ) -> Result<(), ClientError>
+    where
+        Fut: Future<Output = ()> + Send + Sync,
+    {
+        let publishing_id = match message.publishing_id() {
+            Some(publishing_id) => *publishing_id,
+            None => self
+                .0
+                .publish_sequence
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        };
+        message.set_publishing_id(publishing_id);
+
+        let (rx, waiter) = ProducerMessageWaiter::waiter(self.0.stream.clone(), self.0.producer_id);
+        let mut waiting_confirmation = self.0.waiting_confirmations.lock().await;
+
+        waiting_confirmation.insert(publishing_id, waiter);
+
+        drop(waiting_confirmation);
+        self.0.client.publish(self.0.producer_id, message).await?;
+
+        tokio::task::spawn(async move {
+            let result = rx.await;
+            match result {
+                Ok(confirm_status) => cb(confirm_status.map(|_| publishing_id)).await,
+                Err(err) => cb(Err(ClientError::GenericError(Box::new(err)).into())).await,
+            };
+        });
+        Ok(())
+    }
     pub async fn close(self) -> Result<(), ProducerCloseError> {
         self.0.client.delete_publisher(self.0.producer_id).await?;
         Ok(())
@@ -130,7 +166,7 @@ impl MessageHandler for ProducerConfirmHandler {
                 for publishing_id in &confirm.publishing_ids {
                     self.with_waiter(*publishing_id, |waiter| {
                         async {
-                            let _ = waiter.handle_confirm();
+                            let _ = waiter.handle_confirm().await;
                         }
                         .boxed()
                     })
@@ -142,7 +178,7 @@ impl MessageHandler for ProducerConfirmHandler {
                     let code = err.error_code.clone();
                     self.with_waiter(err.publishing_id, move |waiter| {
                         async {
-                            let _ = waiter.handle_error(code);
+                            let _ = waiter.handle_error(code).await;
                         }
                         .boxed()
                     })

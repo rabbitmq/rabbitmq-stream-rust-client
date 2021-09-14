@@ -12,6 +12,9 @@ pub enum ClientError {
     Protocol(#[from] ProtocolError),
     #[error("Cast Error: {0}")]
     CastError(String),
+
+    #[error(transparent)]
+    GenericError(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 
 #[derive(Error, Debug)]

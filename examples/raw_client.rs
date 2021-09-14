@@ -2,10 +2,7 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 
-use rabbitmq_stream_client::{
-    offset_specification::OffsetSpecification,
-    prelude::{Client, ClientOptions},
-};
+use rabbitmq_stream_client::{types::OffsetSpecification, Client, ClientOptions};
 use rabbitmq_stream_protocol::message::Message;
 use rabbitmq_stream_protocol::Response;
 use rabbitmq_stream_protocol::ResponseKind;

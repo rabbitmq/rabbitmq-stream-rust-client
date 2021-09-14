@@ -73,8 +73,10 @@ impl Decoder for Message {
 pub struct MessageBuilder(Message);
 
 impl MessageBuilder {
-    pub fn body(mut self, data: Vec<u8>) -> Self {
-        self.0.message.set_body(|body| body.set_data(data.into()));
+    pub fn body(mut self, data: impl Into<Vec<u8>>) -> Self {
+        self.0
+            .message
+            .set_body(|body| body.set_data(data.into().into()));
         self
     }
 

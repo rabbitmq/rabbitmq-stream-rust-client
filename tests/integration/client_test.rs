@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use fake::{Fake, Faker};
 use rabbitmq_stream_client::{
-    offset_specification::OffsetSpecification,
-    prelude::{Broker, Client, ClientOptions, StreamMetadata},
+    types::{Broker, OffsetSpecification, StreamMetadata},
+    Client, ClientOptions,
 };
 use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};
 
