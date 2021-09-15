@@ -55,7 +55,7 @@ impl Environment {
         if response.is_ok() {
             Ok(())
         } else {
-            Err(StreamDeleteError::DeleteError {
+            Err(StreamDeleteError::Delete {
                 stream: stream.to_owned(),
                 status: response.code().clone(),
             })

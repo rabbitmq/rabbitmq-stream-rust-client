@@ -81,7 +81,7 @@ impl ConsumerBuilder {
                 internal: consumer,
             })
         } else {
-            Err(ConsumerCreateError::CreateError {
+            Err(ConsumerCreateError::Create {
                 stream: stream.to_owned(),
                 status: response.code().clone(),
             })
@@ -95,10 +95,12 @@ impl ConsumerBuilder {
 }
 
 impl Consumer {
+    /// Return an handle for current [`Consumer`]
     pub fn handle(&self) -> ConsumerHandle {
         ConsumerHandle(self.internal.clone())
     }
 
+    /// Check if the consumer is closed
     pub fn is_closed(&self) -> bool {
         self.internal.is_closed()
     }
@@ -117,9 +119,11 @@ impl Stream for Consumer {
     }
 }
 
+/// Handler API for [`Consumer`]
 pub struct ConsumerHandle(Arc<ConsumerInternal>);
 
 impl ConsumerHandle {
+    /// Close the [`Consumer`] associated to this handle
     pub async fn close(self) -> Result<(), ConsumerCloseError> {
         if self.0.is_closed() {
             return Err(ConsumerCloseError::AlreadyClosed);
@@ -131,11 +135,15 @@ impl ConsumerHandle {
             self.0.waker.wake();
             Ok(())
         } else {
-            Err(ConsumerCloseError::CloseError {
+            Err(ConsumerCloseError::Close {
                 stream: self.0.stream.clone(),
                 status: response.code().clone(),
             })
         }
+    }
+    /// Check if the consumer is closed
+    pub async fn is_closed(&self) -> bool {
+        self.0.is_closed()
     }
 }
 

@@ -81,7 +81,9 @@ impl MessageHandler for Client {
         Ok(())
     }
 }
-
+/// Raw API for taking to RabbitMQ stream
+///
+/// For high level APIs check [`crate::Environment`]
 #[derive(Clone)]
 pub struct Client {
     dispatcher: Dispatcher<Client>,

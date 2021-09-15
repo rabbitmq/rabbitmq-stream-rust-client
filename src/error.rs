@@ -40,88 +40,92 @@ impl From<DecodeError> for ClientError {
 #[derive(Error, Debug)]
 pub enum StreamCreateError {
     #[error("Failed to create stream {stream} status: {status:?}")]
-    CreateError {
+    Create {
         stream: String,
         status: ResponseCode,
     },
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
 }
 
 #[derive(Error, Debug)]
 pub enum StreamDeleteError {
     #[error("Failed to delete stream {stream} status: {status:?}")]
-    DeleteError {
+    Delete {
         stream: String,
         status: ResponseCode,
     },
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
 }
 
 #[derive(Error, Debug)]
 pub enum ProducerCreateError {
     #[error("Failed to create producer for stream {stream} status {status:?}")]
-    CreateError {
+    Create {
         stream: String,
         status: ResponseCode,
     },
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
 }
 
 #[derive(Error, Debug)]
 pub enum ProducerPublishError {
     #[error("Failed to publish message for stream {stream} status {status:?}")]
-    CreateError {
+    Create {
         stream: String,
         publisher_id: u8,
         status: ResponseCode,
     },
+    #[error("Failed to publish message, the producer is closed")]
+    Closed,
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
 }
 #[derive(Error, Debug)]
 pub enum ProducerCloseError {
     #[error("Failed to close producer for stream {stream} status {status:?}")]
-    CloseError {
+    Close {
         stream: String,
         status: ResponseCode,
     },
+    #[error("Producer already closed")]
+    AlreadyClosed,
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
 }
 
 #[derive(Error, Debug)]
 pub enum ConsumerCreateError {
     #[error("Failed to create consumer for stream {stream} status {status:?}")]
-    CreateError {
+    Create {
         stream: String,
         status: ResponseCode,
     },
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
 }
 
 #[derive(Error, Debug)]
 pub enum ConsumerDeliveryError {
     #[error("Failed to create consumer for stream {stream} status {status:?}")]
-    CreditError {
+    Credit {
         stream: String,
         status: ResponseCode,
     },
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
 }
 #[derive(Error, Debug)]
 pub enum ConsumerCloseError {
     #[error("Failed to close consumer for stream {stream} status {status:?}")]
-    CloseError {
+    Close {
         stream: String,
         status: ResponseCode,
     },
     #[error("Consumer already closed")]
     AlreadyClosed,
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    Client(#[from] ClientError),
 }

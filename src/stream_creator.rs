@@ -26,7 +26,7 @@ impl StreamCreator {
         if response.is_ok() {
             Ok(())
         } else {
-            Err(StreamCreateError::CreateError {
+            Err(StreamCreateError::Create {
                 stream: stream.to_owned(),
                 status: response.code().clone(),
             })
