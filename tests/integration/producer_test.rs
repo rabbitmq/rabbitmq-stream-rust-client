@@ -1,40 +1,14 @@
-use std::collections::HashMap;
-
 use fake::{Fake, Faker};
+use futures::StreamExt;
 use rabbitmq_stream_client::types::{Message, OffsetSpecification};
-use rabbitmq_stream_protocol::{Response, ResponseKind};
 use tokio::sync::mpsc::channel;
 
-use crate::common::{TestClient, TestEnvironment};
+use crate::common::TestEnvironment;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_send_ok() {
-    let test = TestClient::create().await;
     let env = TestEnvironment::create().await;
     let reference: String = Faker.fake();
-    let (tx, mut rx) = channel(1);
-
-    let handler = move |response: Response| async move {
-        match response.kind() {
-            ResponseKind::Deliver(delivery) => {
-                tx.send(delivery.clone()).await.unwrap();
-            }
-            _ => {}
-        }
-        Ok(())
-    };
-    test.client.set_handler(handler).await;
-    let _ = test
-        .client
-        .subscribe(
-            1,
-            &env.stream,
-            OffsetSpecification::First,
-            1,
-            HashMap::new(),
-        )
-        .await
-        .unwrap();
 
     let producer = env
         .env
@@ -44,23 +18,26 @@ async fn producer_send_ok() {
         .await
         .unwrap();
 
+    let mut consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
     let _ = producer
         .send(Message::builder().body(b"message".to_vec()).build())
         .await
         .unwrap();
 
-    let delivery = rx.recv().await.unwrap();
-
-    let _ = test.client.unsubscribe(1).await.unwrap();
-
     producer.close().await.unwrap();
 
+    let delivery = consumer.next().await.unwrap().unwrap();
     assert_eq!(1, delivery.subscription_id);
-    assert_eq!(1, delivery.messages.len());
-    assert_eq!(
-        Some(b"message".as_ref()),
-        delivery.messages.get(0).unwrap().data()
-    );
+    assert_eq!(Some(b"message".as_ref()), delivery.message.data());
+
+    consumer.handle().close().await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]

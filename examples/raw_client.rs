@@ -46,6 +46,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     notifier.notified().await;
 
     client.delete_publisher(1).await?;
+
+    let _ = client.delete_stream(stream).await?;
     Ok(())
 }
 
@@ -63,7 +65,7 @@ async fn start_subscriber(
     let counter = Arc::new(AtomicI32::new(0));
 
     let handler = move |response: Response| async move {
-        match response.kind() {
+        match response.kind_ref() {
             ResponseKind::Deliver(delivery) => {
                 for message in &delivery.messages {
                     info!(

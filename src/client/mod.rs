@@ -68,7 +68,7 @@ pub struct ClientState {
 #[async_trait::async_trait]
 impl MessageHandler for Client {
     async fn handle_message(&self, item: Response) -> RabbitMQStreamResult<()> {
-        match item.kind() {
+        match item.kind_ref() {
             ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
             _ => {
                 if let Some(handler) = self.state.read().await.handler.as_ref() {
@@ -81,7 +81,9 @@ impl MessageHandler for Client {
         Ok(())
     }
 }
-
+/// Raw API for taking to RabbitMQ stream
+///
+/// For high level APIs check [`crate::Environment`]
 #[derive(Clone)]
 pub struct Client {
     dispatcher: Dispatcher<Client>,

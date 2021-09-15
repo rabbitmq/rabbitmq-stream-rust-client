@@ -1,6 +1,9 @@
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicU64, Arc},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering::Relaxed},
+        Arc,
+    },
 };
 
 use futures::{future::BoxFuture, FutureExt};
@@ -26,11 +29,14 @@ pub struct ProducerInternal {
     producer_id: u8,
     publish_sequence: Arc<AtomicU64>,
     waiting_confirmations: WaiterMap,
+    closed: Arc<AtomicBool>,
 }
 
+/// API for publising messages to RabbitMQ stream
 #[derive(Clone)]
 pub struct Producer(Arc<ProducerInternal>);
 
+/// Builder for [`Producer`]
 pub struct ProducerBuilder {
     pub(crate) environment: Environment,
     pub(crate) name: Option<String>,
@@ -60,10 +66,11 @@ impl ProducerBuilder {
                 client,
                 publish_sequence: Arc::new(AtomicU64::new(1)),
                 waiting_confirmations,
+                closed: Arc::new(AtomicBool::new(false)),
             };
             Ok(Producer(Arc::new(producer)))
         } else {
-            Err(ProducerCreateError::CreateError {
+            Err(ProducerCreateError::Create {
                 stream: stream.to_owned(),
                 status: response.code().clone(),
             })
@@ -77,23 +84,8 @@ impl ProducerBuilder {
 }
 
 impl Producer {
-    pub async fn send(&self, mut message: Message) -> Result<u64, ProducerPublishError> {
-        let publishing_id = match message.publishing_id() {
-            Some(publishing_id) => *publishing_id,
-            None => self
-                .0
-                .publish_sequence
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-        };
-        message.set_publishing_id(publishing_id);
-
-        let (rx, waiter) = ProducerMessageWaiter::waiter(self.0.stream.clone(), self.0.producer_id);
-        let mut waiting_confirmation = self.0.waiting_confirmations.lock().await;
-
-        waiting_confirmation.insert(publishing_id, waiter);
-
-        drop(waiting_confirmation);
-        self.0.client.publish(self.0.producer_id, message).await?;
+    pub async fn send(&self, message: Message) -> Result<u64, ProducerPublishError> {
+        let (publishing_id, rx) = self.internal_send(message).await?;
 
         rx.await
             .map_err(|err| ClientError::GenericError(Box::new(err)))?
@@ -102,29 +94,13 @@ impl Producer {
 
     pub async fn send_with_callback<Fut>(
         &self,
-        mut message: Message,
+        message: Message,
         cb: impl Fn(Result<u64, ProducerPublishError>) -> Fut + Send + Sync + 'static,
-    ) -> Result<(), ClientError>
+    ) -> Result<(), ProducerPublishError>
     where
         Fut: Future<Output = ()> + Send + Sync,
     {
-        let publishing_id = match message.publishing_id() {
-            Some(publishing_id) => *publishing_id,
-            None => self
-                .0
-                .publish_sequence
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-        };
-        message.set_publishing_id(publishing_id);
-
-        let (rx, waiter) = ProducerMessageWaiter::waiter(self.0.stream.clone(), self.0.producer_id);
-        let mut waiting_confirmation = self.0.waiting_confirmations.lock().await;
-
-        waiting_confirmation.insert(publishing_id, waiter);
-
-        drop(waiting_confirmation);
-        self.0.client.publish(self.0.producer_id, message).await?;
-
+        let (publishing_id, rx) = self.internal_send(message).await?;
         tokio::task::spawn(async move {
             let result = rx.await;
             match result {
@@ -134,9 +110,47 @@ impl Producer {
         });
         Ok(())
     }
+
+    async fn internal_send(
+        &self,
+        mut message: Message,
+    ) -> Result<(u64, Receiver<Result<(), ProducerPublishError>>), ProducerPublishError> {
+        if self.is_closed() {
+            return Err(ProducerPublishError::Closed);
+        }
+        let publishing_id = match message.publishing_id() {
+            Some(publishing_id) => *publishing_id,
+            None => self.0.publish_sequence.fetch_add(1, Relaxed),
+        };
+        message.set_publishing_id(publishing_id);
+
+        let (rx, waiter) = ProducerMessageWaiter::waiter(self.0.stream.clone(), self.0.producer_id);
+        let mut waiting_confirmation = self.0.waiting_confirmations.lock().await;
+        waiting_confirmation.insert(publishing_id, waiter);
+        drop(waiting_confirmation);
+        self.0.client.publish(self.0.producer_id, message).await?;
+
+        Ok((publishing_id, rx))
+    }
+    pub fn is_closed(&self) -> bool {
+        self.0.closed.load(Relaxed)
+    }
+    // TODO handle producer state after close
     pub async fn close(self) -> Result<(), ProducerCloseError> {
-        self.0.client.delete_publisher(self.0.producer_id).await?;
-        Ok(())
+        if self.is_closed() {
+            return Err(ProducerCloseError::AlreadyClosed);
+        }
+        let response = self.0.client.delete_publisher(self.0.producer_id).await?;
+
+        if response.is_ok() {
+            self.0.closed.store(true, Relaxed);
+            Ok(())
+        } else {
+            Err(ProducerCloseError::Close {
+                status: response.code().clone(),
+                stream: self.0.stream.clone(),
+            })
+        }
     }
 }
 
@@ -219,7 +233,7 @@ impl ProducerMessageWaiter {
         Ok(())
     }
     async fn handle_error(self, status: ResponseCode) -> RabbitMQStreamResult<()> {
-        let _ = self.tx.send(Err(ProducerPublishError::CreateError {
+        let _ = self.tx.send(Err(ProducerPublishError::Create {
             stream: self.stream,
             publisher_id: self.publisher_id,
             status,

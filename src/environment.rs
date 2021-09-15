@@ -1,11 +1,14 @@
+use crate::types::OffsetSpecification;
+
 use crate::{
     client::{Client, ClientOptions},
+    consumer::ConsumerBuilder,
     error::StreamDeleteError,
     producer::ProducerBuilder,
     stream_creator::StreamCreator,
     RabbitMQStreamResult,
 };
-
+/// Main access point to a node
 #[derive(Clone)]
 pub struct Environment {
     pub(crate) options: EnvironmentOptions,
@@ -21,27 +24,38 @@ impl Environment {
         Ok(Environment { options })
     }
 
+    /// Returns a builder for creating a stream with a specific configuration
     pub fn stream_creator(&self) -> StreamCreator {
         StreamCreator::new(self.clone())
     }
 
+    /// Returns a builder for creating a producer
     pub fn producer(&self) -> ProducerBuilder {
         ProducerBuilder {
             environment: self.clone(),
             name: None,
         }
     }
+
+    /// Returns a builder for creating a consumer
+    pub fn consumer(&self) -> ConsumerBuilder {
+        ConsumerBuilder {
+            environment: self.clone(),
+            offset_specification: OffsetSpecification::Next,
+        }
+    }
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {
         Client::connect(self.options.client_options.clone()).await
     }
 
+    /// Delete a stream
     pub async fn delete_stream(&self, stream: &str) -> Result<(), StreamDeleteError> {
         let response = self.create_client().await?.delete_stream(stream).await?;
 
         if response.is_ok() {
             Ok(())
         } else {
-            Err(StreamDeleteError::DeleteError {
+            Err(StreamDeleteError::Delete {
                 stream: stream.to_owned(),
                 status: response.code().clone(),
             })
@@ -49,6 +63,7 @@ impl Environment {
     }
 }
 
+/// Builder for [`Environment`]
 pub struct EnvironmentBuilder(EnvironmentOptions);
 
 impl EnvironmentBuilder {

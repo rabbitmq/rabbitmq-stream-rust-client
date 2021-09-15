@@ -2,6 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use crate::{byte_capacity::ByteCapacity, environment::Environment, error::StreamCreateError};
 
+/// Builder for creating a RabbitMQ stream
 pub struct StreamCreator {
     pub(crate) env: Environment,
     pub options: HashMap<String, String>,
@@ -17,6 +18,7 @@ impl StreamCreator {
         creator.leader_locator(LeaderLocator::LeastLeaders)
     }
 
+    /// Create a stream with name and options
     pub async fn create(self, stream: &str) -> Result<(), StreamCreateError> {
         let client = self.env.create_client().await?;
         let response = client.create_stream(stream, self.options).await?;
@@ -24,7 +26,7 @@ impl StreamCreator {
         if response.is_ok() {
             Ok(())
         } else {
-            Err(StreamCreateError::CreateError {
+            Err(StreamCreateError::Create {
                 stream: stream.to_owned(),
                 status: response.code().clone(),
             })

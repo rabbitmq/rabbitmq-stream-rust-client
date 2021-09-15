@@ -6,8 +6,8 @@ use crate::{
         Decoder,
     },
     commands::{
-        close::CloseResponse, deliver::DeliverCommand, generic::GenericResponse,
-        heart_beat::HeartbeatResponse, metadata::MetadataResponse,
+        close::CloseResponse, credit::CreditResponse, deliver::DeliverCommand,
+        generic::GenericResponse, heart_beat::HeartbeatResponse, metadata::MetadataResponse,
         metadata_update::MetadataUpdateCommand, open::OpenResponse,
         peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
         publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
@@ -64,6 +64,7 @@ pub enum ResponseKind {
     PublishError(PublishErrorResponse),
     QueryOffset(QueryOffsetResponse),
     QueryPublisherSequence(QueryPublisherResponse),
+    Credit(CreditResponse),
 }
 
 impl Response {
@@ -89,6 +90,7 @@ impl Response {
             ResponseKind::Tunes(_) => None,
             ResponseKind::Heartbeat(_) => None,
             ResponseKind::Deliver(_) => None,
+            ResponseKind::Credit(_) => None,
         }
     }
 
@@ -99,8 +101,11 @@ impl Response {
         T::from_response(self)
     }
 
-    pub fn kind(&self) -> &ResponseKind {
+    pub fn kind_ref(&self) -> &ResponseKind {
         &self.kind
+    }
+    pub fn kind(self) -> ResponseKind {
+        self.kind
     }
 }
 
@@ -152,6 +157,9 @@ impl Decoder for Response {
 
             COMMAND_QUERY_OFFSET => QueryOffsetResponse::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::QueryOffset(kind)))?,
+
+            COMMAND_CREDIT => CreditResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::Credit(kind)))?,
 
             COMMAND_QUERY_PUBLISHER_SEQUENCE => QueryPublisherResponse::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::QueryPublisherSequence(kind)))?,
@@ -226,6 +234,7 @@ mod tests {
                 ResponseKind::QueryPublisherSequence(query_publisher) => {
                     query_publisher.encoded_size()
                 }
+                ResponseKind::Credit(credit) => credit.encoded_size(),
             }
         }
 
@@ -250,6 +259,7 @@ mod tests {
                 ResponseKind::QueryPublisherSequence(query_publisher) => {
                     query_publisher.encode(writer)
                 }
+                ResponseKind::Credit(credit) => credit.encode(writer),
             }
         }
     }

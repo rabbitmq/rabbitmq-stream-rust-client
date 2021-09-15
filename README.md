@@ -43,6 +43,53 @@ Install from [crates.io](https://crates.io/)
 rabbitmq-stream-client = "*"
 ```
 
+### Quick Start
+
+The main access point is `Environment`, which is used to connect to a node.
+
+#### Example
+
+##### Building the environment
+
+```rust,no_run
+use rabbitmq_stream_client::Environment;
+let environment = Environment::builder().build().await?;
+```
+
+##### Publishing messages
+
+```rust,no_run
+use rabbitmq_stream_client::{Environment, types::Message};
+let environment = Environment::builder().build().await?;
+let producer = environment.producer().name("myproducer").build("mystream").await?;
+for i in 0..10 {
+    producer
+        .send(Message::builder().body(format!("message{}", i)).build())
+        .await?;
+}
+producer.close().await?;
+```
+
+##### Consuming messages
+
+```rust,no_run
+use rabbitmq_stream_client::{Environment};
+use futures::StreamExt;
+use tokio::task;
+use tokio::time::{sleep, Duration};
+let environment = Environment::builder().build().await?;
+let mut consumer = environment.consumer().build("mystream").await?;
+let handle = consumer.handle();
+task::spawn(async move {
+    while let Some(delivery) = consumer.next().await {
+        println!("Got message {:?}",delivery);
+    }
+});
+// wait 10 second and then close the consumer
+sleep(Duration::from_secs(10)).await;
+handle.close().await?;
+```
+
 ### Development
 
 #### Compiling
@@ -56,5 +103,5 @@ make build
 
 ```bash
 make rabbitmq-server
-make test 
+make test
 ```
