@@ -120,6 +120,8 @@ pub enum ConsumerCloseError {
         stream: String,
         status: ResponseCode,
     },
+    #[error("Consumer already closed")]
+    AlreadyClosed,
     #[error(transparent)]
     ClientError(#[from] ClientError),
 }

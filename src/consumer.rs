@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     pin::Pin,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering::Relaxed},
+        Arc,
+    },
     task::{Context, Poll},
 };
 
@@ -15,7 +18,7 @@ use crate::{
     error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
     Client, Environment,
 };
-use futures::Stream;
+use futures::{task::AtomicWaker, Stream};
 
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
@@ -28,6 +31,14 @@ struct ConsumerInternal {
     stream: String,
     subscription_id: u8,
     sender: Sender<Result<Delivery, ConsumerDeliveryError>>,
+    closed: Arc<AtomicBool>,
+    waker: AtomicWaker,
+}
+
+impl ConsumerInternal {
+    fn is_closed(&self) -> bool {
+        self.closed.load(Relaxed)
+    }
 }
 
 /// Builder for [`Consumer`]
@@ -58,6 +69,8 @@ impl ConsumerBuilder {
                 stream: stream.to_string(),
                 client: client.clone(),
                 sender: tx,
+                closed: Arc::new(AtomicBool::new(false)),
+                waker: AtomicWaker::new(),
             });
 
             let msg_handler = ConsumerMessageHandler(consumer.clone());
@@ -85,13 +98,22 @@ impl Consumer {
     pub fn handle(&self) -> ConsumerHandle {
         ConsumerHandle(self.internal.clone())
     }
+
+    pub fn is_closed(&self) -> bool {
+        self.internal.is_closed()
+    }
 }
 
 impl Stream for Consumer {
     type Item = Result<Delivery, ConsumerDeliveryError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.receiver).poll_recv(cx)
+        self.internal.waker.register(cx.waker());
+        let poll = Pin::new(&mut self.receiver).poll_recv(cx);
+        match (self.is_closed(), poll.is_ready()) {
+            (true, false) => Poll::Ready(None),
+            _ => poll,
+        }
     }
 }
 
@@ -99,9 +121,14 @@ pub struct ConsumerHandle(Arc<ConsumerInternal>);
 
 impl ConsumerHandle {
     pub async fn close(self) -> Result<(), ConsumerCloseError> {
+        if self.0.is_closed() {
+            return Err(ConsumerCloseError::AlreadyClosed);
+        }
         let response = self.0.client.unsubscribe(self.0.subscription_id).await?;
 
         if response.is_ok() {
+            self.0.closed.store(true, Relaxed);
+            self.0.waker.wake();
             Ok(())
         } else {
             Err(ConsumerCloseError::CloseError {

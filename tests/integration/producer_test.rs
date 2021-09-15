@@ -36,6 +36,8 @@ async fn producer_send_ok() {
     let delivery = consumer.next().await.unwrap().unwrap();
     assert_eq!(1, delivery.subscription_id);
     assert_eq!(Some(b"message".as_ref()), delivery.message.data());
+
+    consumer.handle().close().await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
