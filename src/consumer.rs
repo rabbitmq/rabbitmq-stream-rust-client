@@ -16,6 +16,8 @@ use crate::{
     Client, Environment,
 };
 use futures::Stream;
+
+/// API for consuming RabbitMQ stream messages
 pub struct Consumer {
     receiver: Receiver<Result<Delivery, ConsumerDeliveryError>>,
     internal: Arc<ConsumerInternal>,
@@ -28,6 +30,7 @@ struct ConsumerInternal {
     sender: Sender<Result<Delivery, ConsumerDeliveryError>>,
 }
 
+/// Builder for [`Consumer`]
 pub struct ConsumerBuilder {
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,

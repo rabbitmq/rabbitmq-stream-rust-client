@@ -28,9 +28,11 @@ pub struct ProducerInternal {
     waiting_confirmations: WaiterMap,
 }
 
+/// API for publising messages to RabbitMQ stream
 #[derive(Clone)]
 pub struct Producer(Arc<ProducerInternal>);
 
+/// Builder for [`Producer`]
 pub struct ProducerBuilder {
     pub(crate) environment: Environment,
     pub(crate) name: Option<String>,
