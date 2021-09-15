@@ -84,20 +84,8 @@ impl ProducerBuilder {
 }
 
 impl Producer {
-    pub async fn send(&self, mut message: Message) -> Result<u64, ProducerPublishError> {
-        let publishing_id = match message.publishing_id() {
-            Some(publishing_id) => *publishing_id,
-            None => self.0.publish_sequence.fetch_add(1, Relaxed),
-        };
-        message.set_publishing_id(publishing_id);
-
-        let (rx, waiter) = ProducerMessageWaiter::waiter(self.0.stream.clone(), self.0.producer_id);
-        let mut waiting_confirmation = self.0.waiting_confirmations.lock().await;
-
-        waiting_confirmation.insert(publishing_id, waiter);
-
-        drop(waiting_confirmation);
-        self.0.client.publish(self.0.producer_id, message).await?;
+    pub async fn send(&self, message: Message) -> Result<u64, ProducerPublishError> {
+        let (publishing_id, rx) = self.internal_send(message).await?;
 
         rx.await
             .map_err(|err| ClientError::GenericError(Box::new(err)))?
@@ -106,26 +94,13 @@ impl Producer {
 
     pub async fn send_with_callback<Fut>(
         &self,
-        mut message: Message,
+        message: Message,
         cb: impl Fn(Result<u64, ProducerPublishError>) -> Fut + Send + Sync + 'static,
-    ) -> Result<(), ClientError>
+    ) -> Result<(), ProducerPublishError>
     where
         Fut: Future<Output = ()> + Send + Sync,
     {
-        let publishing_id = match message.publishing_id() {
-            Some(publishing_id) => *publishing_id,
-            None => self.0.publish_sequence.fetch_add(1, Relaxed),
-        };
-        message.set_publishing_id(publishing_id);
-
-        let (rx, waiter) = ProducerMessageWaiter::waiter(self.0.stream.clone(), self.0.producer_id);
-        let mut waiting_confirmation = self.0.waiting_confirmations.lock().await;
-
-        waiting_confirmation.insert(publishing_id, waiter);
-
-        drop(waiting_confirmation);
-        self.0.client.publish(self.0.producer_id, message).await?;
-
+        let (publishing_id, rx) = self.internal_send(message).await?;
         tokio::task::spawn(async move {
             let result = rx.await;
             match result {
@@ -136,6 +111,27 @@ impl Producer {
         Ok(())
     }
 
+    async fn internal_send(
+        &self,
+        mut message: Message,
+    ) -> Result<(u64, Receiver<Result<(), ProducerPublishError>>), ProducerPublishError> {
+        if self.is_closed() {
+            return Err(ProducerPublishError::Closed);
+        }
+        let publishing_id = match message.publishing_id() {
+            Some(publishing_id) => *publishing_id,
+            None => self.0.publish_sequence.fetch_add(1, Relaxed),
+        };
+        message.set_publishing_id(publishing_id);
+
+        let (rx, waiter) = ProducerMessageWaiter::waiter(self.0.stream.clone(), self.0.producer_id);
+        let mut waiting_confirmation = self.0.waiting_confirmations.lock().await;
+        waiting_confirmation.insert(publishing_id, waiter);
+        drop(waiting_confirmation);
+        self.0.client.publish(self.0.producer_id, message).await?;
+
+        Ok((publishing_id, rx))
+    }
     pub fn is_closed(&self) -> bool {
         self.0.closed.load(Relaxed)
     }
@@ -147,6 +143,7 @@ impl Producer {
         let response = self.0.client.delete_publisher(self.0.producer_id).await?;
 
         if response.is_ok() {
+            self.0.closed.store(true, Relaxed);
             Ok(())
         } else {
             Err(ProducerCloseError::Close {
