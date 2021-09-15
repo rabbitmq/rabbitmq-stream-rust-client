@@ -104,6 +104,16 @@ pub enum ConsumerCreateError {
 }
 
 #[derive(Error, Debug)]
+pub enum ConsumerDeliveryError {
+    #[error("Failed to create consumer for stream {stream} status {status:?}")]
+    CreditError {
+        stream: String,
+        status: ResponseCode,
+    },
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+}
+#[derive(Error, Debug)]
 pub enum ConsumerCloseError {
     #[error("Failed to close consumer for stream {stream} status {status:?}")]
     CloseError {

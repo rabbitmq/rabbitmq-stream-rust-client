@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     for _ in 0..message_count {
-        let delivery = consumer.next().await.unwrap();
+        let delivery = consumer.next().await.unwrap()?;
         info!(
             "Got message : {:?}",
             delivery

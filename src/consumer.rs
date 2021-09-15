@@ -12,12 +12,12 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::{
     client::MessageHandler,
-    error::{ConsumerCloseError, ConsumerCreateError},
+    error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
     Client, Environment,
 };
 use futures::Stream;
 pub struct Consumer {
-    receiver: Receiver<Delivery>,
+    receiver: Receiver<Result<Delivery, ConsumerDeliveryError>>,
     internal: Arc<ConsumerInternal>,
 }
 
@@ -25,7 +25,7 @@ struct ConsumerInternal {
     client: Client,
     stream: String,
     subscription_id: u8,
-    sender: Sender<Delivery>,
+    sender: Sender<Result<Delivery, ConsumerDeliveryError>>,
 }
 
 pub struct ConsumerBuilder {
@@ -85,7 +85,7 @@ impl Consumer {
 }
 
 impl Stream for Consumer {
-    type Item = Delivery;
+    type Item = Result<Delivery, ConsumerDeliveryError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.receiver).poll_recv(cx)
@@ -119,13 +119,15 @@ impl MessageHandler for ConsumerMessageHandler {
                 let _ = self
                     .0
                     .sender
-                    .send(Delivery {
+                    .send(Ok(Delivery {
                         subscription_id: self.0.subscription_id,
                         message,
-                    })
+                    }))
                     .await;
-                let _ = self.0.client.credit(self.0.subscription_id, 1).await;
             }
+
+            // TODO handle credit fail
+            let _ = self.0.client.credit(self.0.subscription_id, 1).await;
         }
         Ok(())
     }

@@ -46,6 +46,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     notifier.notified().await;
 
     client.delete_publisher(1).await?;
+
+    let _ = client.delete_stream(stream).await?;
     Ok(())
 }
 

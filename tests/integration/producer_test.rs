@@ -33,7 +33,7 @@ async fn producer_send_ok() {
 
     producer.close().await.unwrap();
 
-    let delivery = consumer.next().await.unwrap();
+    let delivery = consumer.next().await.unwrap().unwrap();
     assert_eq!(1, delivery.subscription_id);
     assert_eq!(Some(b"message".as_ref()), delivery.message.data());
 }
