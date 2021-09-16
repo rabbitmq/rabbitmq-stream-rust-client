@@ -6,17 +6,10 @@ use tokio::sync::mpsc::channel;
 use crate::common::TestEnvironment;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn producer_send_ok() {
+async fn producer_send_no_name_ok() {
     let env = TestEnvironment::create().await;
-    let reference: String = Faker.fake();
 
-    let producer = env
-        .env
-        .producer()
-        .name(&reference)
-        .build(&env.stream)
-        .await
-        .unwrap();
+    let producer = env.env.producer().build(&env.stream).await.unwrap();
 
     let mut consumer = env
         .env
@@ -40,6 +33,59 @@ async fn producer_send_ok() {
     consumer.handle().close().await.unwrap();
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_send_name_with_deduplication_ok() {
+    let env = TestEnvironment::create().await;
+
+    let producer = env
+        .env
+        .producer()
+        .name("myconsumer")
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let mut consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let _ = producer
+        .send(Message::builder().body(b"message0".to_vec()).build())
+        .await
+        .unwrap();
+
+    // this is not published
+    let _ = producer
+        .send(
+            Message::builder()
+                .body(b"message0".to_vec())
+                .publising_id(0)
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    let _ = producer
+        .send(Message::builder().body(b"message1".to_vec()).build())
+        .await
+        .unwrap();
+
+    producer.close().await.unwrap();
+
+    let delivery = consumer.next().await.unwrap().unwrap();
+    assert_eq!(1, delivery.subscription_id);
+    assert_eq!(Some(b"message0".as_ref()), delivery.message.data());
+
+    let delivery = consumer.next().await.unwrap().unwrap();
+    assert_eq!(1, delivery.subscription_id);
+    assert_eq!(Some(b"message1".as_ref()), delivery.message.data());
+
+    consumer.handle().close().await.unwrap();
+}
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_send_with_callback() {
     let env = TestEnvironment::create().await;
@@ -69,7 +115,7 @@ async fn producer_send_with_callback() {
 
     let result = rx.recv().await.unwrap();
 
-    assert_eq!(1, result.unwrap());
+    assert_eq!(0, result.unwrap());
 
     producer.close().await.unwrap();
 }

@@ -134,7 +134,7 @@ async fn client_declare_delete_publisher() {
 
     let response = test
         .client
-        .declare_publisher(1, &reference, &test.stream)
+        .declare_publisher(1, Some(reference.clone()), &test.stream)
         .await
         .unwrap();
 
@@ -153,7 +153,7 @@ async fn client_query_publisher() {
 
     let response = test
         .client
-        .declare_publisher(1, &reference, &test.stream)
+        .declare_publisher(1, Some(reference.clone()), &test.stream)
         .await
         .unwrap();
 
@@ -204,7 +204,7 @@ async fn client_publish() {
 
     let _ = test
         .client
-        .declare_publisher(1, &reference, &test.stream)
+        .declare_publisher(1, Some(reference.clone()), &test.stream)
         .await
         .unwrap();
 

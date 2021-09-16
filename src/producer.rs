@@ -56,15 +56,22 @@ impl ProducerBuilder {
 
         let producer_id = 1;
         let response = client
-            .declare_publisher(producer_id, &self.name.unwrap_or_default(), stream)
+            .declare_publisher(producer_id, self.name.clone(), stream)
             .await?;
+
+        let publish_sequence = if let Some(name) = self.name {
+            let sequence = client.query_publisher_sequence(&name, stream).await?;
+            Arc::new(AtomicU64::new(sequence))
+        } else {
+            Arc::new(AtomicU64::new(0))
+        };
 
         if response.is_ok() {
             let producer = ProducerInternal {
                 producer_id,
                 stream: stream.to_string(),
                 client,
-                publish_sequence: Arc::new(AtomicU64::new(1)),
+                publish_sequence,
                 waiting_confirmations,
                 closed: Arc::new(AtomicBool::new(false)),
             };
@@ -132,6 +139,7 @@ impl Producer {
 
         Ok((publishing_id, rx))
     }
+
     pub fn is_closed(&self) -> bool {
         self.0.closed.load(Relaxed)
     }

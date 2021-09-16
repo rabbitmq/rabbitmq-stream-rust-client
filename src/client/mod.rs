@@ -221,14 +221,14 @@ impl Client {
     pub async fn declare_publisher(
         &self,
         publisher_id: u8,
-        publisher_reference: &str,
+        publisher_reference: Option<String>,
         stream: &str,
     ) -> RabbitMQStreamResult<GenericResponse> {
         self.send_and_receive(|correlation_id| {
             DeclarePublisherCommand::new(
                 correlation_id,
                 publisher_id,
-                publisher_reference.to_owned(),
+                publisher_reference,
                 stream.to_owned(),
             )
         })

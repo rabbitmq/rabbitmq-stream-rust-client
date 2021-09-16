@@ -155,6 +155,19 @@ impl Encoder for HashMap<String, String> {
     }
 }
 
+impl Encoder for Option<String> {
+    fn encoded_size(&self) -> u32 {
+        2 + self.as_ref().map(|string| string.len() as u32).unwrap_or(0)
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        match self {
+            Some(string) => string.as_str().encode(writer)?,
+            None => writer.write_i16::<BigEndian>(0)?,
+        }
+        Ok(())
+    }
+}
 impl Encoder for Vec<String> {
     fn encoded_size(&self) -> u32 {
         4 + self
