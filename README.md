@@ -2,7 +2,7 @@
 
 <div align="center">
  <strong>
-   A Rust Client for RabbitMQ Stream
+   A Work in progress Rust Client for RabbitMQ Stream
  </strong>
 </div>
 
