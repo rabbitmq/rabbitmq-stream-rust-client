@@ -31,7 +31,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     start_subscriber(stream, &client, notifier.clone()).await?;
 
-    client.declare_publisher(1, "my_publisher", stream).await?;
+    client
+        .declare_publisher(1, Some("my_publisher".to_owned()), stream)
+        .await?;
     for i in 0..messages {
         let _ = client
             .publish(

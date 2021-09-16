@@ -130,7 +130,7 @@ impl Decoder for Option<String> {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, len) = read_i16(input)?;
 
-        if len == -1 {
+        if len == 0 {
             return Ok((input, None));
         }
         let (bytes, input) = input.split_at(len as usize);

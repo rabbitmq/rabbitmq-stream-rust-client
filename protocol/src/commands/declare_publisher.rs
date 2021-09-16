@@ -16,7 +16,7 @@ use fake::Fake;
 pub struct DeclarePublisherCommand {
     correlation_id: u32,
     publisher_id: u8,
-    publisher_reference: String,
+    publisher_reference: Option<String>,
     stream_name: String,
 }
 
@@ -24,7 +24,7 @@ impl DeclarePublisherCommand {
     pub fn new(
         correlation_id: u32,
         publisher_id: u8,
-        publisher_reference: String,
+        publisher_reference: Option<String>,
         stream_name: String,
     ) -> Self {
         Self {
@@ -40,14 +40,14 @@ impl Encoder for DeclarePublisherCommand {
     fn encoded_size(&self) -> u32 {
         self.correlation_id.encoded_size()
             + self.publisher_id.encoded_size()
-            + self.publisher_reference.as_str().encoded_size()
+            + self.publisher_reference.encoded_size()
             + self.stream_name.as_str().encoded_size()
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.correlation_id.encode(writer)?;
         self.publisher_id.encode(writer)?;
-        self.publisher_reference.as_str().encode(writer)?;
+        self.publisher_reference.encode(writer)?;
         self.stream_name.as_str().encode(writer)?;
         Ok(())
     }
@@ -71,7 +71,7 @@ impl Decoder for DeclarePublisherCommand {
             DeclarePublisherCommand {
                 correlation_id,
                 publisher_id,
-                publisher_reference: publisher_reference.unwrap(),
+                publisher_reference,
                 stream_name: stream_name.unwrap(),
             },
         ))
