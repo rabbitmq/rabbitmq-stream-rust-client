@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use fake::{Fake, Faker};
 use rabbitmq_stream_client::{
-    types::{Broker, OffsetSpecification, StreamMetadata},
+    types::{
+        Broker, Message, MessageResult, OffsetSpecification, ResponseCode, ResponseKind,
+        StreamMetadata,
+    },
     Client, ClientOptions,
 };
-use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};
 
-use rabbitmq_stream_protocol::message::Message;
 use tokio::sync::mpsc::channel;
 
 use crate::common::TestClient;
@@ -179,12 +180,14 @@ async fn client_publish() {
     let (tx, mut rx) = channel(1);
     let reference: String = Faker.fake();
 
-    let handler = move |response: Response| async move {
-        match response.kind() {
-            ResponseKind::Deliver(delivery) => {
-                tx.send(delivery.clone()).await.unwrap();
+    let handler = move |msg: MessageResult| async move {
+        if let Some(Ok(response)) = msg {
+            match response.kind() {
+                ResponseKind::Deliver(delivery) => {
+                    tx.send(delivery.clone()).await.unwrap();
+                }
+                _ => {}
             }
-            _ => {}
         }
         Ok(())
     };

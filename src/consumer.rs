@@ -2,19 +2,23 @@ use std::{
     collections::HashMap,
     pin::Pin,
     sync::{
-        atomic::{AtomicBool, Ordering::Relaxed},
+        atomic::{
+            AtomicBool,
+            Ordering::{Relaxed, SeqCst},
+        },
         Arc,
     },
     task::{Context, Poll},
 };
 
 use rabbitmq_stream_protocol::{
-    commands::subscribe::OffsetSpecification, message::Message, Response, ResponseKind,
+    commands::subscribe::OffsetSpecification, message::Message, ResponseKind,
 };
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tracing::trace;
 
 use crate::{
-    client::MessageHandler,
+    client::{MessageHandler, MessageResult},
     error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
     Client, Environment,
 };
@@ -125,20 +129,20 @@ pub struct ConsumerHandle(Arc<ConsumerInternal>);
 impl ConsumerHandle {
     /// Close the [`Consumer`] associated to this handle
     pub async fn close(self) -> Result<(), ConsumerCloseError> {
-        if self.0.is_closed() {
-            return Err(ConsumerCloseError::AlreadyClosed);
-        }
-        let response = self.0.client.unsubscribe(self.0.subscription_id).await?;
-
-        if response.is_ok() {
-            self.0.closed.store(true, Relaxed);
-            self.0.waker.wake();
-            Ok(())
-        } else {
-            Err(ConsumerCloseError::Close {
-                stream: self.0.stream.clone(),
-                status: response.code().clone(),
-            })
+        match self.0.closed.compare_exchange(false, true, SeqCst, SeqCst) {
+            Ok(false) => {
+                let response = self.0.client.unsubscribe(self.0.subscription_id).await?;
+                if response.is_ok() {
+                    self.0.waker.wake();
+                    Ok(())
+                } else {
+                    Err(ConsumerCloseError::Close {
+                        stream: self.0.stream.clone(),
+                        status: response.code().clone(),
+                    })
+                }
+            }
+            _ => Err(ConsumerCloseError::AlreadyClosed),
         }
     }
     /// Check if the consumer is closed
@@ -151,21 +155,32 @@ struct ConsumerMessageHandler(Arc<ConsumerInternal>);
 
 #[async_trait::async_trait]
 impl MessageHandler for ConsumerMessageHandler {
-    async fn handle_message(&self, item: Response) -> crate::RabbitMQStreamResult<()> {
-        if let ResponseKind::Deliver(delivery) = item.kind() {
-            for message in delivery.messages {
-                let _ = self
-                    .0
-                    .sender
-                    .send(Ok(Delivery {
-                        subscription_id: self.0.subscription_id,
-                        message,
-                    }))
-                    .await;
+    async fn handle_message(&self, item: MessageResult) -> crate::RabbitMQStreamResult<()> {
+        match item {
+            Some(Ok(response)) => {
+                if let ResponseKind::Deliver(delivery) = response.kind() {
+                    for message in delivery.messages {
+                        let _ = self
+                            .0
+                            .sender
+                            .send(Ok(Delivery {
+                                subscription_id: self.0.subscription_id,
+                                message,
+                            }))
+                            .await;
+                    }
+                }
+                // TODO handle credit fail
+                let _ = self.0.client.credit(self.0.subscription_id, 1).await;
             }
-
-            // TODO handle credit fail
-            let _ = self.0.client.credit(self.0.subscription_id, 1).await;
+            Some(Err(err)) => {
+                let _ = self.0.sender.send(Err(err.into())).await;
+            }
+            None => {
+                trace!("Closing consumer");
+                self.0.closed.store(true, Relaxed);
+                self.0.waker.wake();
+            }
         }
         Ok(())
     }

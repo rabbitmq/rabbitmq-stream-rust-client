@@ -4,7 +4,7 @@ use crate::common::TestEnvironment;
 use fake::{Fake, Faker};
 use futures::StreamExt;
 use rabbitmq_stream_client::{
-    error::ConsumerCloseError,
+    error::{ConsumerCloseError, ProducerCloseError},
     types::{Message, OffsetSpecification},
 };
 
@@ -93,5 +93,10 @@ async fn consumer_close_test() {
         consumer.handle().close().await,
         Err(ConsumerCloseError::AlreadyClosed),
     ));
-    producer.close().await.unwrap();
+    producer.clone().close().await.unwrap();
+
+    assert!(matches!(
+        producer.close().await,
+        Err(ProducerCloseError::AlreadyClosed),
+    ));
 }

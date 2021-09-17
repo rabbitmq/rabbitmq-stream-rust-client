@@ -90,9 +90,10 @@ pub use crate::producer::{Producer, ProducerBuilder};
 pub mod types {
 
     pub use crate::byte_capacity::ByteCapacity;
-    pub use crate::client::{Broker, StreamMetadata};
+    pub use crate::client::{Broker, MessageResult, StreamMetadata};
     pub use crate::consumer::Delivery;
     pub use crate::offset_specification::OffsetSpecification;
     pub use crate::stream_creator::StreamCreator;
     pub use rabbitmq_stream_protocol::message::Message;
+    pub use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};
 }
