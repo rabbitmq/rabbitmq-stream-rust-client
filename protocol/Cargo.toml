@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1"
-ntex-amqp-codec = "= 0.7.2"
+ntex-amqp-codec = "= 0.7.3"
 ntex-bytes = "0.1"
 
 
