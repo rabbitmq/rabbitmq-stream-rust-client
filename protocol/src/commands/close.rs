@@ -12,7 +12,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_CLOSE,
-    ResponseCode,
+    FromResponse, ResponseCode,
 };
 
 use super::Command;
@@ -24,12 +24,12 @@ use fake::Fake;
 #[derive(PartialEq, Debug)]
 pub struct CloseRequest {
     correlation_id: u32,
-    closing_code: u16,
+    closing_code: ResponseCode,
     closing_reason: String,
 }
 
 impl CloseRequest {
-    pub fn new(correlation_id: u32, closing_code: u16, closing_reason: String) -> Self {
+    pub fn new(correlation_id: u32, closing_code: ResponseCode, closing_reason: String) -> Self {
         Self {
             correlation_id,
             closing_code,
@@ -61,7 +61,7 @@ impl Command for CloseRequest {
 impl Decoder for CloseRequest {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
-        let (input, closing_code) = u16::decode(input)?;
+        let (input, closing_code) = ResponseCode::decode(input)?;
         let (input, closing_reason) = Option::decode(input)?;
 
         Ok((
@@ -89,6 +89,9 @@ impl CloseResponse {
             response_code,
         }
     }
+    pub fn is_ok(&self) -> bool {
+        self.response_code == ResponseCode::Ok
+    }
 }
 
 impl Encoder for CloseResponse {
@@ -115,6 +118,15 @@ impl Decoder for CloseResponse {
                 response_code,
             },
         ))
+    }
+}
+
+impl FromResponse for CloseResponse {
+    fn from_response(response: crate::Response) -> Option<Self> {
+        match response.kind {
+            crate::ResponseKind::Close(close) => Some(close),
+            _ => None,
+        }
     }
 }
 

@@ -1,25 +1,26 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering::Relaxed},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
 };
 
 use futures::{future::BoxFuture, FutureExt};
-use rabbitmq_stream_protocol::{message::Message, Response, ResponseCode, ResponseKind};
+use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
 use std::future::Future;
 use tokio::sync::{
     oneshot::{channel, Receiver, Sender},
     Mutex,
 };
+use tracing::trace;
 
+use crate::{client::MessageHandler, RabbitMQStreamResult};
 use crate::{
-    client::Client,
+    client::{Client, MessageResult},
     environment::Environment,
     error::{ClientError, ProducerCloseError, ProducerCreateError, ProducerPublishError},
 };
-use crate::{client::MessageHandler, RabbitMQStreamResult};
 
 type WaiterMap = Arc<Mutex<HashMap<u64, ProducerMessageWaiter>>>;
 
@@ -127,7 +128,7 @@ impl Producer {
         }
         let publishing_id = match message.publishing_id() {
             Some(publishing_id) => *publishing_id,
-            None => self.0.publish_sequence.fetch_add(1, Relaxed),
+            None => self.0.publish_sequence.fetch_add(1, Ordering::Relaxed),
         };
         message.set_publishing_id(publishing_id);
 
@@ -141,23 +142,27 @@ impl Producer {
     }
 
     pub fn is_closed(&self) -> bool {
-        self.0.closed.load(Relaxed)
+        self.0.closed.load(Ordering::Relaxed)
     }
     // TODO handle producer state after close
     pub async fn close(self) -> Result<(), ProducerCloseError> {
-        if self.is_closed() {
-            return Err(ProducerCloseError::AlreadyClosed);
-        }
-        let response = self.0.client.delete_publisher(self.0.producer_id).await?;
-
-        if response.is_ok() {
-            self.0.closed.store(true, Relaxed);
-            Ok(())
-        } else {
-            Err(ProducerCloseError::Close {
-                status: response.code().clone(),
-                stream: self.0.stream.clone(),
-            })
+        match self
+            .0
+            .closed
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            Ok(false) => {
+                let response = self.0.client.delete_publisher(self.0.producer_id).await?;
+                if response.is_ok() {
+                    Ok(())
+                } else {
+                    Err(ProducerCloseError::Close {
+                        status: response.code().clone(),
+                        stream: self.0.stream.clone(),
+                    })
+                }
+            }
+            _ => Err(ProducerCloseError::AlreadyClosed),
         }
     }
 }
@@ -182,33 +187,42 @@ impl ProducerConfirmHandler {
 
 #[async_trait::async_trait]
 impl MessageHandler for ProducerConfirmHandler {
-    async fn handle_message(&self, response: Response) -> RabbitMQStreamResult<()> {
-        match response.kind() {
-            ResponseKind::PublishConfirm(confirm) => {
-                for publishing_id in &confirm.publishing_ids {
-                    self.with_waiter(*publishing_id, |waiter| {
-                        async {
-                            let _ = waiter.handle_confirm().await;
+    async fn handle_message(&self, item: MessageResult) -> RabbitMQStreamResult<()> {
+        match item {
+            Some(Ok(response)) => {
+                match response.kind() {
+                    ResponseKind::PublishConfirm(confirm) => {
+                        for publishing_id in &confirm.publishing_ids {
+                            self.with_waiter(*publishing_id, |waiter| {
+                                async {
+                                    let _ = waiter.handle_confirm().await;
+                                }
+                                .boxed()
+                            })
+                            .await;
                         }
-                        .boxed()
-                    })
-                    .await;
-                }
-            }
-            ResponseKind::PublishError(error) => {
-                for err in &error.publishing_errors {
-                    let code = err.error_code.clone();
-                    self.with_waiter(err.publishing_id, move |waiter| {
-                        async {
-                            let _ = waiter.handle_error(code).await;
+                    }
+                    ResponseKind::PublishError(error) => {
+                        for err in &error.publishing_errors {
+                            let code = err.error_code.clone();
+                            self.with_waiter(err.publishing_id, move |waiter| {
+                                async {
+                                    let _ = waiter.handle_error(code).await;
+                                }
+                                .boxed()
+                            })
+                            .await;
                         }
-                        .boxed()
-                    })
-                    .await;
-                }
+                    }
+                    _ => {}
+                };
             }
-            _ => {}
-        };
+            Some(Err(error)) => {
+                trace!(?error);
+                // TODO clean all waiting for confirm
+            }
+            None => todo!(),
+        }
         Ok(())
     }
 }

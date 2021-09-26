@@ -4,7 +4,7 @@ use std::{
     collections::HashMap,
     sync::{atomic::AtomicU32, Arc},
 };
-use tracing::error;
+use tracing::trace;
 
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
@@ -34,7 +34,10 @@ impl<T> Clone for DispatcherState<T> {
     }
 }
 
-impl<T: MessageHandler> Dispatcher<T> {
+impl<T> Dispatcher<T>
+where
+    T: MessageHandler,
+{
     pub fn new() -> Dispatcher<T> {
         Dispatcher(DispatcherState {
             requests: Arc::new(Mutex::new(HashMap::new())),
@@ -85,7 +88,10 @@ impl<T: MessageHandler> Dispatcher<T> {
     }
 }
 
-impl<T: MessageHandler> DispatcherState<T> {
+impl<T> DispatcherState<T>
+where
+    T: MessageHandler,
+{
     pub async fn dispatch(&self, correlation_id: u32, response: Response) {
         let mut guard = self.requests.lock().await;
 
@@ -100,7 +106,16 @@ impl<T: MessageHandler> DispatcherState<T> {
 
     pub async fn notify(&self, response: Response) {
         if let Some(handler) = self.handler.read().await.as_ref() {
-            let _ = handler.handle_message(response).await;
+            let _ = handler.handle_message(Some(Ok(response))).await;
+        }
+    }
+
+    pub async fn close(self, error: Option<ClientError>) {
+        if let Some(handler) = self.handler.read().await.as_ref() {
+            if let Some(err) = error {
+                let _ = handler.handle_message(Some(Err(err))).await;
+            }
+            let _ = handler.handle_message(None).await;
         }
     }
 }
@@ -113,6 +128,7 @@ where
 {
     tokio::spawn(async move {
         // TODO implements Error handling and close of dispatcher
+        trace!("Dispatcher task: listening for messages");
         while let Some(result) = stream.next().await {
             match result {
                 Ok(item) => match item.correlation_id() {
@@ -120,11 +136,16 @@ where
                     None => state.notify(item).await,
                 },
                 Err(e) => {
-                    error!("Error from stream {:?}", e);
-                    panic!("Error {}", e);
+                    trace!("Error from stream {:?}", e);
+                    break;
                 }
             }
         }
+        if !stream.is_closed() {
+            // TODO handle reconnection if the connection is broken
+            trace!("Stream closed");
+        }
+        state.close(None).await;
     });
 }
 
@@ -146,6 +167,8 @@ mod tests {
         Request, RequestKind, Response, ResponseCode, ResponseKind,
     };
     use tokio::sync::mpsc::channel as tokio_channel;
+
+    use crate::client::MessageResult;
 
     use super::super::channel::channel;
 
@@ -270,7 +293,7 @@ mod tests {
 
         let (push_tx, mut push_rx) = tokio_channel(1);
 
-        let handler = move |response: Response| async move {
+        let handler = move |response: MessageResult| async move {
             push_tx.send(response).await.unwrap();
             Ok(())
         };

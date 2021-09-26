@@ -20,7 +20,9 @@ impl Environment {
     }
 
     async fn boostrap(options: EnvironmentOptions) -> RabbitMQStreamResult<Self> {
-        Client::connect(options.client_options.clone()).await?;
+        // check connection
+        let client = Client::connect(options.client_options.clone()).await?;
+        client.close().await?;
         Ok(Environment { options })
     }
 

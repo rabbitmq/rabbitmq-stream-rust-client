@@ -15,6 +15,8 @@ pub enum ClientError {
 
     #[error(transparent)]
     GenericError(#[from] Box<dyn std::error::Error + Send + Sync>),
+    #[error("Client already closed")]
+    AlreadyClosed,
 }
 
 #[derive(Error, Debug)]

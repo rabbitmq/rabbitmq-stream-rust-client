@@ -14,6 +14,7 @@ pub use metadata::{Broker, StreamMetadata};
 pub use options::ClientOptions;
 use rabbitmq_stream_protocol::{
     commands::{
+        close::{CloseRequest, CloseResponse},
         create_stream::CreateStreamCommand,
         credit::CreditCommand,
         declare_publisher::DeclarePublisherCommand,
@@ -35,10 +36,11 @@ use rabbitmq_stream_protocol::{
     },
     message::Message,
     types::PublishedMessage,
-    FromResponse, Request, Response, ResponseKind,
+    FromResponse, Request, Response, ResponseCode, ResponseKind,
 };
+use tracing::trace;
 
-pub use self::handler::MessageHandler;
+pub use self::handler::{MessageHandler, MessageResult};
 use self::{
     channel::{channel, ChannelReceiver, ChannelSender},
     codec::RabbitMqStreamCodec,
@@ -67,13 +69,31 @@ pub struct ClientState {
 
 #[async_trait::async_trait]
 impl MessageHandler for Client {
-    async fn handle_message(&self, item: Response) -> RabbitMQStreamResult<()> {
-        match item.kind_ref() {
-            ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
-            _ => {
+    async fn handle_message(&self, item: MessageResult) -> RabbitMQStreamResult<()> {
+        match &item {
+            Some(Ok(response)) => match response.kind_ref() {
+                ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
+                _ => {
+                    if let Some(handler) = self.state.read().await.handler.as_ref() {
+                        let handler = handler.clone();
+
+                        tokio::task::spawn(async move { handler.handle_message(item).await });
+                    }
+                }
+            },
+            Some(Err(err)) => {
+                trace!(?err);
                 if let Some(handler) = self.state.read().await.handler.as_ref() {
                     let handler = handler.clone();
+
                     tokio::task::spawn(async move { handler.handle_message(item).await });
+                }
+            }
+            None => {
+                trace!("Closing client");
+                if let Some(handler) = self.state.read().await.handler.as_ref() {
+                    let handler = handler.clone();
+                    tokio::task::spawn(async move { handler.handle_message(None).await });
                 }
             }
         }
@@ -139,6 +159,17 @@ impl Client {
         state.handler = Some(Arc::new(handler));
     }
 
+    pub async fn close(&self) -> RabbitMQStreamResult<()> {
+        if self.channel.is_closed() {
+            return Err(ClientError::AlreadyClosed);
+        }
+        let _: CloseResponse = self
+            .send_and_receive(|correlation_id| {
+                CloseRequest::new(correlation_id, ResponseCode::Ok, "Ok".to_owned())
+            })
+            .await?;
+        self.channel.close().await
+    }
     pub async fn subscribe(
         &self,
         subscription_id: u8,
@@ -308,7 +339,7 @@ impl Client {
         self.dispatcher.set_handler(self.clone()).await;
         self.dispatcher.start(receiver).await;
 
-        self.with_state_lock(self.peer_properties(), |state, server_properties| {
+        self.with_state_lock(self.peer_properties(), move |state, server_properties| {
             state.server_properties = server_properties;
         })
         .await?;

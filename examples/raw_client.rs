@@ -2,10 +2,8 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 
+use rabbitmq_stream_client::types::{Message, MessageResult, ResponseKind};
 use rabbitmq_stream_client::{types::OffsetSpecification, Client, ClientOptions};
-use rabbitmq_stream_protocol::message::Message;
-use rabbitmq_stream_protocol::Response;
-use rabbitmq_stream_protocol::ResponseKind;
 use tokio::sync::Notify;
 use tracing::info;
 use tracing::Level;
@@ -66,27 +64,30 @@ async fn start_subscriber(
     let notifier_inner = notifier.clone();
     let counter = Arc::new(AtomicI32::new(0));
 
-    let handler = move |response: Response| async move {
-        match response.kind_ref() {
-            ResponseKind::Deliver(delivery) => {
-                for message in &delivery.messages {
-                    info!(
-                        "Got message {:?}",
-                        message.data().map(|data| String::from_utf8(data.to_vec()))
-                    );
+    let handler = move |msg: MessageResult| async move {
+        if let Some(Ok(response)) = msg {
+            match response.kind_ref() {
+                ResponseKind::Deliver(delivery) => {
+                    for message in &delivery.messages {
+                        info!(
+                            "Got message {:?}",
+                            message.data().map(|data| String::from_utf8(data.to_vec()))
+                        );
+                    }
+                    let len = delivery.messages.len();
+                    let current = counter
+                        .fetch_add(len as i32, std::sync::atomic::Ordering::Relaxed)
+                        + len as i32;
+                    if current == 10 {
+                        client_inner.unsubscribe(1).await.unwrap();
+                        notifier_inner.notify_one();
+                    } else {
+                        client_inner.credit(1, 1).await.unwrap();
+                    }
                 }
-                let len = delivery.messages.len();
-                let current = counter.fetch_add(len as i32, std::sync::atomic::Ordering::Relaxed)
-                    + len as i32;
-                if current == 10 {
-                    client_inner.unsubscribe(1).await.unwrap();
-                    notifier_inner.notify_one();
-                } else {
-                    client_inner.credit(1, 1).await.unwrap();
+                _ => {
+                    info!("Got response {:?}", &response);
                 }
-            }
-            _ => {
-                info!("Got response {:?}", &response);
             }
         }
         Ok(())

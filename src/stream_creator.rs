@@ -22,6 +22,7 @@ impl StreamCreator {
     pub async fn create(self, stream: &str) -> Result<(), StreamCreateError> {
         let client = self.env.create_client().await?;
         let response = client.create_stream(stream, self.options).await?;
+        client.close().await?;
 
         if response.is_ok() {
             Ok(())
