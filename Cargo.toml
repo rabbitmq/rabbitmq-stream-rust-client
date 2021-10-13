@@ -24,9 +24,8 @@ url = "2.2.2"
 tracing = "0.1"
 thiserror = "1.0"
 async-trait = "0.1.51"
-
+rand = "0.8"
 
 [dev-dependencies]
 tracing-subscriber = "0.2.0"
 fake = { version = "2.4", features=['derive']}
-rand = "0.8"
