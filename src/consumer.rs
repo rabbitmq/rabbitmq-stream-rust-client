@@ -20,9 +20,11 @@ use tracing::trace;
 use crate::{
     client::{MessageHandler, MessageResult},
     error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
-    Client, Environment,
+    Client, ClientOptions, Environment,
 };
 use futures::{task::AtomicWaker, Stream};
+
+use rand::seq::SliceRandom;
 
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
@@ -53,7 +55,31 @@ pub struct ConsumerBuilder {
 
 impl ConsumerBuilder {
     pub async fn build(self, stream: &str) -> Result<Consumer, ConsumerCreateError> {
-        let client = self.environment.create_client().await?;
+        // Connect to the user specified node first, then look for a random replica to connect to instead.
+        // This is recommended for load balancing purposes.
+        let mut client = self.environment.create_client().await?;
+        if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
+            // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
+            // This is desired behavior in case there is only one node in the cluster.
+            if let Some(replica) = metadata.replicas.choose(&mut rand::thread_rng()) {
+                tracing::debug!(
+                    "Picked replica {:?} out of possible candidates {:?} for stream {}",
+                    replica,
+                    metadata.replicas,
+                    stream
+                );
+                client = Client::connect(ClientOptions {
+                    host: replica.host.clone(),
+                    port: replica.port as u16,
+                    ..self.environment.options.client_options
+                })
+                .await?;
+            }
+        } else {
+            return Err(ConsumerCreateError::StreamDoesNotExist {
+                stream: stream.into(),
+            });
+        }
 
         let subscription_id = 1;
         let response = client

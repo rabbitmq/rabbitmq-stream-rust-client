@@ -15,7 +15,7 @@ use tokio::sync::{
 };
 use tracing::trace;
 
-use crate::{client::MessageHandler, RabbitMQStreamResult};
+use crate::{client::MessageHandler, ClientOptions, RabbitMQStreamResult};
 use crate::{
     client::{Client, MessageResult},
     environment::Environment,
@@ -45,7 +45,27 @@ pub struct ProducerBuilder {
 
 impl ProducerBuilder {
     pub async fn build(self, stream: &str) -> Result<Producer, ProducerCreateError> {
-        let client = self.environment.create_client().await?;
+        // Connect to the user specified node first, then look for the stream leader.
+        // The leader is the recommended node for writing, because writing to a replica will redundantly pass these messages
+        // to the leader anyway - it is the only one capable of writing.
+        let mut client = self.environment.create_client().await?;
+        if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
+            tracing::debug!(
+                "Connecting to leader node {:?} of stream {}",
+                metadata.leader,
+                stream
+            );
+            client = Client::connect(ClientOptions {
+                host: metadata.leader.host.clone(),
+                port: metadata.leader.port as u16,
+                ..self.environment.options.client_options
+            })
+            .await?;
+        } else {
+            return Err(ProducerCreateError::StreamDoesNotExist {
+                stream: stream.into(),
+            });
+        }
 
         let waiting_confirmations: WaiterMap = Arc::new(Mutex::new(HashMap::new()));
 
