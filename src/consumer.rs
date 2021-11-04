@@ -185,6 +185,9 @@ impl MessageHandler for ConsumerMessageHandler {
         match item {
             Some(Ok(response)) => {
                 if let ResponseKind::Deliver(delivery) = response.kind() {
+                    let mut offset = delivery.chunk_first_offset;
+
+                    trace!("Got delivery with messages {}", delivery.messages.len());
                     for message in delivery.messages {
                         let _ = self
                             .0
@@ -192,8 +195,10 @@ impl MessageHandler for ConsumerMessageHandler {
                             .send(Ok(Delivery {
                                 subscription_id: self.0.subscription_id,
                                 message,
+                                offset,
                             }))
                             .await;
+                        offset += 1;
                     }
                 }
                 // TODO handle credit fail
@@ -213,6 +218,24 @@ impl MessageHandler for ConsumerMessageHandler {
 }
 #[derive(Debug)]
 pub struct Delivery {
-    pub subscription_id: u8,
-    pub message: Message,
+    subscription_id: u8,
+    message: Message,
+    offset: u64,
+}
+
+impl Delivery {
+    /// Get a reference to the delivery's subscription id.
+    pub fn subscription_id(&self) -> u8 {
+        self.subscription_id
+    }
+
+    /// Get a reference to the delivery's message.
+    pub fn message(&self) -> &Message {
+        &self.message
+    }
+
+    /// Get a reference to the delivery's offset.
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
 }

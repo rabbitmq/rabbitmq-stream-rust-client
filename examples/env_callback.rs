@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use futures::StreamExt;
 use rabbitmq_stream_client::{
     types::{ByteCapacity, Message, OffsetSpecification},
     Environment,
 };
+use tokio::sync::Barrier;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -32,11 +35,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build("test")
         .await?;
 
+    let barrier = Arc::new(Barrier::new(message_count + 1));
     for i in 0..message_count {
+        let b_cloned = barrier.clone();
         producer
-            .send(Message::builder().body(format!("message{}", i)).build())
+            .send_with_callback(
+                Message::builder().body(format!("message{}", i)).build(),
+                move |confirm_result| {
+                    let inner_barrier = b_cloned.clone();
+                    info!("Message confirm result {:?}", confirm_result);
+                    async move {
+                        inner_barrier.wait().await;
+                    }
+                },
+            )
             .await?;
     }
+
+    barrier.wait().await;
 
     producer.close().await?;
 

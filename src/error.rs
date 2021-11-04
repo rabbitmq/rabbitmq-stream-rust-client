@@ -84,6 +84,8 @@ pub enum ProducerPublishError {
         publisher_id: u8,
         status: ResponseCode,
     },
+    #[error("Failed to send batch messages for stream {stream}")]
+    Batch { stream: String },
     #[error("Failed to publish message, the producer is closed")]
     Closed,
     #[error(transparent)]

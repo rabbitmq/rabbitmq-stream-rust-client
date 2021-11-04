@@ -27,8 +27,8 @@ async fn producer_send_no_name_ok() {
     producer.close().await.unwrap();
 
     let delivery = consumer.next().await.unwrap().unwrap();
-    assert_eq!(1, delivery.subscription_id);
-    assert_eq!(Some(b"message".as_ref()), delivery.message.data());
+    assert_eq!(1, delivery.subscription_id());
+    assert_eq!(Some(b"message".as_ref()), delivery.message().data());
 
     consumer.handle().close().await.unwrap();
 }
@@ -77,12 +77,12 @@ async fn producer_send_name_with_deduplication_ok() {
     producer.close().await.unwrap();
 
     let delivery = consumer.next().await.unwrap().unwrap();
-    assert_eq!(1, delivery.subscription_id);
-    assert_eq!(Some(b"message0".as_ref()), delivery.message.data());
+    assert_eq!(1, delivery.subscription_id());
+    assert_eq!(Some(b"message0".as_ref()), delivery.message().data());
 
     let delivery = consumer.next().await.unwrap().unwrap();
-    assert_eq!(1, delivery.subscription_id);
-    assert_eq!(Some(b"message1".as_ref()), delivery.message.data());
+    assert_eq!(1, delivery.subscription_id());
+    assert_eq!(Some(b"message1".as_ref()), delivery.message().data());
 
     consumer.handle().close().await.unwrap();
 }
@@ -115,7 +115,7 @@ async fn producer_send_with_callback() {
 
     let result = rx.recv().await.unwrap();
 
-    assert_eq!(0, result.unwrap());
+    assert_eq!(0, result.unwrap().publishing_id());
 
     producer.close().await.unwrap();
 }

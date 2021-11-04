@@ -62,7 +62,7 @@ impl Decoder for Vec<u8> {
 pub fn read_vec<T: Decoder>(input: &[u8]) -> Result<(&[u8], Vec<T>), DecodeError> {
     let (mut input, len) = read_i32(input)?;
     let len = len as usize;
-    let mut result: Vec<T> = Vec::new();
+    let mut result: Vec<T> = Vec::with_capacity(len);
     for _ in 0..len {
         let (input1, value) = T::decode(input)?;
         result.push(value);

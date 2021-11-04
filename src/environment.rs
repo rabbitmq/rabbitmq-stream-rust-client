@@ -1,3 +1,7 @@
+use std::marker::PhantomData;
+use std::time::Duration;
+
+use crate::producer::NoDedup;
 use crate::types::OffsetSpecification;
 
 use crate::{
@@ -32,10 +36,13 @@ impl Environment {
     }
 
     /// Returns a builder for creating a producer
-    pub fn producer(&self) -> ProducerBuilder {
+    pub fn producer(&self) -> ProducerBuilder<NoDedup> {
         ProducerBuilder {
             environment: self.clone(),
             name: None,
+            batch_size: 100,
+            batch_publishing_delay: Duration::from_millis(100),
+            data: PhantomData,
         }
     }
 

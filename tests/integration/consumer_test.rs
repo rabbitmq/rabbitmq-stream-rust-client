@@ -39,7 +39,7 @@ async fn consumer_test() {
 
     for _ in 0..message_count {
         let delivery = consumer.next().await.unwrap();
-        let data = String::from_utf8(delivery.unwrap().message.data().unwrap().to_vec()).unwrap();
+        let data = String::from_utf8(delivery.unwrap().message().data().unwrap().to_vec()).unwrap();
         assert!(data.contains("message"));
     }
 
@@ -50,15 +50,8 @@ async fn consumer_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_close_test() {
     let env = TestEnvironment::create().await;
-    let reference: String = Faker.fake();
 
-    let producer = env
-        .env
-        .producer()
-        .name(&reference)
-        .build(&env.stream)
-        .await
-        .unwrap();
+    let producer = env.env.producer().build(&env.stream).await.unwrap();
 
     let mut consumer = env
         .env
