@@ -36,13 +36,13 @@ impl Stats {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         let start = Duration::from_nanos(self.start_time.load(Ordering::Relaxed));
         let diff = now - start;
-        let sec = diff.as_millis() as u64;
+        let millis = diff.as_millis() as u64;
 
         info!(
             "Published {} msg/s, Confirmed {} msg/s, Consumed {} msg/s, elapsed {}",
-            self.published_count.load(Ordering::Relaxed) * 1000 / sec,
-            self.confirmed_message_count.load(Ordering::Relaxed) * 1000 / sec,
-            self.consumer_message_count.load(Ordering::Relaxed) * 1000 / sec,
+            self.published_count.load(Ordering::Relaxed) * 1000 / millis,
+            self.confirmed_message_count.load(Ordering::Relaxed) * 1000 / millis,
+            self.consumer_message_count.load(Ordering::Relaxed) * 1000 / millis,
             diff.as_secs()
         );
     }
