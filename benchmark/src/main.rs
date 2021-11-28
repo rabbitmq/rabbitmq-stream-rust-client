@@ -1,17 +1,14 @@
-use std::{
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
-};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use clap::Parser;
 
 use futures::StreamExt;
-use rabbitmq_stream_client::{types::Message, Environment, MetricsCollector, NoDedup, Producer};
+use rabbitmq_stream_client::{types::Message, Environment, NoDedup, Producer};
+use stats::Stats;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
+
+mod stats;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opts = Opts::parse();
@@ -54,31 +51,6 @@ struct Opts {
 
     #[clap(short, long)]
     batch_send: bool,
-}
-
-#[derive(Clone, Default)]
-pub struct Stats {
-    published_count: Arc<AtomicU64>,
-    confirmed_message_count: Arc<AtomicU64>,
-    consumer_message_count: Arc<AtomicU64>,
-}
-
-#[async_trait::async_trait]
-impl MetricsCollector for Stats {
-    async fn publish(&self, count: u64) {
-        self.published_count.fetch_add(count, Ordering::Relaxed);
-    }
-
-    async fn consume(&self, count: u64) {
-        self.consumer_message_count
-            .fetch_add(count, Ordering::Relaxed);
-    }
-
-    async fn publish_confirm(&self, count: u64) {
-        self.confirmed_message_count
-            .fetch_add(count, Ordering::Relaxed);
-    }
-    async fn publish_error(&self, _count: u64) {}
 }
 
 async fn start_publisher(
@@ -163,22 +135,11 @@ async fn start_consumer(
 
 async fn start_reporting_task(stats: Stats) {
     tokio::task::spawn(async move {
-        let start = Instant::now();
         let mut interval = tokio::time::interval(Duration::from_secs(1));
         loop {
             interval.tick().await;
 
-            let diff = Instant::now() - start;
-            let sec = diff.as_secs();
-            if sec > 0 {
-                info!(
-                    "Published {} msg/s, Confirmed {} msg/s, Consumed {} msg/s, elapsed {}",
-                    stats.published_count.load(Ordering::Relaxed) / sec,
-                    stats.confirmed_message_count.load(Ordering::Relaxed) / sec,
-                    stats.consumer_message_count.load(Ordering::Relaxed) / sec,
-                    sec
-                );
-            }
+            stats.dump();
         }
     });
 }
