@@ -89,6 +89,7 @@ async fn start_publisher(
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_nanos();
+
                 msg.push(Message::builder().body(time.to_be_bytes()).build());
             }
 

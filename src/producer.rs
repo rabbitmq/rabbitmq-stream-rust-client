@@ -10,6 +10,7 @@ use std::{
     },
     time::Duration,
 };
+use tokio::sync::mpsc::channel;
 use tokio::sync::{mpsc, Mutex};
 use tracing::{debug, trace};
 
@@ -22,10 +23,17 @@ use crate::{
 
 type WaiterMap = Arc<DashMap<u64, ProducerMessageWaiter>>;
 
+type ConfirmCallback = Arc<
+    dyn Fn(Result<ConfirmationStatus, ProducerPublishError>) -> BoxFuture<'static, ()>
+        + Send
+        + Sync,
+>;
+
 #[derive(Debug)]
 pub struct ConfirmationStatus {
     publishing_id: u64,
     confirmed: bool,
+    status: ResponseCode,
 }
 
 impl ConfirmationStatus {
@@ -234,7 +242,15 @@ fn schedule_batch_send(producer: Arc<ProducerInternal>, delay: Duration) {
 
 impl<T> Producer<T> {
     pub async fn send(&self, message: Message) -> Result<ConfirmationStatus, ProducerPublishError> {
-        let (_, mut rx) = self.internal_send(message).await?;
+        let (tx, mut rx) = channel(1);
+        let _ = self
+            .internal_send(message, move |status| {
+                let cloned = tx.clone();
+                async move {
+                    let _ = cloned.send(status).await;
+                }
+            })
+            .await?;
 
         rx.recv()
             .await
@@ -243,11 +259,16 @@ impl<T> Producer<T> {
             .map(Ok)?
     }
 
-    pub async fn batch_send(&self, messages: Vec<Message>) -> Result<(), ProducerPublishError> {
-        let mut receiver = self.internal_batch_send(messages).await?;
+    pub async fn batch_send(
+        &self,
+        _messages: Vec<Message>,
+    ) -> Result<Vec<ConfirmationStatus>, ProducerPublishError> {
+        todo!()
+        // let _ = self
+        //     .internal_batch_send(messages, |status| async {})
+        //     .await?;
 
-        while receiver.recv().await.is_some() {}
-        Ok(())
+        // Ok(vec![])
     }
     pub async fn batch_send_with_callback<Fut>(
         &self,
@@ -255,15 +276,10 @@ impl<T> Producer<T> {
         cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
     ) -> Result<(), ProducerPublishError>
     where
-        Fut: Future<Output = ()> + Send + Sync,
+        Fut: Future<Output = ()> + Send + Sync + 'static,
     {
-        let mut receiver = self.internal_batch_send(messages).await?;
+        let _ = self.internal_batch_send(messages, cb).await?;
 
-        tokio::task::spawn(async move {
-            while let Some(confirmation_status) = receiver.recv().await {
-                cb(confirmation_status).await;
-            }
-        });
         Ok(())
     }
 
@@ -273,29 +289,20 @@ impl<T> Producer<T> {
         cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
     ) -> Result<(), ProducerPublishError>
     where
-        Fut: Future<Output = ()> + Send + Sync,
+        Fut: Future<Output = ()> + Send + Sync + 'static,
     {
-        let (_, mut rx) = self.internal_send(message).await?;
-        tokio::task::spawn(async move {
-            let result = rx.recv().await.unwrap();
-            match result {
-                Ok(confirm_status) => cb(Ok(confirm_status)).await,
-                Err(err) => cb(Err(ClientError::GenericError(Box::new(err)).into())).await,
-            };
-        });
+        let _ = self.internal_send(message, cb).await?;
         Ok(())
     }
 
-    async fn internal_send(
+    async fn internal_send<Fut>(
         &self,
         mut message: Message,
-    ) -> Result<
-        (
-            u64,
-            mpsc::Receiver<Result<ConfirmationStatus, ProducerPublishError>>,
-        ),
-        ProducerPublishError,
-    > {
+        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+    ) -> Result<(), ProducerPublishError>
+    where
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
         if self.is_closed() {
             return Err(ProducerPublishError::Closed);
         }
@@ -305,33 +312,36 @@ impl<T> Producer<T> {
         };
         message.set_publishing_id(publishing_id);
 
-        let (rx, waiter) =
-            ProducerMessageWaiter::waiter(self.0.stream.clone(), self.0.producer_id, 1);
+        let waiter =
+            ProducerMessageWaiter::waiter_with_cb(self.0.stream.clone(), self.0.producer_id, cb);
         self.0.waiting_confirmations.insert(publishing_id, waiter);
 
         if self.0.accumulator.add(message).await? {
             self.0.batch_send().await?;
         }
 
-        Ok((publishing_id, rx))
+        Ok(())
     }
-    async fn internal_batch_send(
+    async fn internal_batch_send<Fut>(
         &self,
         mut messages: Vec<Message>,
-    ) -> Result<
-        mpsc::Receiver<Result<ConfirmationStatus, ProducerPublishError>>,
-        ProducerPublishError,
-    > {
+        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+    ) -> Result<(), ProducerPublishError>
+    where
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
         if self.is_closed() {
             return Err(ProducerPublishError::Closed);
         }
 
-        let (rx, waiter) = ProducerMessageWaiter::waiter(
-            self.0.stream.clone(),
-            self.0.producer_id,
-            messages.len(),
-        );
+        let arc_cb = Arc::new(move |status| cb(status).boxed());
+
         for message in &mut messages {
+            let waiter = ProducerMessageWaiter::waiter_with_arc_cb(
+                self.0.stream.clone(),
+                self.0.producer_id,
+                arc_cb.clone(),
+            );
             let publishing_id = match message.publishing_id() {
                 Some(publishing_id) => *publishing_id,
                 None => self.0.publish_sequence.fetch_add(1, Ordering::Relaxed),
@@ -345,7 +355,7 @@ impl<T> Producer<T> {
 
         self.0.client.publish(self.0.producer_id, messages).await?;
 
-        Ok(rx)
+        Ok(())
     }
 
     pub fn is_closed(&self) -> bool {
@@ -414,9 +424,10 @@ impl MessageHandler for ProducerConfirmHandler {
                         trace!("Got publish_error  {:?}", error);
                         for err in &error.publishing_errors {
                             let code = err.error_code.clone();
+                            let id = err.publishing_id;
                             self.with_waiter(err.publishing_id, move |waiter| {
-                                async {
-                                    let _ = waiter.handle_error(code).await;
+                                async move {
+                                    let _ = waiter.handle_error(id, code).await;
                                 }
                                 .boxed()
                             })
@@ -440,49 +451,56 @@ impl MessageHandler for ProducerConfirmHandler {
 struct ProducerMessageWaiter {
     stream: Arc<String>,
     publisher_id: u8,
-    tx: mpsc::Sender<Result<ConfirmationStatus, ProducerPublishError>>,
+    cb: ConfirmCallback,
 }
 
 impl ProducerMessageWaiter {
-    fn waiter(
+    fn waiter_with_cb<Fut>(
         stream: String,
         publisher_id: u8,
-        batch_size: usize,
-    ) -> (
-        mpsc::Receiver<Result<ConfirmationStatus, ProducerPublishError>>,
-        Self,
-    ) {
-        let (tx, rx) = mpsc::channel(batch_size);
-
-        (
-            rx,
-            Self {
-                stream: Arc::new(stream),
-                publisher_id,
-                tx,
-            },
-        )
+        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+    ) -> Self
+    where
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
+        Self {
+            stream: Arc::new(stream),
+            publisher_id,
+            cb: Arc::new(move |confirm_status| cb(confirm_status).boxed()),
+        }
     }
 
+    fn waiter_with_arc_cb(
+        stream: String,
+        publisher_id: u8,
+        confirm_callback: ConfirmCallback,
+    ) -> Self {
+        Self {
+            stream: Arc::new(stream),
+            publisher_id,
+            cb: confirm_callback,
+        }
+    }
     async fn handle_confirm(self, publishing_id: u64) -> RabbitMQStreamResult<()> {
-        let _ = self
-            .tx
-            .send(Ok(ConfirmationStatus {
-                publishing_id,
-                confirmed: true,
-            }))
-            .await;
+        (self.cb)(Ok(ConfirmationStatus {
+            publishing_id,
+            confirmed: true,
+            status: ResponseCode::Ok,
+        }))
+        .await;
         Ok(())
     }
-    async fn handle_error(self, status: ResponseCode) -> RabbitMQStreamResult<()> {
-        let _ = self
-            .tx
-            .send(Err(ProducerPublishError::Create {
-                stream: self.stream.as_ref().clone(),
-                publisher_id: self.publisher_id,
-                status,
-            }))
-            .await;
+    async fn handle_error(
+        self,
+        publishing_id: u64,
+        status: ResponseCode,
+    ) -> RabbitMQStreamResult<()> {
+        (self.cb)(Ok(ConfirmationStatus {
+            publishing_id,
+            confirmed: false,
+            status,
+        }))
+        .await;
         Ok(())
     }
 }
