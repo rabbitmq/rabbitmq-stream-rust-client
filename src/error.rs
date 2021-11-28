@@ -88,6 +88,8 @@ pub enum ProducerPublishError {
     Batch { stream: String },
     #[error("Failed to publish message, the producer is closed")]
     Closed,
+    #[error("Failed to publish message, confirmation channel returned None for stream {stream}")]
+    Confirmation { stream: String },
     #[error(transparent)]
     Client(#[from] ClientError),
 }

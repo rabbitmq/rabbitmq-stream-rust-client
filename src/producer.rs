@@ -13,7 +13,7 @@ use std::{
 };
 use tokio::sync::mpsc::channel;
 use tokio::sync::{mpsc, Mutex};
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 
 use crate::MetricsCollector;
 use crate::{client::MessageHandler, ClientOptions, RabbitMQStreamResult};
@@ -67,7 +67,7 @@ impl ProducerInternal {
         let mut messages = Vec::with_capacity(self.batch_size);
 
         while count != self.batch_size {
-            match self.accumulator.get().await.unwrap() {
+            match self.accumulator.get().await? {
                 Some(message) => {
                     messages.push(message);
                     count += 1;
@@ -78,10 +78,7 @@ impl ProducerInternal {
 
         if !messages.is_empty() {
             debug!("Sending batch of {} messages", messages.len());
-            self.client
-                .publish(self.producer_id, messages)
-                .await
-                .unwrap();
+            self.client.publish(self.producer_id, messages).await?;
         }
 
         Ok(())
@@ -214,7 +211,10 @@ impl MessageAccumulator {
     }
 
     pub async fn add(&self, message: Message) -> RabbitMQStreamResult<bool> {
-        self.sender.send(message).await.unwrap();
+        self.sender
+            .send(message)
+            .await
+            .map_err(|err| ClientError::GenericError(Box::new(err)))?;
 
         let val = self.message_count.fetch_add(1, Ordering::Relaxed);
 
@@ -239,7 +239,10 @@ fn schedule_batch_send(producer: Arc<ProducerInternal>, delay: Duration) {
         loop {
             interval.tick().await;
 
-            producer.batch_send().await.unwrap();
+            match producer.batch_send().await {
+                Ok(_) => {}
+                Err(e) => error!("Error publishing batch {:?}", e),
+            }
         }
     });
 }
@@ -258,7 +261,9 @@ impl<T> Producer<T> {
 
         rx.recv()
             .await
-            .unwrap()
+            .ok_or_else(|| ProducerPublishError::Confirmation {
+                stream: self.0.stream.clone(),
+            })?
             .map_err(|err| ClientError::GenericError(Box::new(err)))
             .map(Ok)?
     }
