@@ -9,7 +9,7 @@ use std::{
 use clap::Parser;
 
 use futures::StreamExt;
-use rabbitmq_stream_client::{types::Message, Environment};
+use rabbitmq_stream_client::{types::Message, Environment, NoDedup, Producer};
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 #[tokio::main]
@@ -57,6 +57,9 @@ struct Opts {
 
     #[clap(short, long, default_value = "100")]
     batch_size: usize,
+
+    #[clap(short, long)]
+    batch_send: bool,
 }
 
 #[derive(Clone, Default)]
@@ -81,21 +84,35 @@ async fn start_publisher(
         .build(&stream)
         .await?;
 
+    let is_batch_send = opts.batch_send;
     tokio::task::spawn(async move {
+        info!(
+            "Starting producer with batch size {} and batch send {}",
+            batch_size, is_batch_send
+        );
         loop {
-            let mut msg = Vec::with_capacity(batch_size as usize);
-            for _ in 0..batch_size {
-                let time = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos();
-
-                msg.push(Message::builder().body(time.to_be_bytes()).build());
+            if is_batch_send {
+                batch_send(&producer, batch_size, &stats).await
+            } else {
+                single_send(&producer, batch_size, &stats).await
             }
+        }
+    });
+    Ok(())
+}
 
-            let inner_stats = stats.clone();
-            producer
-                .batch_send_with_callback(msg, move |confirmation_status| {
+async fn single_send(producer: &Producer<NoDedup>, batch_size: usize, stats: &Stats) {
+    for _ in 0..batch_size {
+        let time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
+        let inner_stats = stats.clone();
+        producer
+            .send_with_callback(
+                Message::builder().body(time.to_be_bytes()).build(),
+                move |confirmation_status| {
                     let stats = inner_stats.clone();
                     async move {
                         if confirmation_status.unwrap().confirmed() {
@@ -104,16 +121,45 @@ async fn start_publisher(
                                 .fetch_add(1, Ordering::Relaxed);
                         }
                     }
-                })
-                .await
-                .unwrap();
+                },
+            )
+            .await
+            .unwrap();
+    }
 
-            stats
-                .published_count
-                .fetch_add(batch_size as u64, Ordering::Relaxed);
-        }
-    });
-    Ok(())
+    stats
+        .published_count
+        .fetch_add(batch_size as u64, Ordering::Relaxed);
+}
+async fn batch_send(producer: &Producer<NoDedup>, batch_size: usize, stats: &Stats) {
+    let mut msg = Vec::with_capacity(batch_size);
+    for _ in 0..batch_size {
+        let time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
+        msg.push(Message::builder().body(time.to_be_bytes()).build());
+    }
+
+    let inner_stats = stats.clone();
+    producer
+        .batch_send_with_callback(msg, move |confirmation_status| {
+            let stats = inner_stats.clone();
+            async move {
+                if confirmation_status.unwrap().confirmed() {
+                    stats
+                        .confirmed_message_count
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+    stats
+        .published_count
+        .fetch_add(batch_size as u64, Ordering::Relaxed);
 }
 async fn start_consumer(
     env: Environment,
