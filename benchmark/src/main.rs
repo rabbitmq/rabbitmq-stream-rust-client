@@ -33,17 +33,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         environment.clone(),
         &opts,
         opts.streams.get(0).unwrap().clone(),
-        stats.clone(),
     )
     .await?;
 
-    start_consumer(
-        environment,
-        &opts,
-        opts.streams.get(0).unwrap().clone(),
-        stats,
-    )
-    .await?;
+    start_consumer(environment, &opts, opts.streams.get(0).unwrap().clone()).await?;
     loop {
         tokio::time::sleep(Duration::from_secs(60)).await;
     }
@@ -75,13 +68,23 @@ impl MetricsCollector for Stats {
     async fn publish(&self, count: u64) {
         self.published_count.fetch_add(count, Ordering::Relaxed);
     }
+
+    async fn consume(&self, count: u64) {
+        self.consumer_message_count
+            .fetch_add(count, Ordering::Relaxed);
+    }
+
+    async fn publish_confirm(&self, count: u64) {
+        self.confirmed_message_count
+            .fetch_add(count, Ordering::Relaxed);
+    }
+    async fn publish_error(&self, _count: u64) {}
 }
 
 async fn start_publisher(
     env: Environment,
     opts: &Opts,
     stream: String,
-    stats: Stats,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let _ = env.stream_creator().create(&stream).await;
 
@@ -100,42 +103,32 @@ async fn start_publisher(
         );
         loop {
             if is_batch_send {
-                batch_send(&producer, batch_size, &stats).await
+                batch_send(&producer, batch_size).await
             } else {
-                single_send(&producer, batch_size, &stats).await
+                single_send(&producer, batch_size).await
             }
         }
     });
     Ok(())
 }
 
-async fn single_send(producer: &Producer<NoDedup>, batch_size: usize, stats: &Stats) {
+async fn single_send(producer: &Producer<NoDedup>, batch_size: usize) {
     for _ in 0..batch_size {
         let time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
 
-        let inner_stats = stats.clone();
         producer
             .send_with_callback(
                 Message::builder().body(time.to_be_bytes()).build(),
-                move |confirmation_status| {
-                    let stats = inner_stats.clone();
-                    async move {
-                        if confirmation_status.unwrap().confirmed() {
-                            stats
-                                .confirmed_message_count
-                                .fetch_add(1, Ordering::Relaxed);
-                        }
-                    }
-                },
+                move |_| async move {},
             )
             .await
             .unwrap();
     }
 }
-async fn batch_send(producer: &Producer<NoDedup>, batch_size: usize, stats: &Stats) {
+async fn batch_send(producer: &Producer<NoDedup>, batch_size: usize) {
     let mut msg = Vec::with_capacity(batch_size);
     for _ in 0..batch_size {
         let time = SystemTime::now()
@@ -146,18 +139,8 @@ async fn batch_send(producer: &Producer<NoDedup>, batch_size: usize, stats: &Sta
         msg.push(Message::builder().body(time.to_be_bytes()).build());
     }
 
-    let inner_stats = stats.clone();
     producer
-        .batch_send_with_callback(msg, move |confirmation_status| {
-            let stats = inner_stats.clone();
-            async move {
-                if confirmation_status.unwrap().confirmed() {
-                    stats
-                        .confirmed_message_count
-                        .fetch_add(1, Ordering::Relaxed);
-                }
-            }
-        })
+        .batch_send_with_callback(msg, move |_| async move {})
         .await
         .unwrap();
 }
@@ -165,14 +148,13 @@ async fn start_consumer(
     env: Environment,
     _opts: &Opts,
     stream: String,
-    stats: Stats,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut consumer = env.consumer().build(&stream).await?;
 
     tokio::task::spawn(async move {
         loop {
             while consumer.next().await.is_some() {
-                stats.consumer_message_count.fetch_add(1, Ordering::Relaxed);
+                // TODO
             }
         }
     });

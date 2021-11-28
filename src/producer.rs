@@ -14,6 +14,7 @@ use tokio::sync::mpsc::channel;
 use tokio::sync::{mpsc, Mutex};
 use tracing::{debug, trace};
 
+use crate::MetricsCollector;
 use crate::{client::MessageHandler, ClientOptions, RabbitMQStreamResult};
 use crate::{
     client::{Client, MessageResult},
@@ -107,6 +108,7 @@ impl<T> ProducerBuilder<T> {
         // The leader is the recommended node for writing, because writing to a replica will redundantly pass these messages
         // to the leader anyway - it is the only one capable of writing.
         let mut client = self.environment.create_client().await?;
+        let metrics_collector = self.environment.options.client_options.collector.clone();
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             tracing::debug!(
                 "Connecting to leader node {:?} of stream {}",
@@ -129,6 +131,7 @@ impl<T> ProducerBuilder<T> {
 
         let confirm_handler = ProducerConfirmHandler {
             waiting_confirmations: waiting_confirmations.clone(),
+            metrics_collector,
         };
 
         client.set_handler(confirm_handler).await;
@@ -386,6 +389,7 @@ impl<T> Producer<T> {
 
 struct ProducerConfirmHandler {
     waiting_confirmations: WaiterMap,
+    metrics_collector: Arc<dyn MetricsCollector>,
 }
 
 impl ProducerConfirmHandler {
@@ -409,6 +413,7 @@ impl MessageHandler for ProducerConfirmHandler {
                 match response.kind() {
                     ResponseKind::PublishConfirm(confirm) => {
                         trace!("Got publish_confirm for {:?}", confirm.publishing_ids);
+                        let confirm_len = confirm.publishing_ids.len();
                         for publishing_id in &confirm.publishing_ids {
                             let id = *publishing_id;
                             self.with_waiter(*publishing_id, move |waiter| {
@@ -419,6 +424,9 @@ impl MessageHandler for ProducerConfirmHandler {
                             })
                             .await;
                         }
+                        self.metrics_collector
+                            .publish_confirm(confirm_len as u64)
+                            .await;
                     }
                     ResponseKind::PublishError(error) => {
                         trace!("Got publish_error  {:?}", error);
