@@ -41,7 +41,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", author = "Enrico R.  <enrico.risa@gmail.com>")]
 struct Opts {
-    #[clap(short, long, default_value = "default.conf")]
+    // Ignored for now.
+    #[clap(short, long, default_value = "")]
     urls: Vec<String>,
     #[clap(short, long, default_value = "benchmark_stream")]
     streams: Vec<String>,

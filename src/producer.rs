@@ -2,6 +2,7 @@ use dashmap::DashMap;
 use futures::{future::BoxFuture, FutureExt};
 use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
 use std::future::Future;
+use std::vec;
 use std::{
     marker::PhantomData,
     sync::{
@@ -264,14 +265,27 @@ impl<T> Producer<T> {
 
     pub async fn batch_send(
         &self,
-        _messages: Vec<Message>,
+        messages: Vec<Message>,
     ) -> Result<Vec<ConfirmationStatus>, ProducerPublishError> {
-        todo!()
-        // let _ = self
-        //     .internal_batch_send(messages, |status| async {})
-        //     .await?;
+        let messages_len = messages.len();
+        let (tx, mut rx) = channel(messages_len);
 
-        // Ok(vec![])
+        let _ = self
+            .internal_batch_send(messages, move |status| {
+                let cloned = tx.clone();
+                async move {
+                    let _ = cloned.send(status).await;
+                }
+            })
+            .await?;
+
+        let mut confirmations = Vec::with_capacity(messages_len);
+
+        while let Some(confirmation) = rx.recv().await {
+            confirmations.push(confirmation?);
+        }
+
+        Ok(confirmations)
     }
     pub async fn batch_send_with_callback<Fut>(
         &self,
