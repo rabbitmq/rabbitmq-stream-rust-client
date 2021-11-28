@@ -1,11 +1,12 @@
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::producer::NoDedup;
 use crate::types::OffsetSpecification;
 
 use crate::{
-    client::{Client, ClientOptions},
+    client::{Client, ClientOptions, MetricsCollector},
     consumer::ConsumerBuilder,
     error::StreamDeleteError,
     producer::ProducerBuilder,
@@ -101,6 +102,14 @@ impl EnvironmentBuilder {
     }
     pub fn port(mut self, port: u16) -> EnvironmentBuilder {
         self.0.client_options.port = port;
+        self
+    }
+
+    pub fn metrics_collector(
+        mut self,
+        collector: impl MetricsCollector + Send + Sync + 'static,
+    ) -> EnvironmentBuilder {
+        self.0.client_options.collector = Arc::new(collector);
         self
     }
 }

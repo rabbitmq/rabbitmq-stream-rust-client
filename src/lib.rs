@@ -82,7 +82,7 @@ mod stream_creator;
 
 pub type RabbitMQStreamResult<T> = Result<T, error::ClientError>;
 
-pub use crate::client::{Client, ClientOptions};
+pub use crate::client::{Client, ClientOptions, MetricsCollector};
 
 pub use crate::consumer::{Consumer, ConsumerBuilder, ConsumerHandle};
 pub use crate::environment::{Environment, EnvironmentBuilder};

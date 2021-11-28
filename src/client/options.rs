@@ -1,4 +1,8 @@
-#[derive(Clone, Debug)]
+use std::{fmt::Debug, sync::Arc};
+
+use super::metrics::{MetricsCollector, NopMetricsCollector};
+
+#[derive(Clone)]
 pub struct ClientOptions {
     pub(crate) host: String,
     pub(crate) port: u16,
@@ -7,8 +11,22 @@ pub struct ClientOptions {
     pub(crate) v_host: String,
     pub(crate) heartbeat: u32,
     pub(crate) max_frame_size: u32,
+    pub(crate) collector: Arc<dyn MetricsCollector>,
 }
 
+impl Debug for ClientOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientOptions")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("user", &self.user)
+            .field("password", &self.password)
+            .field("v_host", &self.v_host)
+            .field("heartbeat", &self.heartbeat)
+            .field("max_frame_size", &self.max_frame_size)
+            .finish()
+    }
+}
 impl Default for ClientOptions {
     fn default() -> Self {
         ClientOptions {
@@ -19,6 +37,7 @@ impl Default for ClientOptions {
             v_host: "/".to_owned(),
             heartbeat: 60,
             max_frame_size: 1048576,
+            collector: Arc::new(NopMetricsCollector {}),
         }
     }
 }

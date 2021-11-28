@@ -9,7 +9,7 @@ use std::{
 use clap::Parser;
 
 use futures::StreamExt;
-use rabbitmq_stream_client::{types::Message, Environment, NoDedup, Producer};
+use rabbitmq_stream_client::{types::Message, Environment, MetricsCollector, NoDedup, Producer};
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 #[tokio::main]
@@ -19,13 +19,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+    let stats = Stats::default();
     let environment = Environment::builder()
         .host("localhost")
         .port(5552)
+        .metrics_collector(stats.clone())
         .build()
         .await?;
 
-    let stats = Stats::default();
     start_reporting_task(stats.clone()).await;
 
     start_publisher(
@@ -67,6 +68,13 @@ pub struct Stats {
     published_count: Arc<AtomicU64>,
     confirmed_message_count: Arc<AtomicU64>,
     consumer_message_count: Arc<AtomicU64>,
+}
+
+#[async_trait::async_trait]
+impl MetricsCollector for Stats {
+    async fn publish(&self, count: u64) {
+        self.published_count.fetch_add(count, Ordering::Relaxed);
+    }
 }
 
 async fn start_publisher(
@@ -126,10 +134,6 @@ async fn single_send(producer: &Producer<NoDedup>, batch_size: usize, stats: &St
             .await
             .unwrap();
     }
-
-    stats
-        .published_count
-        .fetch_add(batch_size as u64, Ordering::Relaxed);
 }
 async fn batch_send(producer: &Producer<NoDedup>, batch_size: usize, stats: &Stats) {
     let mut msg = Vec::with_capacity(batch_size);
@@ -156,10 +160,6 @@ async fn batch_send(producer: &Producer<NoDedup>, batch_size: usize, stats: &Sta
         })
         .await
         .unwrap();
-
-    stats
-        .published_count
-        .fetch_add(batch_size as u64, Ordering::Relaxed);
 }
 async fn start_consumer(
     env: Environment,
