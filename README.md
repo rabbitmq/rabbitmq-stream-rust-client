@@ -105,3 +105,10 @@ make build
 make rabbitmq-server
 make test
 ```
+
+#### Running Benchmarks
+
+```bash
+make rabbitmq-server
+make run-benchmark
+```
