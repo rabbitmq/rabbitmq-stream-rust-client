@@ -93,7 +93,7 @@ async fn single_send(producer: &Producer<NoDedup>, batch_size: usize) {
             .as_nanos();
 
         producer
-            .send_with_callback(
+            .send(
                 Message::builder().body(time.to_be_bytes()).build(),
                 move |_| async move {},
             )
@@ -113,7 +113,7 @@ async fn batch_send(producer: &Producer<NoDedup>, batch_size: usize) {
     }
 
     producer
-        .batch_send_with_callback(msg, move |_| async move {})
+        .batch_send(msg, move |_| async move {})
         .await
         .unwrap();
 }

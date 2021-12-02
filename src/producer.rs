@@ -248,7 +248,10 @@ fn schedule_batch_send(producer: Arc<ProducerInternal>, delay: Duration) {
 }
 
 impl<T> Producer<T> {
-    pub async fn send(&self, message: Message) -> Result<ConfirmationStatus, ProducerPublishError> {
+    pub async fn send_with_confirm(
+        &self,
+        message: Message,
+    ) -> Result<ConfirmationStatus, ProducerPublishError> {
         let (tx, mut rx) = channel(1);
         let _ = self
             .internal_send(message, move |status| {
@@ -268,7 +271,7 @@ impl<T> Producer<T> {
             .map(Ok)?
     }
 
-    pub async fn batch_send(
+    pub async fn batch_send_with_confirm(
         &self,
         messages: Vec<Message>,
     ) -> Result<Vec<ConfirmationStatus>, ProducerPublishError> {
@@ -292,7 +295,7 @@ impl<T> Producer<T> {
 
         Ok(confirmations)
     }
-    pub async fn batch_send_with_callback<Fut>(
+    pub async fn batch_send<Fut>(
         &self,
         messages: Vec<Message>,
         cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
@@ -305,7 +308,7 @@ impl<T> Producer<T> {
         Ok(())
     }
 
-    pub async fn send_with_callback<Fut>(
+    pub async fn send<Fut>(
         &self,
         message: Message,
         cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,

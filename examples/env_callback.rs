@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..message_count {
         let b_cloned = barrier.clone();
         producer
-            .send_with_callback(
+            .send(
                 Message::builder().body(format!("message{}", i)).build(),
                 move |confirm_result| {
                     let inner_barrier = b_cloned.clone();

@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for i in 0..message_count {
         producer
-            .send(Message::builder().body(format!("message{}", i)).build())
+            .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
             .await?;
     }
 

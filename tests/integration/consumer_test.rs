@@ -32,7 +32,7 @@ async fn consumer_test() {
 
     for n in 0..message_count {
         let _ = producer
-            .send(Message::builder().body(format!("message{}", n)).build())
+            .send_with_confirm(Message::builder().body(format!("message{}", n)).build())
             .await
             .unwrap();
     }
@@ -62,7 +62,7 @@ async fn consumer_close_test() {
         .unwrap();
 
     let _ = producer
-        .send(Message::builder().body("message").build())
+        .send_with_confirm(Message::builder().body("message").build())
         .await
         .unwrap();
 

@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let barrier_cloned = barrier.clone();
         tokio::task::spawn(async move {
             producer_cloned
-                .send(Message::builder().body(format!("message{}", i)).build())
+                .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
                 .await
                 .unwrap();
 

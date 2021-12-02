@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     producer
-        .batch_send_with_callback(messages, |confirmation_status| async move {
+        .batch_send(messages, |confirmation_status| async move {
             info!("Message confirmed with status {:?}", confirmation_status);
         })
         .await?;

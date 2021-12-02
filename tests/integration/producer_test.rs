@@ -20,7 +20,7 @@ async fn producer_send_no_name_ok() {
         .unwrap();
 
     let _ = producer
-        .send(Message::builder().body(b"message".to_vec()).build())
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
         .await
         .unwrap();
 
@@ -54,13 +54,13 @@ async fn producer_send_name_with_deduplication_ok() {
         .unwrap();
 
     let _ = producer
-        .send(Message::builder().body(b"message0".to_vec()).build())
+        .send_with_confirm(Message::builder().body(b"message0".to_vec()).build())
         .await
         .unwrap();
 
     // this is not published
     let _ = producer
-        .send(
+        .send_with_confirm(
             Message::builder()
                 .body(b"message0".to_vec())
                 .publising_id(0)
@@ -70,7 +70,7 @@ async fn producer_send_name_with_deduplication_ok() {
         .unwrap();
 
     let _ = producer
-        .send(Message::builder().body(b"message1".to_vec()).build())
+        .send_with_confirm(Message::builder().body(b"message1".to_vec()).build())
         .await
         .unwrap();
 
@@ -101,7 +101,7 @@ async fn producer_send_with_callback() {
         .unwrap();
 
     let _ = producer
-        .send_with_callback(
+        .send(
             Message::builder().body(b"message".to_vec()).build(),
             move |confirm_result| {
                 let inner_tx = tx.clone();
@@ -128,7 +128,7 @@ async fn producer_batch_send_with_callback() {
     let producer = env.env.producer().build(&env.stream).await.unwrap();
 
     let _ = producer
-        .batch_send_with_callback(
+        .batch_send(
             vec![Message::builder().body(b"message".to_vec()).build()],
             move |confirm_result| {
                 let inner_tx = tx.clone();
@@ -154,7 +154,7 @@ async fn producer_batch_send() {
     let producer = env.env.producer().build(&env.stream).await.unwrap();
 
     let result = producer
-        .batch_send(vec![Message::builder().body(b"message".to_vec()).build()])
+        .batch_send_with_confirm(vec![Message::builder().body(b"message".to_vec()).build()])
         .await
         .unwrap();
 
