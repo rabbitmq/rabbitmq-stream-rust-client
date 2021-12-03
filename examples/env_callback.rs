@@ -1,11 +1,9 @@
-use std::sync::Arc;
-
 use futures::StreamExt;
 use rabbitmq_stream_client::{
     types::{ByteCapacity, Message, OffsetSpecification},
     Environment,
 };
-use tokio::sync::Barrier;
+use tokio::sync::mpsc::channel;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -23,36 +21,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let message_count = 10;
-    environment
+
+    let _ = environment
         .stream_creator()
         .max_length(ByteCapacity::GB(2))
         .create("test")
-        .await?;
+        .await;
 
-    let producer = environment
-        .producer()
-        .name("test_producer")
-        .build("test")
-        .await?;
+    let producer = environment.producer().build("test").await?;
 
-    let barrier = Arc::new(Barrier::new(message_count + 1));
+    let (tx, mut rx) = channel(message_count);
     for i in 0..message_count {
-        let b_cloned = barrier.clone();
+        let tx_cloned = tx.clone();
         producer
             .send(
                 Message::builder().body(format!("message{}", i)).build(),
                 move |confirm_result| {
-                    let inner_barrier = b_cloned.clone();
                     info!("Message confirm result {:?}", confirm_result);
+                    let tx_cloned = tx_cloned.clone();
                     async move {
-                        inner_barrier.wait().await;
+                        tx_cloned.send(()).await.unwrap();
                     }
                 },
             )
             .await?;
     }
+    drop(tx);
 
-    barrier.wait().await;
+    while let Some(_) = rx.recv().await {}
 
     producer.close().await?;
 
