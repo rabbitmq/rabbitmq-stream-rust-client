@@ -113,15 +113,7 @@ impl EnvironmentBuilder {
         self
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct EnvironmentOptions {
     pub(crate) client_options: ClientOptions,
-}
-
-impl Default for EnvironmentOptions {
-    fn default() -> Self {
-        Self {
-            client_options: ClientOptions::default(),
-        }
-    }
 }

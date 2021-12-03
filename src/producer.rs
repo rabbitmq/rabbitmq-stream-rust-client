@@ -48,6 +48,11 @@ impl ConfirmationStatus {
     pub fn publishing_id(&self) -> u64 {
         self.publishing_id
     }
+
+    /// Get a reference to the confirmation status's status.
+    pub fn status(&self) -> &ResponseCode {
+        &self.status
+    }
 }
 
 pub struct ProducerInternal {
@@ -337,8 +342,7 @@ impl<T> Producer<T> {
         };
         message.set_publishing_id(publishing_id);
 
-        let waiter =
-            ProducerMessageWaiter::waiter_with_cb(self.0.stream.clone(), self.0.producer_id, cb);
+        let waiter = ProducerMessageWaiter::waiter_with_cb(cb);
         self.0.waiting_confirmations.insert(publishing_id, waiter);
 
         if self.0.accumulator.add(message).await? {
@@ -362,11 +366,7 @@ impl<T> Producer<T> {
         let arc_cb = Arc::new(move |status| cb(status).boxed());
 
         for message in &mut messages {
-            let waiter = ProducerMessageWaiter::waiter_with_arc_cb(
-                self.0.stream.clone(),
-                self.0.producer_id,
-                arc_cb.clone(),
-            );
+            let waiter = ProducerMessageWaiter::waiter_with_arc_cb(arc_cb.clone());
             let publishing_id = match message.publishing_id() {
                 Some(publishing_id) => *publishing_id,
                 None => self.0.publish_sequence.fetch_add(1, Ordering::Relaxed),
@@ -479,35 +479,23 @@ impl MessageHandler for ProducerConfirmHandler {
 
 #[derive(Clone)]
 struct ProducerMessageWaiter {
-    stream: Arc<String>,
-    publisher_id: u8,
     cb: ConfirmCallback,
 }
 
 impl ProducerMessageWaiter {
     fn waiter_with_cb<Fut>(
-        stream: String,
-        publisher_id: u8,
         cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
     ) -> Self
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
         Self {
-            stream: Arc::new(stream),
-            publisher_id,
             cb: Arc::new(move |confirm_status| cb(confirm_status).boxed()),
         }
     }
 
-    fn waiter_with_arc_cb(
-        stream: String,
-        publisher_id: u8,
-        confirm_callback: ConfirmCallback,
-    ) -> Self {
+    fn waiter_with_arc_cb(confirm_callback: ConfirmCallback) -> Self {
         Self {
-            stream: Arc::new(stream),
-            publisher_id,
             cb: confirm_callback,
         }
     }
