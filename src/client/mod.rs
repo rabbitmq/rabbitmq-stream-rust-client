@@ -3,14 +3,15 @@ mod codec;
 mod dispatcher;
 mod handler;
 mod metadata;
+mod metrics;
 mod options;
-
 use crate::{error::ClientError, RabbitMQStreamResult};
 use futures::{
     stream::{SplitSink, SplitStream},
     Stream, StreamExt, TryFutureExt,
 };
 pub use metadata::{Broker, StreamMetadata};
+pub use metrics::MetricsCollector;
 pub use options::ClientOptions;
 use rabbitmq_stream_protocol::{
     commands::{
@@ -284,7 +285,7 @@ impl Client {
         let messages = messages.into();
         let mut messages_to_publish = Vec::with_capacity(messages.len());
         let mut sequences = Vec::with_capacity(messages.len());
-
+        let len = messages.len();
         // TODO batch publish with max frame size check
         for message in messages {
             let publishing_id = match message.publishing_id() {
@@ -298,6 +299,8 @@ impl Client {
         }
         self.send(PublishCommand::new(publisher_id, messages_to_publish))
             .await?;
+
+        self.opts.collector.publish(len as u64).await;
 
         Ok(sequences)
     }

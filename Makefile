@@ -16,6 +16,10 @@ test: build
 watch: build
 	cargo watch -x 'test --all -- --nocapture'
 
+
+run-benchmark:
+	cargo run --release -p benchmark
+
 rabbitmq-server:
 	docker run -it --rm --name rabbitmq-stream-go-client-test \
 		-p 5552:5552 -p 5672:5672 -p 15672:15672 \

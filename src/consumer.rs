@@ -20,7 +20,7 @@ use tracing::trace;
 use crate::{
     client::{MessageHandler, MessageResult},
     error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
-    Client, ClientOptions, Environment,
+    Client, ClientOptions, Environment, MetricsCollector,
 };
 use futures::{task::AtomicWaker, Stream};
 
@@ -39,6 +39,7 @@ struct ConsumerInternal {
     sender: Sender<Result<Delivery, ConsumerDeliveryError>>,
     closed: Arc<AtomicBool>,
     waker: AtomicWaker,
+    metrics_collector: Arc<dyn MetricsCollector>,
 }
 
 impl ConsumerInternal {
@@ -58,6 +59,7 @@ impl ConsumerBuilder {
         // Connect to the user specified node first, then look for a random replica to connect to instead.
         // This is recommended for load balancing purposes.
         let mut client = self.environment.create_client().await?;
+        let collector = self.environment.options.client_options.collector.clone();
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
             // This is desired behavior in case there is only one node in the cluster.
@@ -101,6 +103,7 @@ impl ConsumerBuilder {
                 sender: tx,
                 closed: Arc::new(AtomicBool::new(false)),
                 waker: AtomicWaker::new(),
+                metrics_collector: collector,
             });
 
             let msg_handler = ConsumerMessageHandler(consumer.clone());
@@ -185,6 +188,10 @@ impl MessageHandler for ConsumerMessageHandler {
         match item {
             Some(Ok(response)) => {
                 if let ResponseKind::Deliver(delivery) = response.kind() {
+                    let mut offset = delivery.chunk_first_offset;
+
+                    let len = delivery.messages.len();
+                    trace!("Got delivery with messages {}", len);
                     for message in delivery.messages {
                         let _ = self
                             .0
@@ -192,12 +199,16 @@ impl MessageHandler for ConsumerMessageHandler {
                             .send(Ok(Delivery {
                                 subscription_id: self.0.subscription_id,
                                 message,
+                                offset,
                             }))
                             .await;
+                        offset += 1;
                     }
+
+                    // TODO handle credit fail
+                    let _ = self.0.client.credit(self.0.subscription_id, 1).await;
+                    self.0.metrics_collector.consume(len as u64).await;
                 }
-                // TODO handle credit fail
-                let _ = self.0.client.credit(self.0.subscription_id, 1).await;
             }
             Some(Err(err)) => {
                 let _ = self.0.sender.send(Err(err.into())).await;
@@ -213,6 +224,24 @@ impl MessageHandler for ConsumerMessageHandler {
 }
 #[derive(Debug)]
 pub struct Delivery {
-    pub subscription_id: u8,
-    pub message: Message,
+    subscription_id: u8,
+    message: Message,
+    offset: u64,
+}
+
+impl Delivery {
+    /// Get a reference to the delivery's subscription id.
+    pub fn subscription_id(&self) -> u8 {
+        self.subscription_id
+    }
+
+    /// Get a reference to the delivery's message.
+    pub fn message(&self) -> &Message {
+        &self.message
+    }
+
+    /// Get a reference to the delivery's offset.
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
 }

@@ -1,7 +1,12 @@
+use std::marker::PhantomData;
+use std::sync::Arc;
+use std::time::Duration;
+
+use crate::producer::NoDedup;
 use crate::types::OffsetSpecification;
 
 use crate::{
-    client::{Client, ClientOptions},
+    client::{Client, ClientOptions, MetricsCollector},
     consumer::ConsumerBuilder,
     error::StreamDeleteError,
     producer::ProducerBuilder,
@@ -32,10 +37,13 @@ impl Environment {
     }
 
     /// Returns a builder for creating a producer
-    pub fn producer(&self) -> ProducerBuilder {
+    pub fn producer(&self) -> ProducerBuilder<NoDedup> {
         ProducerBuilder {
             environment: self.clone(),
             name: None,
+            batch_size: 100,
+            batch_publishing_delay: Duration::from_millis(100),
+            data: PhantomData,
         }
     }
 
@@ -96,16 +104,16 @@ impl EnvironmentBuilder {
         self.0.client_options.port = port;
         self
     }
+
+    pub fn metrics_collector(
+        mut self,
+        collector: impl MetricsCollector + Send + Sync + 'static,
+    ) -> EnvironmentBuilder {
+        self.0.client_options.collector = Arc::new(collector);
+        self
+    }
 }
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct EnvironmentOptions {
     pub(crate) client_options: ClientOptions,
-}
-
-impl Default for EnvironmentOptions {
-    fn default() -> Self {
-        Self {
-            client_options: ClientOptions::default(),
-        }
-    }
 }

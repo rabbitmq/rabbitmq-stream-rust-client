@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use futures::StreamExt;
 use rabbitmq_stream_client::{
     types::{ByteCapacity, Message, OffsetSpecification},
     Environment,
 };
+use tokio::sync::Barrier;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -19,31 +22,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
+    let _ = environment.delete_stream("batch_test").await;
     let message_count = 10;
     environment
         .stream_creator()
         .max_length(ByteCapacity::GB(2))
-        .create("test")
+        .create("batch_test")
         .await?;
 
-    let producer = environment
-        .producer()
-        .name("test_producer")
-        .build("test")
-        .await?;
+    let producer = environment.producer().build("batch_test").await?;
 
+    let barrier = Arc::new(Barrier::new(message_count + 1));
     for i in 0..message_count {
-        producer
-            .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
-            .await?;
+        let producer_cloned = producer.clone();
+
+        let barrier_cloned = barrier.clone();
+        tokio::task::spawn(async move {
+            producer_cloned
+                .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
+                .await
+                .unwrap();
+
+            barrier_cloned.wait().await;
+        });
     }
+
+    barrier.wait().await;
 
     producer.close().await?;
 
     let mut consumer = environment
         .consumer()
         .offset(OffsetSpecification::First)
-        .build("test")
+        .build("batch_test")
         .await
         .unwrap();
 
@@ -61,6 +72,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     consumer.handle().close().await.unwrap();
 
-    environment.delete_stream("test").await?;
+    environment.delete_stream("batch_test").await?;
     Ok(())
 }

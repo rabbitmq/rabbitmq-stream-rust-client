@@ -1,14 +1,12 @@
 use futures::Stream;
 use rabbitmq_stream_protocol::Response;
-use std::{
-    collections::HashMap,
-    sync::{atomic::AtomicU32, Arc},
-};
+use std::sync::{atomic::AtomicU32, Arc};
 use tracing::trace;
 
+use dashmap::DashMap;
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
-    Mutex, RwLock,
+    RwLock,
 };
 
 use crate::error::ClientError;
@@ -19,7 +17,7 @@ use super::{channel::ChannelReceiver, handler::MessageHandler};
 pub(crate) struct Dispatcher<T>(DispatcherState<T>);
 
 pub(crate) struct DispatcherState<T> {
-    requests: Arc<Mutex<HashMap<u32, Sender<Response>>>>,
+    requests: Arc<DashMap<u32, Sender<Response>>>,
     correlation_id: Arc<AtomicU32>,
     handler: Arc<RwLock<Option<T>>>,
 }
@@ -40,7 +38,7 @@ where
 {
     pub fn new() -> Dispatcher<T> {
         Dispatcher(DispatcherState {
-            requests: Arc::new(Mutex::new(HashMap::new())),
+            requests: Arc::new(DashMap::new()),
             correlation_id: Arc::new(AtomicU32::new(0)),
             handler: Arc::new(RwLock::new(None)),
         })
@@ -49,7 +47,7 @@ where
     #[cfg(test)]
     pub fn with_handler(handler: T) -> Dispatcher<T> {
         Dispatcher(DispatcherState {
-            requests: Arc::new(Mutex::new(HashMap::new())),
+            requests: Arc::new(DashMap::new()),
             correlation_id: Arc::new(AtomicU32::new(0)),
             handler: Arc::new(RwLock::new(Some(handler))),
         })
@@ -63,16 +61,14 @@ where
             .correlation_id
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        let mut guard = self.0.requests.lock().await;
-
-        guard.insert(correlation_id, tx);
+        self.0.requests.insert(correlation_id, tx);
 
         (correlation_id, rx)
     }
 
     #[cfg(test)]
     async fn requests_count(&self) -> usize {
-        self.0.requests.lock().await.len()
+        self.0.requests.len()
     }
 
     pub async fn set_handler(&self, handler: T) {
@@ -93,14 +89,10 @@ where
     T: MessageHandler,
 {
     pub async fn dispatch(&self, correlation_id: u32, response: Response) {
-        let mut guard = self.requests.lock().await;
-
-        let receiver = guard.remove(&correlation_id);
-
-        drop(guard);
+        let receiver = self.requests.remove(&correlation_id);
 
         if let Some(rcv) = receiver {
-            let _ = rcv.send(response).await;
+            let _ = rcv.1.send(response).await;
         }
     }
 

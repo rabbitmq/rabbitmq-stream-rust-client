@@ -21,7 +21,7 @@ pub struct DeliverCommand {
     num_entries: u16,
     timestamp: u64,
     epoch: u64,
-    chunk_first_offset: u64,
+    pub chunk_first_offset: u64,
     chunk_crc: i32,
     trailer_length: u32,
     reserved: u32,
@@ -121,7 +121,7 @@ impl Decoder for DeliverCommand {
         let (input, trailer_length) = u32::decode(input)?;
         let (mut input, reserved) = u32::decode(input)?;
 
-        let mut messages = Vec::new();
+        let mut messages = Vec::with_capacity(num_records as usize);
         for _ in 0..num_records {
             let (input1, result) = read_vec(input)?;
             let (_, message) = Message::decode(&result)?;

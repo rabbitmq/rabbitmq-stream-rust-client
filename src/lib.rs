@@ -30,7 +30,7 @@
 //!
 //! for i in 0..10 {
 //!     producer
-//!         .send(Message::builder().body(format!("message{}", i)).build())
+//!         .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
 //!         .await?;
 //! }
 //!
@@ -82,11 +82,11 @@ mod stream_creator;
 
 pub type RabbitMQStreamResult<T> = Result<T, error::ClientError>;
 
-pub use crate::client::{Client, ClientOptions};
+pub use crate::client::{Client, ClientOptions, MetricsCollector};
 
 pub use crate::consumer::{Consumer, ConsumerBuilder, ConsumerHandle};
 pub use crate::environment::{Environment, EnvironmentBuilder};
-pub use crate::producer::{Producer, ProducerBuilder};
+pub use crate::producer::{Dedup, NoDedup, Producer, ProducerBuilder};
 pub mod types {
 
     pub use crate::byte_capacity::ByteCapacity;

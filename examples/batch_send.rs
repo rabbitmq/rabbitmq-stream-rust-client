@@ -19,31 +19,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
+    let _ = environment.delete_stream("batch_send").await;
     let message_count = 10;
     environment
         .stream_creator()
         .max_length(ByteCapacity::GB(2))
-        .create("test")
+        .create("batch_send")
         .await?;
 
-    let producer = environment
-        .producer()
-        .name("test_producer")
-        .build("test")
-        .await?;
+    let producer = environment.producer().build("batch_send").await?;
 
+    let mut messages = Vec::with_capacity(message_count);
     for i in 0..message_count {
-        producer
-            .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
-            .await?;
+        let msg = Message::builder().body(format!("message{}", i)).build();
+        messages.push(msg);
     }
+
+    producer
+        .batch_send(messages, |confirmation_status| async move {
+            info!("Message confirmed with status {:?}", confirmation_status);
+        })
+        .await?;
 
     producer.close().await?;
 
     let mut consumer = environment
         .consumer()
         .offset(OffsetSpecification::First)
-        .build("test")
+        .build("batch_send")
         .await
         .unwrap();
 
@@ -61,6 +64,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     consumer.handle().close().await.unwrap();
 
-    environment.delete_stream("test").await?;
+    environment.delete_stream("batch_send").await?;
     Ok(())
 }
