@@ -10,8 +10,8 @@
 
 <div align="center">
 
-  <a href="https://github.com/korsmakolnikov/rabbitmq-stream-rust-client/actions?query=workflow%3ATests">
-    <img src="https://github.com/korsmakolnikov/rabbitmq-stream-rust-client/workflows/Tests/badge.svg"
+  <a href="https://github.com/rabbitmq/rabbitmq-stream-rust-client/actions?query=workflow%3ATests">
+    <img src="https://github.com/rabbitmq/rabbitmq-stream-rust-client/workflows/Tests/badge.svg"
     alt="Tests status" />
   </a>
   
@@ -24,8 +24,8 @@
       alt="docs.rs docs" />
   </a>
 
-   <a href="https://deps.rs/repo/github/korsmakolnikov/rabbitmq-stream-rust-client">
-    <img src="https://deps.rs/repo/github/korsmakolnikov/rabbitmq-stream-rust-client/status.svg"
+   <a href="https://deps.rs/repo/github/rabbitmq/rabbitmq-stream-rust-client">
+    <img src="https://deps.rs/repo/github/rabbitmq/rabbitmq-stream-rust-client/status.svg"
       alt="deps" />
   </a>
 </div>
