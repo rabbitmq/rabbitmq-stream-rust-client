@@ -145,6 +145,7 @@ async fn producer_batch_send_with_callback() {
     assert_eq!(0, result.publishing_id());
     assert_eq!(true, result.confirmed());
     assert_eq!(Some(b"message".as_ref()), result.message().data());
+    assert!(result.message().publishing_id().is_none());
 
     producer.close().await.unwrap();
 }
@@ -166,6 +167,7 @@ async fn producer_batch_send() {
     assert_eq!(0, confirmation.publishing_id());
     assert_eq!(true, confirmation.confirmed());
     assert_eq!(Some(b"message".as_ref()), confirmation.message().data());
+    assert!(confirmation.message().publishing_id().is_none());
 
     producer.close().await.unwrap();
 }
