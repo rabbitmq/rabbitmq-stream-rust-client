@@ -26,7 +26,7 @@
 //! use rabbitmq_stream_client::{Environment, types::Message};
 //!
 //! let environment = Environment::builder().build().await?;
-//! let producer = environment.producer().name("myproducer").build("mystream").await?;
+//! let producer = environment.producer().build("mystream").await?;
 //!
 //! for i in 0..10 {
 //!     producer

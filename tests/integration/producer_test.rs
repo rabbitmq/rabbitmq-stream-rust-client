@@ -37,7 +37,7 @@ async fn producer_send_no_name_ok() {
 async fn producer_send_name_with_deduplication_ok() {
     let env = TestEnvironment::create().await;
 
-    let producer = env
+    let mut producer = env
         .env
         .producer()
         .name("myconsumer")
@@ -92,7 +92,7 @@ async fn producer_send_with_callback() {
     let reference: String = Faker.fake();
 
     let (tx, mut rx) = channel(1);
-    let producer = env
+    let mut producer = env
         .env
         .producer()
         .name(&reference)

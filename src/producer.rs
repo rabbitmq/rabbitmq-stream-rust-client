@@ -252,8 +252,80 @@ fn schedule_batch_send(producer: Arc<ProducerInternal>, delay: Duration) {
     });
 }
 
-impl<T> Producer<T> {
+impl Producer<NoDedup> {
     pub async fn send_with_confirm(
+        &self,
+        message: Message,
+    ) -> Result<ConfirmationStatus, ProducerPublishError> {
+        self.do_send_with_confirm(message).await
+    }
+    pub async fn batch_send_with_confirm(
+        &self,
+        messages: Vec<Message>,
+    ) -> Result<Vec<ConfirmationStatus>, ProducerPublishError> {
+        self.do_batch_send_with_confirm(messages).await
+    }
+    pub async fn batch_send<Fut>(
+        &self,
+        messages: Vec<Message>,
+        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+    ) -> Result<(), ProducerPublishError>
+    where
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
+        self.do_batch_send(messages, cb).await
+    }
+
+    pub async fn send<Fut>(
+        &self,
+        message: Message,
+        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+    ) -> Result<(), ProducerPublishError>
+    where
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
+        self.do_send(message, cb).await
+    }
+}
+
+impl Producer<Dedup> {
+    pub async fn send_with_confirm(
+        &mut self,
+        message: Message,
+    ) -> Result<ConfirmationStatus, ProducerPublishError> {
+        self.do_send_with_confirm(message).await
+    }
+    pub async fn batch_send_with_confirm(
+        &mut self,
+        messages: Vec<Message>,
+    ) -> Result<Vec<ConfirmationStatus>, ProducerPublishError> {
+        self.do_batch_send_with_confirm(messages).await
+    }
+    pub async fn batch_send<Fut>(
+        &mut self,
+        messages: Vec<Message>,
+        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+    ) -> Result<(), ProducerPublishError>
+    where
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
+        self.do_batch_send(messages, cb).await
+    }
+
+    pub async fn send<Fut>(
+        &mut self,
+        message: Message,
+        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+    ) -> Result<(), ProducerPublishError>
+    where
+        Fut: Future<Output = ()> + Send + Sync + 'static,
+    {
+        self.do_send(message, cb).await
+    }
+}
+
+impl<T> Producer<T> {
+    async fn do_send_with_confirm(
         &self,
         message: Message,
     ) -> Result<ConfirmationStatus, ProducerPublishError> {
@@ -276,7 +348,7 @@ impl<T> Producer<T> {
             .map(Ok)?
     }
 
-    pub async fn batch_send_with_confirm(
+    async fn do_batch_send_with_confirm(
         &self,
         messages: Vec<Message>,
     ) -> Result<Vec<ConfirmationStatus>, ProducerPublishError> {
@@ -300,7 +372,7 @@ impl<T> Producer<T> {
 
         Ok(confirmations)
     }
-    pub async fn batch_send<Fut>(
+    async fn do_batch_send<Fut>(
         &self,
         messages: Vec<Message>,
         cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
@@ -313,7 +385,7 @@ impl<T> Producer<T> {
         Ok(())
     }
 
-    pub async fn send<Fut>(
+    async fn do_send<Fut>(
         &self,
         message: Message,
         cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
