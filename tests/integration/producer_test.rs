@@ -140,9 +140,11 @@ async fn producer_batch_send_with_callback() {
         .await
         .unwrap();
 
-    let result = rx.recv().await.unwrap();
+    let result = rx.recv().await.unwrap().unwrap();
 
-    assert_eq!(0, result.unwrap().publishing_id());
+    assert_eq!(0, result.publishing_id());
+    assert_eq!(true, result.confirmed());
+    assert_eq!(Some(b"message".as_ref()), result.message().data());
 
     producer.close().await.unwrap();
 }
@@ -159,7 +161,11 @@ async fn producer_batch_send() {
         .unwrap();
 
     assert_eq!(1, result.len());
-    assert_eq!(0, result.get(0).unwrap().publishing_id());
+
+    let confirmation = result.get(0).unwrap();
+    assert_eq!(0, confirmation.publishing_id());
+    assert_eq!(true, confirmation.confirmed());
+    assert_eq!(Some(b"message".as_ref()), confirmation.message().data());
 
     producer.close().await.unwrap();
 }

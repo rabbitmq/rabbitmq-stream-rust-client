@@ -39,6 +39,11 @@ impl PublishedMessage {
             message,
         }
     }
+
+    /// Get a reference to the published message's publishing id.
+    pub fn publishing_id(&self) -> u64 {
+        self.publishing_id
+    }
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
