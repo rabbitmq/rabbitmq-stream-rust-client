@@ -311,34 +311,6 @@ impl Client {
         Ok(sequences)
     }
 
-    // pub async fn publish(
-    //     &self,
-    //     publisher_id: u8,
-    //     messages: impl Into<Vec<Message>>,
-    // ) -> RabbitMQStreamResult<Vec<u64>> {
-    //     let messages = messages.into();
-    //     let mut messages_to_publish = Vec::with_capacity(messages.len());
-    //     let mut sequences = Vec::with_capacity(messages.len());
-    //     let len = messages.len();
-    //     // TODO batch publish with max frame size check
-    //     for message in messages {
-    //         let publishing_id = match message.publishing_id() {
-    //             Some(publishing_id) => *publishing_id,
-    //             None => self
-    //                 .publish_sequence
-    //                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-    //         };
-    //         sequences.push(publishing_id);
-    //         messages_to_publish.push(PublishedMessage::new(publishing_id, message));
-    //     }
-    //     self.send(PublishCommand::new(publisher_id, messages_to_publish))
-    //         .await?;
-
-    //     self.opts.collector.publish(len as u64).await;
-
-    //     Ok(sequences)
-    // }
-
     pub async fn query_publisher_sequence(
         &self,
         reference: &str,
