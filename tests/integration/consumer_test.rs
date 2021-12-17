@@ -14,7 +14,7 @@ async fn consumer_test() {
     let reference: String = Faker.fake();
 
     let message_count = 10;
-    let producer = env
+    let mut producer = env
         .env
         .producer()
         .name(&reference)

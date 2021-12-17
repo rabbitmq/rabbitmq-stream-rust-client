@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex_amqp_codec::{Encode, Message as AmpqMessage};
 use ntex_bytes::BytesMut;
 
@@ -7,7 +9,10 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Message {
+pub struct Message(Arc<InternalMessage>);
+
+#[derive(Debug, PartialEq)]
+pub struct InternalMessage {
     pub(crate) publishing_id: Option<u64>,
     pub(crate) message: AmpqMessage,
 }
@@ -17,13 +22,13 @@ unsafe impl Sync for Message {}
 
 impl Encoder for Message {
     fn encoded_size(&self) -> u32 {
-        self.message.encoded_size() as u32
+        self.0.message.encoded_size() as u32
     }
 
     fn encode(&self, writer: &mut impl std::io::Write) -> Result<(), crate::error::EncodeError> {
         let mut buf = BytesMut::with_capacity(self.encoded_size() as usize);
 
-        ntex_amqp_codec::Encode::encode(&self.message, &mut buf);
+        ntex_amqp_codec::Encode::encode(&self.0.message, &mut buf);
 
         writer.write_all(&buf)?;
 
@@ -32,25 +37,24 @@ impl Encoder for Message {
 }
 
 impl Message {
+    #[cfg(test)]
+    pub(crate) fn new(internal: InternalMessage) -> Message {
+        Message(Arc::new(internal))
+    }
     pub fn builder() -> MessageBuilder {
-        MessageBuilder(Message {
+        MessageBuilder(InternalMessage {
             message: AmpqMessage::default(),
             publishing_id: None,
         })
     }
 
     pub fn data(&self) -> Option<&[u8]> {
-        self.message.body().data().map(|data| data.as_ref())
-    }
-
-    /// Set the message's publishing id.
-    pub fn set_publishing_id(&mut self, publishing_id: u64) {
-        self.publishing_id = Some(publishing_id);
+        self.0.message.body().data().map(|data| data.as_ref())
     }
 
     /// Get a reference to the message's publishing id.
     pub fn publishing_id(&self) -> Option<&u64> {
-        self.publishing_id.as_ref()
+        self.0.publishing_id.as_ref()
     }
 }
 
@@ -61,16 +65,16 @@ impl Decoder for Message {
             .map(|message| {
                 (
                     message.0,
-                    Message {
+                    Message(Arc::new(InternalMessage {
                         publishing_id: None,
                         message: message.1,
-                    },
+                    })),
                 )
             })
     }
 }
 
-pub struct MessageBuilder(Message);
+pub struct MessageBuilder(InternalMessage);
 
 impl MessageBuilder {
     pub fn body(mut self, data: impl Into<Vec<u8>>) -> Self {
@@ -85,7 +89,7 @@ impl MessageBuilder {
         self
     }
     pub fn build(self) -> Message {
-        self.0
+        Message(Arc::new(self.0))
     }
 }
 

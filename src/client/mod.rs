@@ -2,6 +2,7 @@ mod channel;
 mod codec;
 mod dispatcher;
 mod handler;
+mod message;
 mod metadata;
 mod metrics;
 mod options;
@@ -10,6 +11,8 @@ use futures::{
     stream::{SplitSink, SplitStream},
     Stream, StreamExt, TryFutureExt,
 };
+
+pub use message::ClientMessage;
 pub use metadata::{Broker, StreamMetadata};
 pub use metrics::MetricsCollector;
 pub use options::ClientOptions;
@@ -35,7 +38,6 @@ use rabbitmq_stream_protocol::{
         tune::TunesCommand,
         unsubscribe::UnSubscribeCommand,
     },
-    message::Message,
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseCode, ResponseKind,
 };
@@ -46,13 +48,14 @@ use self::{
     channel::{channel, ChannelReceiver, ChannelSender},
     codec::RabbitMqStreamCodec,
     dispatcher::Dispatcher,
+    message::BaseMessage,
 };
 
-use std::future::Future;
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicU64, Arc},
 };
+use std::{future::Future, sync::atomic::Ordering};
 use tokio::sync::RwLock;
 use tokio::{net::TcpStream, sync::Notify};
 use tokio_util::codec::Framed;
@@ -277,27 +280,30 @@ impl Client {
         .await
     }
 
-    pub async fn publish(
+    pub async fn publish<T: BaseMessage>(
         &self,
         publisher_id: u8,
-        messages: impl Into<Vec<Message>>,
+        messages: impl Into<Vec<T>>,
     ) -> RabbitMQStreamResult<Vec<u64>> {
-        let messages = messages.into();
-        let mut messages_to_publish = Vec::with_capacity(messages.len());
-        let mut sequences = Vec::with_capacity(messages.len());
+        let messages: Vec<PublishedMessage> = messages
+            .into()
+            .into_iter()
+            .map(|message| {
+                let publishing_id = message
+                    .publishing_id()
+                    .unwrap_or_else(|| self.publish_sequence.fetch_add(1, Ordering::Relaxed));
+
+                PublishedMessage::new(publishing_id, message.to_message())
+            })
+            .collect();
+        let sequences = messages
+            .iter()
+            .map(|message| message.publishing_id())
+            .collect();
         let len = messages.len();
+
         // TODO batch publish with max frame size check
-        for message in messages {
-            let publishing_id = match message.publishing_id() {
-                Some(publishing_id) => *publishing_id,
-                None => self
-                    .publish_sequence
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-            };
-            sequences.push(publishing_id);
-            messages_to_publish.push(PublishedMessage::new(publishing_id, message));
-        }
-        self.send(PublishCommand::new(publisher_id, messages_to_publish))
+        self.send(PublishCommand::new(publisher_id, messages))
             .await?;
 
         self.opts.collector.publish(len as u64).await;
