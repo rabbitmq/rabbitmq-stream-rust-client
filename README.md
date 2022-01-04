@@ -28,6 +28,13 @@
     <img src="https://deps.rs/repo/github/rabbitmq/rabbitmq-stream-rust-client/status.svg"
       alt="deps" />
   </a>
+
+  <a href="https://codecov.io/gh/rabbitmq/rabbitmq-stream-rust-client">
+    <img src="https://codecov.io/gh/rabbitmq/rabbitmq-stream-rust-client/branch/main/graph/badge.svg?token=2DHIQ20BDE" alt="codecov"/>
+  </a>
+
+
+
 </div>
 
 # RabbitMQ Stream Client
