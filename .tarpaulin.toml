@@ -1,0 +1,10 @@
+[all]
+exclude-files=[
+    "examples/*",
+    "benchmark/*",
+    "build.rs",
+    "src/lib.rs",
+    "tests/**/*",
+    "mod.rs"
+]
+test-threads = 1
