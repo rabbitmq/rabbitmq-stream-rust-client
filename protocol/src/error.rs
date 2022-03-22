@@ -2,12 +2,13 @@ use std::string::FromUtf8Error;
 
 #[derive(Debug)]
 pub enum DecodeError {
-    Incomplete(usize),
+    Incomplete(IncompleteError),
     Utf8Error(FromUtf8Error),
     UnknownResponseCode(u16),
     UnsupportedResponseType(u16),
     MismatchSize(usize),
     MessageParse(String),
+    InvalidFormatCode(u8),
     Empty,
 }
 
@@ -28,3 +29,12 @@ impl From<FromUtf8Error> for DecodeError {
         DecodeError::Utf8Error(err)
     }
 }
+
+impl From<IncompleteError> for DecodeError {
+    fn from(err: IncompleteError) -> Self {
+        DecodeError::Incomplete(err)
+    }
+}
+
+#[derive(Debug)]
+pub struct IncompleteError(pub usize);

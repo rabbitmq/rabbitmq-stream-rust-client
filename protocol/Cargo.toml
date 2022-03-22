@@ -8,10 +8,13 @@ license = "Apache-2.0 OR MPL-2.0"
 
 [dependencies]
 byteorder = "1"
-ntex-amqp-codec = "= 0.7.2"
-ntex-bytes = "0.1"
-
+ordered-float = "2.10.0"
+uuid = "0.8.2"
+chrono = "0.4.19"
+num_enum = "0.5.7"
+derive_more = "0.99"
 
 [dev-dependencies]
-fake = { version = "2.4", features=['derive']}
+fake = { version = "2.4", features=['derive', 'chrono','uuid']}
 rand = "0.8"
+pretty_assertions = "1.2.0"

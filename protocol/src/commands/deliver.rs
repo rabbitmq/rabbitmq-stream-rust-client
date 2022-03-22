@@ -160,15 +160,11 @@ mod tests {
     use fake::{Dummy, Faker};
 
     use crate::{commands::tests::command_encode_decode_test, message::InternalMessage};
-    use ntex_amqp_codec::Message as AmpqMessage;
 
     use super::{DeliverCommand, Message};
     impl Dummy<Faker> for Message {
         fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &Faker, _rng: &mut R) -> Self {
-            Message::new(InternalMessage {
-                message: AmpqMessage::default(),
-                publishing_id: None,
-            })
+            Message::new(InternalMessage::default())
         }
     }
 

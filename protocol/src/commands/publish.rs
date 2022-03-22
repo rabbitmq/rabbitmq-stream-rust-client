@@ -36,6 +36,7 @@ impl Encoder for PublishCommand {
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.publisher_id.encode(writer)?;
         self.published_messages.encode(writer)?;
+
         Ok(())
     }
 }
