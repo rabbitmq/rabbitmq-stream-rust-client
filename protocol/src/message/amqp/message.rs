@@ -1,7 +1,7 @@
 use super::body::MessageBody;
 use super::codec::constants::{
     MESSAGE_ANNOTATIONS, MESSAGE_APPLICATION_PROPERTIES, MESSAGE_DELIVERY_ANNOTATIONS,
-    MESSAGE_FOOTER, SECTION_PREFIX_LENGTH,
+    MESSAGE_FOOTER,
 };
 use super::codec::AmqpEncoder;
 use super::error::AmqpEncodeError;
@@ -181,19 +181,19 @@ impl AmqpEncoder for Message {
             size += h.encoded_size();
         }
         if let Some(ref da) = self.delivery_annotations {
-            size += da.encoded_size() + SECTION_PREFIX_LENGTH;
+            size += da.encoded_size() + MESSAGE_DELIVERY_ANNOTATIONS.encoded_size();
         }
         if let Some(ref ma) = self.message_annotations {
-            size += ma.encoded_size() + SECTION_PREFIX_LENGTH;
+            size += ma.encoded_size() + MESSAGE_ANNOTATIONS.encoded_size();
         }
         if let Some(ref p) = self.properties {
             size += p.encoded_size();
         }
         if let Some(ref ap) = self.application_properties {
-            size += ap.encoded_size() + SECTION_PREFIX_LENGTH;
+            size += ap.encoded_size() + MESSAGE_APPLICATION_PROPERTIES.encoded_size();
         }
         if let Some(ref f) = self.footer {
-            size += f.encoded_size() + SECTION_PREFIX_LENGTH;
+            size += f.encoded_size() + MESSAGE_FOOTER.encoded_size();
         }
 
         size as u32

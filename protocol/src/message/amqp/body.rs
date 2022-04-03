@@ -1,9 +1,7 @@
 use crate::message::amqp::codec::AmqpEncoder;
 
 use super::{
-    codec::constants::{
-        MESSAGE_BODY_DATA, MESSAGE_BODY_SEQUENCE, MESSAGE_BODY_VALUE, SECTION_PREFIX_LENGTH,
-    },
+    codec::constants::{MESSAGE_BODY_DATA, MESSAGE_BODY_SEQUENCE, MESSAGE_BODY_VALUE},
     types::{List, Value},
     AmqpEncodeError,
 };
@@ -42,17 +40,15 @@ impl MessageBody {
 
 impl AmqpEncoder for MessageBody {
     fn encoded_size(&self) -> u32 {
-        let mut size = self
-            .data
-            .iter()
-            .fold(0, |a, d| a + d.encoded_size() + SECTION_PREFIX_LENGTH);
-        size += self
-            .sequence
-            .iter()
-            .fold(0, |a, seq| a + seq.encoded_size() + SECTION_PREFIX_LENGTH);
+        let mut size = self.data.iter().fold(0, |a, d| {
+            a + d.encoded_size() + MESSAGE_BODY_DATA.encoded_size()
+        });
+        size += self.sequence.iter().fold(0, |a, seq| {
+            a + seq.encoded_size() + MESSAGE_BODY_SEQUENCE.encoded_size()
+        });
 
         if let Some(ref val) = self.value {
-            size + val.encoded_size() + SECTION_PREFIX_LENGTH
+            size + val.encoded_size() + MESSAGE_BODY_VALUE.encoded_size()
         } else {
             size
         }

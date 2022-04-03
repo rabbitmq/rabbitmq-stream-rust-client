@@ -18,7 +18,6 @@ pub const MESSAGE_BODY_SEQUENCE: Descriptor = Descriptor::Ulong(118);
 pub const MESSAGE_BODY_VALUE: Descriptor = Descriptor::Ulong(119);
 pub const MESSAGE_FOOTER: Descriptor = Descriptor::Ulong(120);
 
-pub const SECTION_PREFIX_LENGTH: u32 = 3;
 use byteorder::WriteBytesExt;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
