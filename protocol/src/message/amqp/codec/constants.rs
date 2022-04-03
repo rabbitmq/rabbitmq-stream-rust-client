@@ -28,7 +28,7 @@ use super::{AmqpDecoder, AmqpEncoder};
 #[repr(u8)]
 pub enum TypeCode {
     Described = 0x00,
-    Null = 0x40, // fixed width --V
+    Null = 0x40,
     Boolean = 0x56,
     BooleanTrue = 0x41,
     BooleanFalse = 0x42,
@@ -51,13 +51,13 @@ pub enum TypeCode {
     Char = 0x73,
     Timestamp = 0x83,
     Uuid = 0x98,
-    Binary8 = 0xa0, // variable --V
+    Binary8 = 0xa0,
     Binary32 = 0xb0,
     String8 = 0xa1,
     String32 = 0xb1,
     Symbol8 = 0xa3,
     Symbol32 = 0xb3,
-    List0 = 0x45, // compound --V
+    List0 = 0x45,
     List8 = 0xc0,
     List32 = 0xd0,
     Map8 = 0xc1,
@@ -79,7 +79,7 @@ impl AmqpEncoder for TypeCode {
 
 impl AmqpDecoder for TypeCode {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), AmqpDecodeError> {
-        let (input, code) = read_u8(input).unwrap();
+        let (input, code) = read_u8(input)?;
         Ok((
             input,
             code.try_into()
