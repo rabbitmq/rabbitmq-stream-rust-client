@@ -83,3 +83,9 @@ impl From<&str> for Symbol {
         Symbol(string.to_string())
     }
 }
+
+impl PartialEq<Symbol> for str {
+    fn eq(&self, other: &Symbol) -> bool {
+        self == other.0
+    }
+}

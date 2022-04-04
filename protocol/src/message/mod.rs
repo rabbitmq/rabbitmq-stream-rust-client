@@ -11,7 +11,8 @@ use crate::message::amqp::{AmqpDecoder, AmqpEncoder};
 use amqp::AmqpMessage;
 
 use self::amqp::{
-    AmqpDecodeError, AmqpEncodeError, ApplicationProperties, Header, Properties, Value,
+    AmqpDecodeError, AmqpEncodeError, ApplicationProperties, Header, MessageAnnotations,
+    Properties, Value,
 };
 use self::builder::MessageBuilder;
 
@@ -68,6 +69,10 @@ impl Message {
     }
     pub fn header(&self) -> Option<&Header> {
         self.0.message.header()
+    }
+
+    pub fn message_annotations(&self) -> Option<&MessageAnnotations> {
+        self.0.message.message_annotations()
     }
     pub fn application_properties(&self) -> Option<&ApplicationProperties> {
         self.0.message.application_properties()

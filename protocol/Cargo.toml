@@ -6,6 +6,9 @@ edition = "2018"
 license = "Apache-2.0 OR MPL-2.0"
 
 
+[features]
+wasm-bindgen = ["uuid/wasm-bindgen"]
+
 [dependencies]
 byteorder = "1"
 ordered-float = "2.10.0"

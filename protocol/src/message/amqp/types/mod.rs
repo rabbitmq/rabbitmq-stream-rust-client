@@ -1,6 +1,6 @@
 use crate::utils::TupleMapperSecond;
 pub use definitions::*;
-use derive_more::From;
+use derive_more::{From, TryInto};
 pub use descriptor::Descriptor;
 pub use primitives::*;
 
@@ -21,11 +21,12 @@ pub use symbol::Symbol;
 
 pub type Milliseconds = u32;
 
-#[derive(Debug, Eq, PartialEq, Clone, From)]
+#[derive(Debug, Eq, PartialEq, Clone, From, TryInto)]
+#[try_into(owned, ref, ref_mut)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub enum MessageId {
     ULong(ULong),
-    // Long(Long),
+    Long(Long),
     Uuid(Uuid),
     Binary(Binary),
     String(Str),
@@ -38,7 +39,7 @@ impl AmqpEncoder for MessageId {
             MessageId::Uuid(id) => id.encoded_size(),
             MessageId::Binary(id) => id.encoded_size(),
             MessageId::String(id) => id.encoded_size(),
-            // MessageId::Long(id) => id.encoded_size(),
+            MessageId::Long(id) => id.encoded_size(),
         }
     }
 
@@ -48,7 +49,7 @@ impl AmqpEncoder for MessageId {
             MessageId::Uuid(id) => id.encode(writer),
             MessageId::Binary(id) => id.encode(writer),
             MessageId::String(id) => id.encode(writer),
-            // MessageId::Long(id) => id.encode(writer),
+            MessageId::Long(id) => id.encode(writer),
         }
     }
 }
@@ -61,7 +62,7 @@ impl AmqpDecoder for MessageId {
             TypeCode::ULong0 | TypeCode::ULong | TypeCode::ULongSmall => {
                 ULong::decode(input).map_second(MessageId::ULong)
             }
-            // TypeCode::Long | TypeCode::LongSmall => Long::decode(input).map_second(MessageId::Long),
+            TypeCode::Long | TypeCode::LongSmall => Long::decode(input).map_second(MessageId::Long),
             TypeCode::Uuid => Uuid::decode(input).map_second(MessageId::Uuid),
             TypeCode::Binary8 | TypeCode::Binary32 => {
                 Binary::decode(input).map_second(MessageId::Binary)

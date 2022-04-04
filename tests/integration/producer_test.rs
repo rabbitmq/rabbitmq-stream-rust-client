@@ -192,7 +192,7 @@ async fn producer_send_with_complex_message_ok() {
                 .body(b"message".to_vec())
                 .value(32i32)
                 .properties()
-                .message_id(32)
+                .message_id(32u64)
                 .message_builder()
                 .header()
                 .delivery_count(10)
@@ -222,7 +222,7 @@ async fn producer_send_with_complex_message_ok() {
     assert_eq!(Some(&32), val);
 
     assert_eq!(
-        Some(32.into()),
+        Some(32u64.into()),
         properties.and_then(|properties| properties.message_id.clone())
     );
     assert_eq!(10, header.unwrap().delivery_count);

@@ -126,6 +126,12 @@ impl Message {
     pub fn header(&self) -> Option<&Header> {
         self.header.as_ref()
     }
+
+    /// Get a reference to the message's message annotations.
+    #[must_use]
+    pub fn message_annotations(&self) -> Option<&MessageAnnotations> {
+        self.message_annotations.as_ref()
+    }
 }
 
 impl AmqpDecoder for Message {
@@ -242,6 +248,8 @@ mod tests {
     use crate::message::amqp::codec::AmqpEncoder;
     use crate::message::amqp::tests::type_encode_decode_test_fuzzy;
     use crate::message::amqp::types::List;
+    use crate::message::amqp::AnnonationKey;
+    use crate::message::amqp::Value;
 
     #[test]
     fn message_with_body_test() {
@@ -365,7 +373,7 @@ mod tests {
         assert_eq!(true, header.first_acquirer);
         assert_eq!(100, header.priority);
         assert_eq!(300, header.delivery_count);
-        assert_eq!(Some(0), header.ttl);
+        assert_eq!(0, header.ttl.unwrap_or_default());
 
         assert!(message.body().data().is_some());
     }
@@ -430,7 +438,36 @@ mod tests {
 
         assert!(remaining.is_empty());
 
-        assert_eq!(message.body().data(), Some(&vec![]));
+        assert_eq!(
+            Some(b"test".as_slice()),
+            message.body().data().map(|data| data.as_slice())
+        );
+
+        let properties = message.properties().unwrap();
+
+        let msg_id: &String = properties.message_id.as_ref().unwrap().try_into().unwrap();
+        assert_eq!("test", properties.subject.as_ref().unwrap());
+        assert_eq!("test", msg_id);
+        assert_eq!("test", properties.reply_to.as_ref().unwrap());
+        assert_eq!("test", properties.content_encoding.as_ref().unwrap());
+        assert_eq!("test", properties.content_type.as_ref().unwrap());
+        assert_eq!("test", properties.group_id.as_ref().unwrap());
+        assert_eq!("test", properties.reply_to.as_ref().unwrap());
+        assert_eq!(b"test".as_slice(), properties.user_id.as_ref().unwrap());
+
+        for (k, v) in message.application_properties().unwrap().iter() {
+            assert_eq!("test", k);
+            let v: &String = v.try_into().unwrap();
+            assert_eq!("test", v);
+        }
+
+        let message_annotations = message.message_annotations().unwrap();
+
+        let key: AnnonationKey = "test".into();
+        assert_eq!(Value::from("test"), message_annotations[&key]);
+
+        let key = AnnonationKey::Long(100_000);
+        assert_eq!(Value::from(100_000i64), message_annotations[&key]);
     }
     #[test]
     fn test_message_body_250() {

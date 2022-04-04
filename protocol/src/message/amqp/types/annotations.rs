@@ -3,7 +3,7 @@ use crate::{
     utils::TupleMapperSecond,
 };
 
-use super::{Map, Symbol, ULong, Value};
+use super::{Long, Map, Symbol, ULong, Value};
 #[cfg(test)]
 use fake::Fake;
 
@@ -12,6 +12,7 @@ use fake::Fake;
 pub enum AnnonationKey {
     Symbol(Symbol),
     ULong(ULong),
+    Long(Long),
 }
 
 pub type Annotations = Map<AnnonationKey, Value>;
@@ -54,6 +55,9 @@ impl AmqpDecoder for AnnonationKey {
             TypeCode::ULong | TypeCode::ULong0 | TypeCode::ULongSmall => {
                 ULong::decode(input).map_second(AnnonationKey::ULong)
             }
+            TypeCode::Long | TypeCode::LongSmall => {
+                Long::decode(input).map_second(AnnonationKey::Long)
+            }
             _ => Err(Self::invalid_type_code(code)),
         }
     }
@@ -63,6 +67,7 @@ impl AmqpEncoder for AnnonationKey {
         match self {
             AnnonationKey::Symbol(symbol) => symbol.encoded_size(),
             AnnonationKey::ULong(long) => long.encoded_size(),
+            AnnonationKey::Long(long) => long.encoded_size(),
         }
     }
 
@@ -73,6 +78,7 @@ impl AmqpEncoder for AnnonationKey {
         match self {
             AnnonationKey::Symbol(symbol) => symbol.encode(writer),
             AnnonationKey::ULong(long) => long.encode(writer),
+            AnnonationKey::Long(long) => long.encode(writer),
         }
     }
 }
