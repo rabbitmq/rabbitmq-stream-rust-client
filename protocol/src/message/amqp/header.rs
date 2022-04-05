@@ -14,6 +14,7 @@ use super::{
 #[cfg(test)]
 use fake::Fake;
 
+/// Header of the message
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct Header {

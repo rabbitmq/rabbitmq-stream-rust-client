@@ -19,6 +19,8 @@ use crate::{
 
 #[cfg(test)]
 use fake::Fake;
+
+/// Primitive AMQP 1.0 data type
 #[derive(Debug, Eq, PartialEq, Hash, Clone, From, TryInto)]
 #[try_into(owned, ref, ref_mut)]
 #[cfg_attr(test, derive(fake::Dummy))]

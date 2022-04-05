@@ -14,8 +14,8 @@ pub use header::Header;
 pub use message::Message as AmqpMessage;
 pub use properties::Properties;
 pub use types::{
-    Address, AnnonationKey, Annotations, ApplicationProperties, MessageAnnotations, MessageId,
-    SequenceNo, SimpleValue, Str, Symbol, Timestamp, Value,
+    Address, AnnonationKey, Annotations, ApplicationProperties, DeliveryAnnotations, Footer, Map,
+    MessageAnnotations, MessageId, SequenceNo, SimpleValue, Str, Symbol, Timestamp, Value,
 };
 
 #[cfg(test)]

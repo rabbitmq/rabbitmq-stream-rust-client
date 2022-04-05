@@ -138,6 +138,12 @@ impl Message {
     pub fn message_annotations(&self) -> Option<&MessageAnnotations> {
         self.message_annotations.as_ref()
     }
+
+    /// Get a reference to the message's delivery annotations.
+    #[must_use]
+    pub fn delivery_annotations(&self) -> Option<&DeliveryAnnotations> {
+        self.delivery_annotations.as_ref()
+    }
 }
 
 impl AmqpDecoder for Message {

@@ -18,6 +18,7 @@ use super::{
 #[cfg(test)]
 use fake::Fake;
 
+/// Properties of the message
 #[derive(Clone, Debug, PartialEq, Default)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct Properties {

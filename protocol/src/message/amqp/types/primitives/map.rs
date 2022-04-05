@@ -10,6 +10,7 @@ use crate::{
     utils::TupleMapperSecond,
 };
 
+/// API for attaching additional metadata to messages
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Map<K, V>(pub(crate) HashMap<K, V>)
 where

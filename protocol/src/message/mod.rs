@@ -10,12 +10,14 @@ use crate::message::amqp::{AmqpDecoder, AmqpEncoder};
 
 use amqp::AmqpMessage;
 
-use self::amqp::{
-    AmqpDecodeError, AmqpEncodeError, ApplicationProperties, Header, MessageAnnotations,
-    Properties, Value,
+pub use self::amqp::{
+    AmqpDecodeError, AmqpEncodeError, AnnonationKey, Annotations, ApplicationProperties,
+    DeliveryAnnotations, Footer, Header, Map, MessageAnnotations, Properties, SimpleValue, Value,
 };
+
 use self::builder::MessageBuilder;
 
+/// API for inbound and outbound messages
 #[derive(Debug, PartialEq, Clone)]
 pub struct Message(Arc<InternalMessage>);
 
@@ -41,6 +43,8 @@ impl Message {
     pub(crate) fn new(internal: InternalMessage) -> Message {
         Message(Arc::new(internal))
     }
+
+    /// Builder for creating [`Message`]
     pub fn builder() -> MessageBuilder {
         MessageBuilder(InternalMessage {
             message: AmqpMessage::default(),
@@ -48,6 +52,7 @@ impl Message {
         })
     }
 
+    /// Extract a value as reference from the `amqp-value` section of the body if present
     pub fn value_ref<'a, T>(&'a self) -> Result<Option<T>, DecodeError>
     where
         T: TryFrom<&'a Value, Error = DecodeError>,
@@ -60,22 +65,32 @@ impl Message {
             .transpose()
     }
 
+    /// Get the data associated to the message if any
     pub fn data(&self) -> Option<&[u8]> {
         self.0.message.body().data().map(|data| data.as_slice())
     }
 
+    /// Get the properties of the message
     pub fn properties(&self) -> Option<&Properties> {
         self.0.message.properties()
     }
+    /// Get the header of the message
     pub fn header(&self) -> Option<&Header> {
         self.0.message.header()
     }
 
+    /// Get the annotations of the message
     pub fn message_annotations(&self) -> Option<&MessageAnnotations> {
         self.0.message.message_annotations()
     }
+    /// Get the application properties of the message
     pub fn application_properties(&self) -> Option<&ApplicationProperties> {
         self.0.message.application_properties()
+    }
+
+    /// Get the delivery annotations of the message
+    pub fn delivery_annotations(&self) -> Option<&DeliveryAnnotations> {
+        self.0.message.delivery_annotations()
     }
 
     /// Get a reference to the message's publishing id.

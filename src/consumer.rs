@@ -222,6 +222,7 @@ impl MessageHandler for ConsumerMessageHandler {
         Ok(())
     }
 }
+/// Envelope from incoming message
 #[derive(Debug)]
 pub struct Delivery {
     subscription_id: u8,

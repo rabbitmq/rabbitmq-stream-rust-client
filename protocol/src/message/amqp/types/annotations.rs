@@ -7,6 +7,7 @@ use super::{Long, Map, Symbol, ULong, Value};
 #[cfg(test)]
 use fake::Fake;
 
+/// Key for annotations [`Map`]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub enum AnnonationKey {
