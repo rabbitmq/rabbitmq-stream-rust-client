@@ -3,7 +3,8 @@ use std::sync::Arc;
 use super::{InternalMessage, Message};
 
 use super::amqp::{
-    Address, AnnonationKey, Annotations, MessageId, SequenceNo, Symbol, Timestamp, Value,
+    Address, AnnonationKey, Annotations, MessageId, SequenceNo, SimpleValue, Str, Symbol,
+    Timestamp, Value,
 };
 pub struct MessageBuilder(pub(crate) InternalMessage);
 
@@ -43,6 +44,10 @@ impl MessageBuilder {
             self,
             Box::new(|builder| builder.0.message.delivery_annotations_mut()),
         )
+    }
+
+    pub fn application_properties(self) -> ApplicationPropertiesBuider {
+        ApplicationPropertiesBuider(self)
     }
     pub fn publising_id(mut self, publishing_id: u64) -> Self {
         self.0.publishing_id = Some(publishing_id);
@@ -200,6 +205,23 @@ impl AnnotationBuider {
     {
         let annotations = self.1(&mut self.0);
         annotations.put(key, value);
+        self
+    }
+    pub fn message_builder(self) -> MessageBuilder {
+        self.0
+    }
+}
+
+pub struct ApplicationPropertiesBuider(MessageBuilder);
+
+impl ApplicationPropertiesBuider {
+    pub fn insert<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<Str>,
+        V: Into<SimpleValue>,
+    {
+        let app_properties = self.0 .0.message.application_properties_mut();
+        app_properties.0.insert(key.into(), value.into());
         self
     }
     pub fn message_builder(self) -> MessageBuilder {

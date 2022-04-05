@@ -16,8 +16,10 @@ mod primitives;
 mod symbol;
 
 pub use annotations::{AnnonationKey, Annotations};
-pub use primitives::Value;
+pub use primitives::{SimpleValue, Value};
 pub use symbol::Symbol;
+
+pub use primitives::Str;
 
 pub type Milliseconds = u32;
 

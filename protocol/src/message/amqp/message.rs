@@ -73,6 +73,12 @@ impl Message {
         }
         self.message_annotations.as_mut().unwrap()
     }
+    pub fn application_properties_mut(&mut self) -> &mut ApplicationProperties {
+        if self.application_properties.is_none() {
+            self.application_properties = Some(ApplicationProperties::default());
+        }
+        self.application_properties.as_mut().unwrap()
+    }
     #[cfg(test)]
     pub fn with_footer<F>(&mut self, f: F) -> &mut Self
     where

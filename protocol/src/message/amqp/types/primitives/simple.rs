@@ -641,7 +641,7 @@ impl AmqpDecoder for Str {
     }
 }
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, From)]
 pub struct Timestamp(DateTime<Utc>);
 
 impl AmqpDecoder for Timestamp {

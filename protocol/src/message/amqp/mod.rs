@@ -15,7 +15,7 @@ pub use message::Message as AmqpMessage;
 pub use properties::Properties;
 pub use types::{
     Address, AnnonationKey, Annotations, ApplicationProperties, MessageAnnotations, MessageId,
-    SequenceNo, Symbol, Timestamp, Value,
+    SequenceNo, SimpleValue, Str, Symbol, Timestamp, Value,
 };
 
 #[cfg(test)]

@@ -6,11 +6,7 @@ use super::{
     AmqpEncodeError,
 };
 
-#[cfg(test)]
-use fake::Fake;
-
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(test, derive(fake::Dummy))]
 pub struct MessageBody {
     pub data: Vec<Vec<u8>>,
     pub sequence: Vec<List>,
@@ -69,5 +65,24 @@ impl AmqpEncoder for MessageBody {
             val.encode(writer)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use fake::{Dummy, Fake, Faker};
+
+    use crate::message::amqp::Value;
+
+    use super::MessageBody;
+    impl Dummy<Faker> for MessageBody {
+        fn dummy_with_rng<R: rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+            MessageBody {
+                data: config.fake_with_rng(rng),
+                sequence: config.fake_with_rng(rng),
+                value: Some(Value::Simple(config.fake_with_rng(rng))),
+            }
+        }
     }
 }
