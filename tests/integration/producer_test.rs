@@ -190,12 +190,8 @@ async fn producer_send_with_complex_message_ok() {
         .send_with_confirm(
             Message::builder()
                 .body(b"message".to_vec())
-                .value(32i32)
                 .properties()
                 .message_id(32u64)
-                .message_builder()
-                .header()
-                .delivery_count(10)
                 .message_builder()
                 .message_annotations()
                 .insert("test", "test")
@@ -215,17 +211,11 @@ async fn producer_send_with_complex_message_ok() {
     let message = delivery.message();
     assert_eq!(Some(b"message".as_ref()), message.data());
     let properties = message.properties();
-    let header = message.header();
-
-    let val = message.value_ref::<&i32>().unwrap();
-
-    assert_eq!(Some(&32), val);
 
     assert_eq!(
         Some(32u64.into()),
         properties.and_then(|properties| properties.message_id.clone())
     );
-    assert_eq!(10, header.unwrap().delivery_count);
 
     consumer.handle().close().await.unwrap();
 }

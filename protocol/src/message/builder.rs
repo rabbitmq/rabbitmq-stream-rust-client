@@ -16,33 +16,14 @@ impl MessageBuilder {
         self
     }
 
-    pub fn value(mut self, value: impl Into<Value>) -> Self {
-        self.0.message.set_body(|body| {
-            body.set_value(value.into());
-        });
-        self
-    }
-
     pub fn properties(self) -> PropertiesBuilder {
         PropertiesBuilder(self)
     }
-    pub fn header(self) -> HeaderBuilder {
-        HeaderBuilder(self)
-    }
 
-    pub fn footer(self) -> AnnotationBuider {
-        AnnotationBuider(self, Box::new(|builder| builder.0.message.footer_mut()))
-    }
     pub fn message_annotations(self) -> AnnotationBuider {
         AnnotationBuider(
             self,
             Box::new(|builder| builder.0.message.message_annotations_mut()),
-        )
-    }
-    pub fn delivery_annotations(self) -> AnnotationBuider {
-        AnnotationBuider(
-            self,
-            Box::new(|builder| builder.0.message.delivery_annotations_mut()),
         )
     }
 
@@ -154,41 +135,6 @@ impl PropertiesBuilder {
             .message
             .with_properties(|p| p.reply_to_group_id = Some(reply_to_group_id.into()));
         self
-    }
-}
-
-pub struct HeaderBuilder(MessageBuilder);
-
-impl HeaderBuilder {
-    pub fn delivery_count(mut self, delivery_count: u32) -> Self {
-        self.0
-             .0
-            .message
-            .with_header(|p| p.delivery_count = delivery_count);
-        self
-    }
-    pub fn durable(mut self, durable: bool) -> Self {
-        self.0 .0.message.with_header(|p| p.durable = durable);
-        self
-    }
-    pub fn first_acquirer(mut self, first_acquirer: bool) -> Self {
-        self.0
-             .0
-            .message
-            .with_header(|p| p.first_acquirer = first_acquirer);
-        self
-    }
-    pub fn priority(mut self, priority: u8) -> Self {
-        self.0 .0.message.with_header(|p| p.priority = priority);
-        self
-    }
-    pub fn ttl(mut self, ttl: u32) -> Self {
-        self.0 .0.message.with_header(|p| p.ttl = Some(ttl));
-        self
-    }
-
-    pub fn message_builder(self) -> MessageBuilder {
-        self.0
     }
 }
 

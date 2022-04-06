@@ -40,6 +40,7 @@ impl Message {
         self
     }
 
+    #[cfg(test)]
     pub fn with_header<F>(&mut self, f: F) -> &mut Self
     where
         F: FnOnce(&mut Header),
@@ -55,18 +56,6 @@ impl Message {
         self
     }
 
-    pub fn footer_mut(&mut self) -> &mut Footer {
-        if self.footer.is_none() {
-            self.footer = Some(Footer::default());
-        }
-        self.footer.as_mut().unwrap()
-    }
-    pub fn delivery_annotations_mut(&mut self) -> &mut DeliveryAnnotations {
-        if self.delivery_annotations.is_none() {
-            self.delivery_annotations = Some(DeliveryAnnotations::default());
-        }
-        self.delivery_annotations.as_mut().unwrap()
-    }
     pub fn message_annotations_mut(&mut self) -> &mut MessageAnnotations {
         if self.message_annotations.is_none() {
             self.message_annotations = Some(MessageAnnotations::default());

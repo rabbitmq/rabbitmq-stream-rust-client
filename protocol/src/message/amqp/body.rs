@@ -22,6 +22,7 @@ impl MessageBody {
         self.value.as_ref()
     }
 
+    #[cfg(test)]
     pub fn set_value(&mut self, value: impl Into<Value>) -> &mut Self {
         self.value = Some(value.into());
         self
