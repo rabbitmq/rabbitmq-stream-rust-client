@@ -96,4 +96,9 @@ pub mod types {
     pub use crate::stream_creator::StreamCreator;
     pub use rabbitmq_stream_protocol::message::Message;
     pub use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};
+
+    pub use rabbitmq_stream_protocol::message::{
+        AnnonationKey, ApplicationProperties, DeliveryAnnotations, Footer, Header, Map, Properties,
+        SimpleValue, Value,
+    };
 }

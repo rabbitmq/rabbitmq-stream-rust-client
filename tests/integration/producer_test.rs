@@ -171,3 +171,51 @@ async fn producer_batch_send() {
 
     producer.close().await.unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_send_with_complex_message_ok() {
+    let env = TestEnvironment::create().await;
+
+    let producer = env.env.producer().build(&env.stream).await.unwrap();
+
+    let mut consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let _ = producer
+        .send_with_confirm(
+            Message::builder()
+                .body(b"message".to_vec())
+                .properties()
+                .message_id(32u64)
+                .message_builder()
+                .message_annotations()
+                .insert("test", "test")
+                .insert("test", true)
+                .insert("test", 3u8)
+                .message_builder()
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    producer.close().await.unwrap();
+
+    let delivery = consumer.next().await.unwrap().unwrap();
+    assert_eq!(1, delivery.subscription_id());
+
+    let message = delivery.message();
+    assert_eq!(Some(b"message".as_ref()), message.data());
+    let properties = message.properties();
+
+    assert_eq!(
+        Some(32u64.into()),
+        properties.and_then(|properties| properties.message_id.clone())
+    );
+
+    consumer.handle().close().await.unwrap();
+}
