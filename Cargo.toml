@@ -31,7 +31,7 @@ tracing = "0.1"
 thiserror = "1.0"
 async-trait = "0.1.51"
 rand = "0.8"
-dashmap = "4.0.2"
+dashmap = "5.3.3"
 
 [dev-dependencies]
 tracing-subscriber = "0.3.1"
