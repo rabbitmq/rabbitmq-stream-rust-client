@@ -13,7 +13,7 @@ wasm-bindgen = ["uuid/wasm-bindgen"]
 [dependencies]
 byteorder = "1"
 ordered-float = "3.0.0"
-uuid = "0.8.2"
+uuid = "1.1.1"
 chrono = "0.4.19"
 num_enum = "0.5.7"
 derive_more = "0.99"
