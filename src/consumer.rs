@@ -23,6 +23,7 @@ use crate::{
     Client, ClientOptions, Environment, MetricsCollector,
 };
 use futures::{task::AtomicWaker, Stream};
+use rand::rngs::ThreadRng;
 
 use rand::seq::SliceRandom;
 
@@ -63,7 +64,7 @@ impl ConsumerBuilder {
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
             // This is desired behavior in case there is only one node in the cluster.
-            if let Some(replica) = metadata.replicas.choose(&mut rand::thread_rng()) {
+            if let Some(replica) = metadata.replicas.choose(&mut ThreadRng::default()) {
                 tracing::debug!(
                     "Picked replica {:?} out of possible candidates {:?} for stream {}",
                     replica,
