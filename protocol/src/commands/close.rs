@@ -21,7 +21,7 @@ use super::Command;
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct CloseRequest {
     correlation_id: u32,
     closing_code: ResponseCode,
@@ -76,7 +76,7 @@ impl Decoder for CloseRequest {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct CloseResponse {
     pub(crate) correlation_id: u32,
     response_code: ResponseCode,

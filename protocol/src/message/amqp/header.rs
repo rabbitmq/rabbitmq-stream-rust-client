@@ -15,7 +15,7 @@ use super::{
 use fake::Fake;
 
 /// Header of the message
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct Header {
     pub durable: bool,

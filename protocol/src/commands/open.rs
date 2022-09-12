@@ -14,7 +14,7 @@ use super::Command;
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct OpenCommand {
     correlation_id: u32,
     virtual_host: String,
@@ -48,7 +48,7 @@ impl Command for OpenCommand {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct OpenResponse {
     pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,

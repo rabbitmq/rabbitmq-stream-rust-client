@@ -13,7 +13,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct DeliverCommand {
     pub subscription_id: u8,
     magic_version: i8,

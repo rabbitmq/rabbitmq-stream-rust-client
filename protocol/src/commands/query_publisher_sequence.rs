@@ -12,7 +12,7 @@ use super::Command;
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct QueryPublisherRequest {
     correlation_id: u32,
     publisher_reference: String,
@@ -83,7 +83,7 @@ impl Decoder for QueryPublisherRequest {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct QueryPublisherResponse {
     pub(crate) correlation_id: u32,
     response_code: ResponseCode,

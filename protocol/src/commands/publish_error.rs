@@ -14,7 +14,7 @@ use super::Command;
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct PublishErrorResponse {
     pub publisher_id: u8,
     pub publishing_errors: Vec<PublishingError>,

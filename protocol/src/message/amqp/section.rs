@@ -19,7 +19,7 @@ use super::{
     AmqpDecodeError,
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessageSection {
     Header(Header),

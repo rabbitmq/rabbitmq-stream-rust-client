@@ -12,7 +12,7 @@ use crate::{
 use super::Command;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct UnSubscribeCommand {
     correlation_id: u32,
     subscription_id: u8,

@@ -9,7 +9,7 @@ use crate::{
 use super::Command;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct HeartBeatCommand {}
 
 impl HeartBeatCommand {
@@ -41,7 +41,7 @@ impl Decoder for HeartBeatCommand {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct HeartbeatResponse {}
 
 impl Decoder for HeartbeatResponse {

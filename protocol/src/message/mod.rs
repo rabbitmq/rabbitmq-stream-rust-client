@@ -18,10 +18,10 @@ pub use self::amqp::{
 use self::builder::MessageBuilder;
 
 /// API for inbound and outbound messages
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Message(Arc<InternalMessage>);
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct InternalMessage {
     pub(crate) publishing_id: Option<u64>,
     pub(crate) message: AmqpMessage,

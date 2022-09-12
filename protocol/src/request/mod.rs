@@ -20,7 +20,7 @@ use crate::{
 
 use byteorder::{BigEndian, WriteBytesExt};
 mod shims;
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Request {
     header: Header,
     kind: RequestKind,
@@ -37,7 +37,7 @@ impl Request {
         &self.header
     }
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RequestKind {
     PeerProperties(PeerPropertiesCommand),
     SaslHandshake(SaslHandshakeCommand),

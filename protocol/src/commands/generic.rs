@@ -10,7 +10,7 @@ use crate::{
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct GenericResponse {
     pub(crate) correlation_id: u32,
     code: ResponseCode,

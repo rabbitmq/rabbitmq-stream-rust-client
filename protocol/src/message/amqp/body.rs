@@ -6,7 +6,7 @@ use super::{
     AmqpEncodeError,
 };
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MessageBody {
     pub data: Vec<Vec<u8>>,
     pub sequence: Vec<List>,

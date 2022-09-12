@@ -337,14 +337,13 @@ impl<T> Producer<T> {
         message: Message,
     ) -> Result<ConfirmationStatus, ProducerPublishError> {
         let (tx, mut rx) = channel(1);
-        let _ = self
-            .internal_send(message, move |status| {
-                let cloned = tx.clone();
-                async move {
-                    let _ = cloned.send(status).await;
-                }
-            })
-            .await?;
+        self.internal_send(message, move |status| {
+            let cloned = tx.clone();
+            async move {
+                let _ = cloned.send(status).await;
+            }
+        })
+        .await?;
 
         rx.recv()
             .await
@@ -362,14 +361,13 @@ impl<T> Producer<T> {
         let messages_len = messages.len();
         let (tx, mut rx) = channel(messages_len);
 
-        let _ = self
-            .internal_batch_send(messages, move |status| {
-                let cloned = tx.clone();
-                async move {
-                    let _ = cloned.send(status).await;
-                }
-            })
-            .await?;
+        self.internal_batch_send(messages, move |status| {
+            let cloned = tx.clone();
+            async move {
+                let _ = cloned.send(status).await;
+            }
+        })
+        .await?;
 
         let mut confirmations = Vec::with_capacity(messages_len);
 
@@ -387,7 +385,7 @@ impl<T> Producer<T> {
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
-        let _ = self.internal_batch_send(messages, cb).await?;
+        self.internal_batch_send(messages, cb).await?;
 
         Ok(())
     }
@@ -400,7 +398,7 @@ impl<T> Producer<T> {
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
-        let _ = self.internal_send(message, cb).await?;
+        self.internal_send(message, cb).await?;
         Ok(())
     }
 
