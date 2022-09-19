@@ -39,7 +39,7 @@ impl TestEnvironment {
     pub async fn create() -> TestEnvironment {
         let stream: String = Faker.fake();
         let env = Environment::builder().build().await.unwrap();
-        let _ = env.stream_creator().create(&stream).await.unwrap();
+        env.stream_creator().create(&stream).await.unwrap();
 
         TestEnvironment { env, stream }
     }

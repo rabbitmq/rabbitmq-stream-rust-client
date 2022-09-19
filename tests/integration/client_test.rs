@@ -182,11 +182,8 @@ async fn client_publish() {
 
     let handler = move |msg: MessageResult| async move {
         if let Some(Ok(response)) = msg {
-            match response.kind() {
-                ResponseKind::Deliver(delivery) => {
-                    tx.send(delivery.clone()).await.unwrap();
-                }
-                _ => {}
+            if let ResponseKind::Deliver(delivery) = response.kind() {
+                tx.send(delivery.clone()).await.unwrap()
             }
         }
         Ok(())
