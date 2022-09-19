@@ -100,7 +100,7 @@ async fn producer_send_with_callback() {
         .await
         .unwrap();
 
-    let _ = producer
+    producer
         .send(
             Message::builder().body(b"message".to_vec()).build(),
             move |confirm_result| {
@@ -127,7 +127,7 @@ async fn producer_batch_send_with_callback() {
     let (tx, mut rx) = channel(1);
     let producer = env.env.producer().build(&env.stream).await.unwrap();
 
-    let _ = producer
+    producer
         .batch_send(
             vec![Message::builder().body(b"message".to_vec()).build()],
             move |confirm_result| {
@@ -143,7 +143,7 @@ async fn producer_batch_send_with_callback() {
     let result = rx.recv().await.unwrap().unwrap();
 
     assert_eq!(0, result.publishing_id());
-    assert_eq!(true, result.confirmed());
+    assert!(result.confirmed());
     assert_eq!(Some(b"message".as_ref()), result.message().data());
     assert!(result.message().publishing_id().is_none());
 
@@ -165,7 +165,7 @@ async fn producer_batch_send() {
 
     let confirmation = result.get(0).unwrap();
     assert_eq!(0, confirmation.publishing_id());
-    assert_eq!(true, confirmation.confirmed());
+    assert!(confirmation.confirmed());
     assert_eq!(Some(b"message".as_ref()), confirmation.message().data());
     assert!(confirmation.message().publishing_id().is_none());
 

@@ -69,7 +69,7 @@ async fn consumer_close_test() {
     let handle = consumer.handle();
     let delivery = consumer.next().await;
 
-    assert_eq!(false, consumer.is_closed());
+    assert!(!consumer.is_closed());
     assert!(delivery.is_some());
 
     tokio::spawn(async move {
@@ -80,7 +80,7 @@ async fn consumer_close_test() {
     let delivery = consumer.next().await;
 
     assert!(delivery.is_none());
-    assert_eq!(true, consumer.is_closed());
+    assert!(consumer.is_closed());
 
     assert!(matches!(
         consumer.handle().close().await,
