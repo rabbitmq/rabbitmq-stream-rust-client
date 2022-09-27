@@ -503,7 +503,7 @@ pub type Binary = Vec<u8>;
 
 impl<T: AmqpEncoder> AmqpEncoder for Option<T> {
     fn encoded_size(&self) -> u32 {
-        self.as_ref().map(T::encoded_size).unwrap_or(1)
+        self.as_ref().map_or(1, T::encoded_size)
     }
 
     fn encode(&self, writer: &mut impl std::io::Write) -> Result<(), AmqpEncodeError> {

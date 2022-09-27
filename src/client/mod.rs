@@ -298,7 +298,7 @@ impl Client {
             .collect();
         let sequences = messages
             .iter()
-            .map(|message| message.publishing_id())
+            .map(rabbitmq_stream_protocol::types::PublishedMessage::publishing_id)
             .collect();
         let len = messages.len();
 
