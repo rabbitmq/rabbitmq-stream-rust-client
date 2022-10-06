@@ -25,6 +25,7 @@ use rabbitmq_stream_protocol::{
         delete::Delete,
         delete_publisher::DeletePublisherCommand,
         generic::GenericResponse,
+        heart_beat::HeartBeatCommand,
         metadata::MetadataCommand,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
@@ -77,6 +78,7 @@ impl MessageHandler for Client {
         match &item {
             Some(Ok(response)) => match response.kind_ref() {
                 ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
+                ResponseKind::Heartbeat(_) => self.handle_heart_beat_command().await,
                 _ => {
                     if let Some(handler) = self.state.read().await.handler.as_ref() {
                         let handler = handler.clone();
@@ -483,5 +485,10 @@ impl Client {
             .await;
 
         self.tune_notifier.notify_one();
+    }
+
+    async fn handle_heart_beat_command(&self) {
+        trace!("handling heartbeat");
+        let _ = self.channel.send(HeartBeatCommand::default().into()).await;
     }
 }
