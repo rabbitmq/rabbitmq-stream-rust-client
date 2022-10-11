@@ -499,16 +499,18 @@ impl Client {
                 heartbeat_task.abort();
                 state.heartbeat_task = None
             }
-            let c = self.channel.clone();
-            let heartbeat_interval = (heart_beat / 2).max(1);
-            let handle = tokio::task::spawn(async move {
-                loop {
-                    trace!("sending heartbeat");
-                    let _ = c.send(HeartBeatCommand::default().into()).await;
-                    tokio::time::sleep(Duration::from_secs(heartbeat_interval.into())).await;
-                }
-            });
-            state.heartbeat_task = Some(Arc::new(handle));
+            if heart_beat != 0 {
+                let c = self.channel.clone();
+                let heartbeat_interval = (heart_beat / 2).max(1);
+                let handle = tokio::task::spawn(async move {
+                    loop {
+                        trace!("sending heartbeat");
+                        let _ = c.send(HeartBeatCommand::default().into()).await;
+                        tokio::time::sleep(Duration::from_secs(heartbeat_interval.into())).await;
+                    }
+                });
+                state.heartbeat_task = Some(Arc::new(handle));
+            }
         }
         drop(state);
 
