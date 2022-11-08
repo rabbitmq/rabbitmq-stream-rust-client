@@ -42,7 +42,10 @@ jobs:
 #          args: '-- --test-threads 1'
 
       - name: Upload to codecov.io
+        if: ${{ env.HAVE_CODECOV_TOKEN == 'true' }}
         uses: codecov/codecov-action@v1.0.2
+        env:
+          HAVE_CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN != '' }}
         with:
           token: ${{secrets.CODECOV_TOKEN}}
 
