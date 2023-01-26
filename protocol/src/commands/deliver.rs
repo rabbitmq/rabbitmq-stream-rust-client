@@ -75,7 +75,7 @@ impl Encoder for DeliverCommand {
             + 4 // vec of messages
             + self.messages.iter().fold(0, |acc, message| {
                 acc + 1 +  message.encoded_size()
-            }) as u32
+            })
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
@@ -94,7 +94,7 @@ impl Encoder for DeliverCommand {
             .iter()
             .fold(0, |acc, message| acc + 1 + message.encoded_size());
 
-        writer.write_u32::<BigEndian>(size as u32)?;
+        writer.write_u32::<BigEndian>(size)?;
         self.trailer_length.encode(writer)?;
         self.reserved.encode(writer)?;
 
