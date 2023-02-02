@@ -1,6 +1,7 @@
 use std::{fmt::Debug, sync::Arc};
 
 use super::metrics::{MetricsCollector, NopMetricsCollector};
+use crate::environment::TlsConfiguration;
 
 #[derive(Clone)]
 pub struct ClientOptions {
@@ -11,6 +12,7 @@ pub struct ClientOptions {
     pub(crate) v_host: String,
     pub(crate) heartbeat: u32,
     pub(crate) max_frame_size: u32,
+    pub(crate) tls: TlsConfiguration,
     pub(crate) collector: Arc<dyn MetricsCollector>,
 }
 
@@ -38,6 +40,25 @@ impl Default for ClientOptions {
             heartbeat: 60,
             max_frame_size: 1048576,
             collector: Arc::new(NopMetricsCollector {}),
+            tls: TlsConfiguration {
+                enabled: false,
+                hostname_verification: false,
+                trust_everything: false,
+            },
         }
+    }
+}
+
+impl ClientOptions {
+    pub fn get_tls(&self) -> TlsConfiguration {
+        self.tls
+    }
+
+    pub fn enable_tls(&mut self) {
+        self.tls.enable(true);
+    }
+
+    pub fn set_port(&mut self, port: u16) {
+        self.port = port;
     }
 }

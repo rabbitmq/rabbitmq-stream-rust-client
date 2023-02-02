@@ -51,17 +51,73 @@ use self::{
     message::BaseMessage,
 };
 
+use pin_project::pin_project;
 use std::{
     collections::HashMap,
+    io,
+    pin::Pin,
     sync::{atomic::AtomicU64, Arc},
+    task::{Context, Poll},
 };
 use std::{future::Future, sync::atomic::Ordering};
+use tokio::io::AsyncRead;
+use tokio::io::AsyncWrite;
+use tokio::io::ReadBuf;
 use tokio::sync::RwLock;
 use tokio::{net::TcpStream, sync::Notify};
+use tokio_native_tls::TlsStream;
 use tokio_util::codec::Framed;
 
-type SinkConnection = SplitSink<Framed<TcpStream, RabbitMqStreamCodec>, Request>;
-type StreamConnection = SplitStream<Framed<TcpStream, RabbitMqStreamCodec>>;
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio-stream")))]
+#[pin_project(project = StreamProj)]
+#[derive(Debug)]
+enum GenericTcpStream {
+    Tcp(#[pin] TcpStream),
+    SecureTcp(#[pin] TlsStream<TcpStream>),
+}
+
+impl AsyncRead for GenericTcpStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        match self.project() {
+            StreamProj::Tcp(tcp_stream) => tcp_stream.poll_read(cx, buf),
+            StreamProj::SecureTcp(tls_stream) => tls_stream.poll_read(cx, buf),
+        }
+    }
+}
+
+impl AsyncWrite for GenericTcpStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        match self.project() {
+            StreamProj::Tcp(tcp_stream) => tcp_stream.poll_write(cx, buf),
+            StreamProj::SecureTcp(tls_stream) => tls_stream.poll_write(cx, buf),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.project() {
+            StreamProj::Tcp(tcp_stream) => tcp_stream.poll_flush(cx),
+            StreamProj::SecureTcp(tls_stream) => tls_stream.poll_flush(cx),
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.project() {
+            StreamProj::Tcp(tcp_stream) => tcp_stream.poll_shutdown(cx),
+            StreamProj::SecureTcp(tls_stream) => tls_stream.poll_shutdown(cx),
+        }
+    }
+}
+
+type SinkConnection = SplitSink<Framed<GenericTcpStream, RabbitMqStreamCodec>, Request>;
+type StreamConnection = SplitStream<Framed<GenericTcpStream, RabbitMqStreamCodec>>;
 
 pub struct ClientState {
     server_properties: HashMap<String, String>,
@@ -332,7 +388,24 @@ impl Client {
         ),
         ClientError,
     > {
-        let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+        let stream = if broker.tls.enabled() {
+            let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+
+            let mut tls_builder = tokio_native_tls::native_tls::TlsConnector::builder();
+            tls_builder
+                .danger_accept_invalid_certs(true)
+                .danger_accept_invalid_hostnames(true);
+
+            let conn = tokio_native_tls::TlsConnector::from(tls_builder.build()?);
+
+            let stream = conn.connect(broker.host.as_str(), stream).await?;
+
+            GenericTcpStream::SecureTcp(stream)
+        } else {
+            let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+            GenericTcpStream::Tcp(stream)
+        };
+
         let stream = Framed::new(stream, RabbitMqStreamCodec {});
 
         let (sink, stream) = stream.split();
