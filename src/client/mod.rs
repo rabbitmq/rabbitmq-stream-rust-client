@@ -396,13 +396,11 @@ impl Client {
                 .danger_accept_invalid_certs(true)
                 .danger_accept_invalid_hostnames(true);
 
-            let conn = tls_builder.build();
+            let conn = tokio_native_tls::TlsConnector::from(tls_builder.build()?);
 
-            let conn = tokio_native_tls::TlsConnector::from(conn.unwrap());
+            let stream = conn.connect(broker.host.as_str(), stream).await?;
 
-            let stream = conn.connect(broker.host.as_str(), stream).await;
-
-            GenericTcpStream::SecureTcp(stream.unwrap())
+            GenericTcpStream::SecureTcp(stream)
         } else {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
             GenericTcpStream::Tcp(stream)
