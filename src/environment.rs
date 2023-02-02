@@ -178,3 +178,35 @@ impl TlsConfiguration {
         self.trust_everything
     }
 }
+
+pub struct TlsConfigurationBuilder(TlsConfiguration);
+
+impl TlsConfigurationBuilder {
+    pub fn trust_everything(mut self, trust_everything: bool) -> TlsConfigurationBuilder {
+        self.0.trust_everything = trust_everything;
+        self
+    }
+
+    pub fn enable(mut self, enable: bool) -> TlsConfigurationBuilder {
+        self.0.enabled = enable;
+        self
+    }
+
+    pub fn hostname_verification_enable(
+        mut self,
+        hostname_verification: bool,
+    ) -> TlsConfigurationBuilder {
+        self.0.hostname_verification = hostname_verification;
+        self
+    }
+
+    pub fn build(self) -> TlsConfiguration {
+        self.0
+    }
+}
+
+impl TlsConfiguration {
+    pub fn builder() -> TlsConfigurationBuilder {
+        TlsConfigurationBuilder(TlsConfiguration::default())
+    }
+}
