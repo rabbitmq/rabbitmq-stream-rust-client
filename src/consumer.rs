@@ -84,6 +84,20 @@ impl ConsumerBuilder {
         }
 
         let subscription_id = 1;
+        let (tx, rx) = channel(10000);
+        let consumer = Arc::new(ConsumerInternal {
+            subscription_id,
+            stream: stream.to_string(),
+            client: client.clone(),
+            sender: tx,
+            closed: Arc::new(AtomicBool::new(false)),
+            waker: AtomicWaker::new(),
+            metrics_collector: collector,
+        });
+
+        let msg_handler = ConsumerMessageHandler(consumer.clone());
+        client.set_handler(msg_handler).await;
+
         let response = client
             .subscribe(
                 subscription_id,
@@ -95,20 +109,6 @@ impl ConsumerBuilder {
             .await?;
 
         if response.is_ok() {
-            let (tx, rx) = channel(10000);
-            let consumer = Arc::new(ConsumerInternal {
-                subscription_id,
-                stream: stream.to_string(),
-                client: client.clone(),
-                sender: tx,
-                closed: Arc::new(AtomicBool::new(false)),
-                waker: AtomicWaker::new(),
-                metrics_collector: collector,
-            });
-
-            let msg_handler = ConsumerMessageHandler(consumer.clone());
-            client.set_handler(msg_handler).await;
-
             Ok(Consumer {
                 receiver: rx,
                 internal: consumer,
