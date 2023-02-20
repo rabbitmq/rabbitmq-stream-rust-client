@@ -125,6 +125,7 @@ impl<T> ProducerBuilder<T> {
                 metadata.leader,
                 stream
             );
+            client.close().await?;
             client = Client::connect(ClientOptions {
                 host: metadata.leader.host.clone(),
                 port: metadata.leader.port as u16,
@@ -553,7 +554,10 @@ impl MessageHandler for ProducerConfirmHandler {
                 trace!(?error);
                 // TODO clean all waiting for confirm
             }
-            None => todo!(),
+            None => {
+                trace!("Connection closed");
+                // TODO connection close clean all waiting
+            }
         }
         Ok(())
     }

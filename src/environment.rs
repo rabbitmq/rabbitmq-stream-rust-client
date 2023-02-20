@@ -60,7 +60,9 @@ impl Environment {
 
     /// Delete a stream
     pub async fn delete_stream(&self, stream: &str) -> Result<(), StreamDeleteError> {
-        let response = self.create_client().await?.delete_stream(stream).await?;
+        let client = self.create_client().await?;
+        let response = client.delete_stream(stream).await?;
+        client.close().await?;
 
         if response.is_ok() {
             Ok(())
@@ -122,6 +124,10 @@ impl EnvironmentBuilder {
         self
     }
 
+    pub fn heartbeat(mut self, heartbeat: u32) -> EnvironmentBuilder {
+        self.0.client_options.heartbeat = heartbeat;
+        self
+    }
     pub fn metrics_collector(
         mut self,
         collector: impl MetricsCollector + Send + Sync + 'static,
