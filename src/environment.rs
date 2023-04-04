@@ -13,8 +13,11 @@ use crate::{
     stream_creator::StreamCreator,
     RabbitMQStreamResult,
 };
+
+use tokio_native_tls::native_tls::Certificate;
+
 /// Main access point to a node
-#[derive(Clone)]
+#[derive(Clone)]     
 pub struct Environment {
     pub(crate) options: EnvironmentOptions,
 }
@@ -108,18 +111,10 @@ impl EnvironmentBuilder {
     }
 
     pub fn tls(mut self, tls_configuration: TlsConfiguration) -> EnvironmentBuilder {
+
         self.0
             .client_options
-            .tls
-            .trust_everything(tls_configuration.trust_everything_enabled());
-        self.0
-            .client_options
-            .tls
-            .hostname_verification_enable(tls_configuration.hostname_verification_enabled());
-        self.0
-            .client_options
-            .tls
-            .enable(tls_configuration.enabled());
+            .tls = tls_configuration;
 
         self
     }
@@ -142,27 +137,26 @@ pub struct EnvironmentOptions {
 }
 
 /** Helper for tls configuration */
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct TlsConfiguration {
     pub(crate) enabled: bool,
-    pub(crate) hostname_verification: bool,
-    pub(crate) trust_everything: bool,
+    pub(crate) trust_hostname: bool,
+    pub(crate) trust_certificate: bool,
+    pub(crate) certificate: Option<Certificate>,
 }
 
 impl Default for TlsConfiguration {
     fn default() -> TlsConfiguration {
         TlsConfiguration {
             enabled: true,
-            trust_everything: false,
-            hostname_verification: true,
+            trust_certificate: false,
+            trust_hostname: false,
+            certificate: None,
         }
     }
 }
 
 impl TlsConfiguration {
-    pub fn trust_everything(&mut self, trust_everything: bool) {
-        self.trust_everything = trust_everything
-    }
 
     pub fn enable(&mut self, enabled: bool) {
         self.enabled = enabled
@@ -172,24 +166,37 @@ impl TlsConfiguration {
         self.enabled
     }
 
-    pub fn hostname_verification_enable(&mut self, hostname_verification: bool) {
-        self.hostname_verification = hostname_verification
+    pub fn get_root_certificate(&self) -> Option<&Certificate> {
+        self.certificate.as_ref()
     }
 
-    pub fn hostname_verification_enabled(&self) -> bool {
-        self.hostname_verification
+    pub fn add_root_certificate(&mut self, certificate: Certificate)  {
+        self.certificate = Some(certificate)
     }
 
-    pub fn trust_everything_enabled(&self) -> bool {
-        self.trust_everything
+    pub fn trust_hostname(&mut self, trust_hostname: bool) {
+        self.trust_hostname = trust_hostname
     }
+
+    pub fn trust_hostname_enabled(&self) -> bool {
+        self.trust_hostname
+    }
+
+    pub fn trust_certificate(&mut self, trust_certificate: bool)  {
+        self.trust_certificate = trust_certificate
+    }
+
+    pub fn trust_certificate_enabled(&self) -> bool {
+        self.trust_certificate
+    }
+
 }
 
 pub struct TlsConfigurationBuilder(TlsConfiguration);
 
 impl TlsConfigurationBuilder {
-    pub fn trust_everything(mut self, trust_everything: bool) -> TlsConfigurationBuilder {
-        self.0.trust_everything = trust_everything;
+    pub fn trust_certificate(mut self, trust_certificate: bool) -> TlsConfigurationBuilder {
+        self.0.trust_certificate = trust_certificate;
         self
     }
 
@@ -198,11 +205,19 @@ impl TlsConfigurationBuilder {
         self
     }
 
-    pub fn hostname_verification_enable(
+    pub fn trust_hostname(
         mut self,
         hostname_verification: bool,
     ) -> TlsConfigurationBuilder {
-        self.0.hostname_verification = hostname_verification;
+        self.0.trust_hostname = hostname_verification;
+        self
+    }
+
+    pub fn add_root_certificate(
+        mut self,
+        certificate: Certificate,
+    ) -> TlsConfigurationBuilder {
+        self.0.certificate = Some(certificate);
         self
     }
 

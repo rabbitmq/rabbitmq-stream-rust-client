@@ -406,10 +406,20 @@ impl Client {
         let stream = if broker.tls.enabled() {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
 
-            let mut tls_builder = tokio_native_tls::native_tls::TlsConnector::builder();
-            tls_builder
-                .danger_accept_invalid_certs(true)
-                .danger_accept_invalid_hostnames(true);
+            let mut tls_builder: tokio_native_tls::native_tls::TlsConnectorBuilder = tokio_native_tls::native_tls::TlsConnector::builder();
+
+            
+            if broker.tls.trust_hostname_enabled()   {
+                tls_builder.danger_accept_invalid_hostnames(true);
+            }
+            if broker.tls.trust_certificate_enabled()   {
+                tls_builder.danger_accept_invalid_certs(true);
+            } else {
+                if let Some(cert)=broker.tls.get_root_certificate()  {
+                    print!("Hello, World!");
+                    tls_builder.add_root_certificate(cert.clone());
+                }
+            }
 
             let conn = tokio_native_tls::TlsConnector::from(tls_builder.build()?);
 
