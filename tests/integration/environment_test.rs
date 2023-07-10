@@ -23,13 +23,22 @@ async fn environment_create_stream_twice() {
     assert_eq!(response.is_err(), true);
 
     assert!(matches!( response.err().unwrap(), error::StreamCreateError::Create {
-        stream: _,
+        stream: _, // ?
         status: ResponseCode::StreamAlreadyExists,
     }));
 
-    print!("{:?}", response.err().unwrap());
+
+    let delete_response = env.delete_stream(&stream_to_test).await;
+    assert_eq!(delete_response.is_ok(), true);
 
     let delete_response = env.delete_stream(&stream_to_test).await;
 
-    assert_eq!(delete_response.is_ok(), true);
+    assert_eq!(delete_response.is_ok(), false);
+    assert_eq!(delete_response.is_err(), true);
+
+    assert!(matches!( delete_response.err().unwrap(), error::StreamDeleteError::Delete {
+        stream: _, //
+        status: ResponseCode::StreamDoesNotExist,
+    }));
+
 }
