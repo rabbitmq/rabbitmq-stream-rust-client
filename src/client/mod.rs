@@ -487,15 +487,21 @@ impl Client {
     async fn handle_authentication(&self, _mechanism: Vec<String>) -> Result<(), ClientError> {
         let auth_data = format!("\u{0000}{}\u{0000}{}", self.opts.user, self.opts.password);
 
-        self.send_and_receive::<GenericResponse, _, _>(|correlation_id| {
-            SaslAuthenticateCommand::new(
-                correlation_id,
-                "PLAIN".to_owned(),
-                auth_data.as_bytes().to_vec(),
-            )
-        })
-        .await
-        .map(|_| ())
+        let response = self
+            .send_and_receive::<GenericResponse, _, _>(|correlation_id| {
+                SaslAuthenticateCommand::new(
+                    correlation_id,
+                    "PLAIN".to_owned(),
+                    auth_data.as_bytes().to_vec(),
+                )
+            })
+            .await?;
+
+        if response.is_ok() {
+            Ok(())
+        } else {
+            Err(ClientError::RequestError(response.code().clone()))
+        }
     }
 
     async fn sasl_mechanism(&self) -> Result<Vec<String>, ClientError> {

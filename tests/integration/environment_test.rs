@@ -17,46 +17,44 @@ async fn environment_fail_to_connect_wrong_config() {
     // and return an error
 
     let env = Environment::builder().host("does_not_exist").build().await;
-    assert_eq!(env.is_err(), true);
 
     assert!(matches!(
-        env.err().unwrap(),
-        rabbitmq_stream_client::error::ClientError::Io { .. }
+        env,
+        Err(rabbitmq_stream_client::error::ClientError::Io { .. })
     ));
 
     let env = Environment::builder().port(1).build().await;
-    assert_eq!(env.is_err(), true);
     assert!(matches!(
-        env.err().unwrap(),
-        rabbitmq_stream_client::error::ClientError::Io { .. }
+        env,
+        Err(rabbitmq_stream_client::error::ClientError::Io { .. })
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn environment_fail_to_connect_wrong_credentials() {
+    let env = Environment::builder()
+        .password("wrong_password")
+        .build()
+        .await;
+
+    assert!(matches!(
+        env,
+        Err(rabbitmq_stream_client::error::ClientError::RequestError(
+            ResponseCode::AuthenticationFailure
+        ))
     ));
 
-    // TODO: remove the following tests when the
-    // authentication is correctly implemented
-    //
-    // let env = Environment::builder()
-    //     .password("wrong_password")
-    //     .build()
-    //     .await;
-    //
-    // assert_eq!(env.is_err(), true);
-    //
-    // assert!(matches!(
-    //     env.err().unwrap(),
-    //     rabbitmq_stream_client::error::ClientError::Io { .. }
-    // ));
-    //
-    // let env = Environment::builder()
-    //     .username("wrong_username")
-    //     .build()
-    //     .await;
-    //
-    // assert_eq!(env.is_err(), true);
-    //
-    // assert!(matches!(
-    //     env.err().unwrap(),
-    //     rabbitmq_stream_client::error::ClientError::Io { .. }
-    // ));
+    let env = Environment::builder()
+        .username("wrong_username")
+        .build()
+        .await;
+
+    assert!(matches!(
+        env,
+        Err(rabbitmq_stream_client::error::ClientError::RequestError(
+            ResponseCode::AuthenticationFailure
+        ))
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -71,15 +69,13 @@ async fn environment_create_delete_stream_twice() {
     assert_eq!(response.is_ok(), true);
 
     let response = env.stream_creator().create(&stream_to_test).await;
-    assert_eq!(response.is_ok(), false);
-    assert_eq!(response.is_err(), true);
 
     assert!(matches!(
-        response.err().unwrap(),
-        error::StreamCreateError::Create {
+        response,
+        Err(error::StreamCreateError::Create {
             stream: _, // ?
             status: ResponseCode::StreamAlreadyExists,
-        }
+        })
     ));
 
     // The first delete should succeed since the stream was created
@@ -89,14 +85,11 @@ async fn environment_create_delete_stream_twice() {
     // the second delete should fail since the stream was already deleted
     let delete_response = env.delete_stream(&stream_to_test).await;
 
-    assert_eq!(delete_response.is_ok(), false);
-    assert_eq!(delete_response.is_err(), true);
-
     assert!(matches!(
-        delete_response.err().unwrap(),
-        error::StreamDeleteError::Delete {
+        delete_response,
+        Err(error::StreamDeleteError::Delete {
             stream: _, //
             status: ResponseCode::StreamDoesNotExist,
-        }
+        })
     ));
 }
