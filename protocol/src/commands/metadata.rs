@@ -14,7 +14,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct MetadataCommand {
     correlation_id: u32,
     streams: Vec<String>,
@@ -63,7 +63,7 @@ impl Command for MetadataCommand {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct MetadataResponse {
     pub(crate) correlation_id: u32,
     pub brokers: Vec<Broker>,
@@ -71,7 +71,7 @@ pub struct MetadataResponse {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Broker {
     pub reference: u16,
     pub host: String,
@@ -79,7 +79,7 @@ pub struct Broker {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct StreamMetadata {
     pub stream_name: String,
     pub code: ResponseCode,

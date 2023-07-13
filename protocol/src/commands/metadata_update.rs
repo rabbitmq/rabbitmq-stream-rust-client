@@ -9,7 +9,7 @@ use crate::codec::Encoder;
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct MetadataUpdateCommand {
     code: ResponseCode,
     stream: String,

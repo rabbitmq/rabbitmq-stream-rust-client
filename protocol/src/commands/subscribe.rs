@@ -13,7 +13,7 @@ use crate::{
 use super::Command;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct SubscribeCommand {
     correlation_id: u32,
     subscription_id: u8,
@@ -94,7 +94,7 @@ impl Command for SubscribeCommand {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum OffsetSpecification {
     First,
     Last,

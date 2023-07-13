@@ -38,9 +38,10 @@ impl AmqpDecoder for Descriptor {
             (input, TypeCode::Described) => {
                 let (remaining, code) = TypeCode::decode(input)?;
                 match code {
-                    TypeCode::ULong => ULong::decode(input).map_second(Descriptor::Ulong),
+                    TypeCode::ULong | TypeCode::ULongSmall => {
+                        ULong::decode(input).map_second(Descriptor::Ulong)
+                    }
                     TypeCode::ULong0 => Ok((remaining, Descriptor::Ulong(0))),
-                    TypeCode::ULongSmall => ULong::decode(input).map_second(Descriptor::Ulong),
                     TypeCode::Symbol8 | TypeCode::Symbol32 => {
                         Symbol::decode(input).map_second(Descriptor::Symbol)
                     }

@@ -13,7 +13,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct DeliverCommand {
     pub subscription_id: u8,
     magic_version: i8,
@@ -75,7 +75,7 @@ impl Encoder for DeliverCommand {
             + 4 // vec of messages
             + self.messages.iter().fold(0, |acc, message| {
                 acc + 1 +  message.encoded_size()
-            }) as u32
+            })
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {

@@ -23,8 +23,8 @@ use crate::{
     Client, ClientOptions, Environment, MetricsCollector,
 };
 use futures::{task::AtomicWaker, Stream};
-
-use rand::seq::SliceRandom;
+use rand::rngs::StdRng;
+use rand::{seq::SliceRandom, SeedableRng};
 
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
@@ -63,7 +63,7 @@ impl ConsumerBuilder {
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
             // This is desired behavior in case there is only one node in the cluster.
-            if let Some(replica) = metadata.replicas.choose(&mut rand::thread_rng()) {
+            if let Some(replica) = metadata.replicas.choose(&mut StdRng::from_entropy()) {
                 tracing::debug!(
                     "Picked replica {:?} out of possible candidates {:?} for stream {}",
                     replica,
@@ -84,6 +84,20 @@ impl ConsumerBuilder {
         }
 
         let subscription_id = 1;
+        let (tx, rx) = channel(10000);
+        let consumer = Arc::new(ConsumerInternal {
+            subscription_id,
+            stream: stream.to_string(),
+            client: client.clone(),
+            sender: tx,
+            closed: Arc::new(AtomicBool::new(false)),
+            waker: AtomicWaker::new(),
+            metrics_collector: collector,
+        });
+
+        let msg_handler = ConsumerMessageHandler(consumer.clone());
+        client.set_handler(msg_handler).await;
+
         let response = client
             .subscribe(
                 subscription_id,
@@ -95,20 +109,6 @@ impl ConsumerBuilder {
             .await?;
 
         if response.is_ok() {
-            let (tx, rx) = channel(10000);
-            let consumer = Arc::new(ConsumerInternal {
-                subscription_id,
-                stream: stream.to_string(),
-                client: client.clone(),
-                sender: tx,
-                closed: Arc::new(AtomicBool::new(false)),
-                waker: AtomicWaker::new(),
-                metrics_collector: collector,
-            });
-
-            let msg_handler = ConsumerMessageHandler(consumer.clone());
-            client.set_handler(msg_handler).await;
-
             Ok(Consumer {
                 receiver: rx,
                 internal: consumer,

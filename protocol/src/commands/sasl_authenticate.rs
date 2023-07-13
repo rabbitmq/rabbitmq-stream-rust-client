@@ -12,7 +12,7 @@ use super::Command;
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct SaslAuthenticateCommand {
     correlation_id: u32,
     mechanism: String,

@@ -13,7 +13,7 @@ use crate::{
 use super::Command;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct CreditCommand {
     subscription_id: u8,
     credit: u16,
@@ -62,7 +62,7 @@ impl Command for CreditCommand {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct CreditResponse {
     pub(crate) code: ResponseCode,
     pub(crate) subscription_id: u8,

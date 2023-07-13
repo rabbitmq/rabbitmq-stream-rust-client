@@ -9,14 +9,8 @@ use crate::{
 use super::Command;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug, Default)]
 pub struct HeartBeatCommand {}
-
-impl HeartBeatCommand {
-    pub fn default() -> Self {
-        Self {}
-    }
-}
 
 impl Encoder for HeartBeatCommand {
     fn encoded_size(&self) -> u32 {
@@ -41,7 +35,7 @@ impl Decoder for HeartBeatCommand {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct HeartbeatResponse {}
 
 impl Decoder for HeartbeatResponse {

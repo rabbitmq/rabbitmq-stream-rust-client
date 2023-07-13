@@ -25,6 +25,12 @@ pub enum AmqpDecodeError {
     UuidError(uuid::Error),
 }
 
+impl AmqpDecodeError {
+    pub fn parse_error(msg: impl Into<String>) -> AmqpDecodeError {
+        AmqpDecodeError::MessageParse(msg.into())
+    }
+}
+
 impl From<IncompleteError> for AmqpDecodeError {
     fn from(err: IncompleteError) -> Self {
         AmqpDecodeError::Incomplete(err)

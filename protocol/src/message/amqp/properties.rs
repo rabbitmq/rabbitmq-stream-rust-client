@@ -19,7 +19,7 @@ use super::{
 use fake::Fake;
 
 /// Properties of the message
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct Properties {
     pub message_id: Option<MessageId>,

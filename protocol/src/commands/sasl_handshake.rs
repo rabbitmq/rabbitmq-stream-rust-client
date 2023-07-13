@@ -14,7 +14,7 @@ use super::Command;
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct SaslHandshakeCommand {
     correlation_id: u32,
 }
@@ -51,7 +51,7 @@ impl Command for SaslHandshakeCommand {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SaslHandshakeResponse {
     pub(crate) correlation_id: u32,
     pub(crate) code: ResponseCode,

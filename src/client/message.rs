@@ -7,7 +7,7 @@ pub trait BaseMessage {
 
 impl BaseMessage for Message {
     fn publishing_id(&self) -> Option<u64> {
-        self.publishing_id().cloned()
+        self.publishing_id().copied()
     }
 
     fn to_message(self) -> Message {

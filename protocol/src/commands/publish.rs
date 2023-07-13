@@ -13,7 +13,7 @@ use crate::types::PublishedMessage;
 use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct PublishCommand {
     publisher_id: u8,
     published_messages: Vec<PublishedMessage>,

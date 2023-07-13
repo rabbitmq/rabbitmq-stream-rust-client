@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use rabbitmq_stream_protocol::{commands::metadata::MetadataResponse, ResponseCode};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Broker {
     pub host: String,
     pub port: u32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct StreamMetadata {
     pub stream: String,
     pub response_code: ResponseCode,

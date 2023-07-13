@@ -503,7 +503,7 @@ pub type Binary = Vec<u8>;
 
 impl<T: AmqpEncoder> AmqpEncoder for Option<T> {
     fn encoded_size(&self) -> u32 {
-        self.as_ref().map(T::encoded_size).unwrap_or(1)
+        self.as_ref().map_or(1, T::encoded_size)
     }
 
     fn encode(&self, writer: &mut impl std::io::Write) -> Result<(), AmqpEncodeError> {
@@ -650,8 +650,19 @@ impl AmqpDecoder for Timestamp {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), AmqpDecodeError> {
         match TypeCode::decode(input)? {
             (input, TypeCode::Timestamp) => read_i64(input)
-                .map_second(|millis| Timestamp(Utc.timestamp_millis(millis)))
-                .map(Ok)?,
+                .map_second(|millis| {
+                    Utc.timestamp_millis_opt(millis)
+                        .single()
+                        .map(Timestamp)
+                        .ok_or_else(|| {
+                            AmqpDecodeError::parse_error(format!(
+                                "Invalid timestmap millis {}",
+                                millis
+                            ))
+                        })
+                })
+                .map(Ok)?
+                .and_then(|(input, timestamp)| Ok((input, timestamp?))),
             (_, code) => Err(Self::invalid_type_code(code)),
         }
     }

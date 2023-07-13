@@ -14,7 +14,7 @@ use super::{AmqpDecodeError, AmqpDecoder};
 #[cfg(test)]
 use fake::Fake;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct Message {
     header: Option<Header>,

@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     drop(tx);
 
-    while let Some(_) = rx.recv().await {}
+    while (rx.recv().await).is_some() {}
 
     producer.close().await?;
 

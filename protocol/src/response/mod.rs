@@ -21,7 +21,7 @@ use crate::{
 mod shims;
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ResponseCode {
     Ok,
     StreamDoesNotExist,
@@ -42,13 +42,13 @@ pub enum ResponseCode {
     PrecoditionFailed,
     PublisherDoesNotExist,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Response {
     header: Header,
     pub(crate) kind: ResponseKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResponseKind {
     Open(OpenResponse),
     Close(CloseResponse),

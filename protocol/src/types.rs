@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Header {
     key: u16,
     version: u16,
@@ -26,7 +26,7 @@ use fake::Fake;
 use crate::{message::Message, ResponseCode};
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PublishedMessage {
     pub(crate) publishing_id: u64,
     pub(crate) message: Message,
@@ -47,7 +47,7 @@ impl PublishedMessage {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PublishingError {
     pub publishing_id: u64,
     pub error_code: ResponseCode,

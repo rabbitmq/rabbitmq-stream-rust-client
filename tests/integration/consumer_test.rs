@@ -4,8 +4,9 @@ use crate::common::TestEnvironment;
 use fake::{Fake, Faker};
 use futures::StreamExt;
 use rabbitmq_stream_client::{
-    error::{ConsumerCloseError, ProducerCloseError},
-    types::{Message, OffsetSpecification},
+    error::{ConsumerCloseError, ConsumerDeliveryError, ProducerCloseError},
+    types::{Delivery, Message, OffsetSpecification},
+    Consumer, NoDedup, Producer,
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -69,7 +70,7 @@ async fn consumer_close_test() {
     let handle = consumer.handle();
     let delivery = consumer.next().await;
 
-    assert_eq!(false, consumer.is_closed());
+    assert!(!consumer.is_closed());
     assert!(delivery.is_some());
 
     tokio::spawn(async move {
@@ -80,7 +81,7 @@ async fn consumer_close_test() {
     let delivery = consumer.next().await;
 
     assert!(delivery.is_none());
-    assert_eq!(true, consumer.is_closed());
+    assert!(consumer.is_closed());
 
     assert!(matches!(
         consumer.handle().close().await,
@@ -92,4 +93,57 @@ async fn consumer_close_test() {
         producer.close().await,
         Err(ProducerCloseError::AlreadyClosed),
     ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_thread_safe_test() {
+    let message_body = "test0";
+
+    struct Wrapper {
+        producer: Producer<NoDedup>,
+        consumer: Consumer,
+    }
+
+    impl Wrapper {
+        pub async fn init() -> Self {
+            let env = TestEnvironment::create().await;
+            let producer = env.env.producer().build(&env.stream).await.unwrap();
+            let consumer = env
+                .env
+                .consumer()
+                .offset(OffsetSpecification::Next)
+                .build(&env.stream)
+                .await
+                .unwrap();
+            Self { producer, consumer }
+        }
+
+        pub async fn produce(&mut self, body: &str) {
+            self.producer
+                .send_with_confirm(Message::builder().body(body).build())
+                .await
+                .unwrap();
+        }
+
+        pub async fn consume(&mut self) -> Option<Result<Delivery, ConsumerDeliveryError>> {
+            self.consumer.next().await
+        }
+
+        pub async fn close(self) {
+            self.producer.close().await.unwrap();
+            self.consumer.handle().close().await.unwrap();
+        }
+    }
+
+    // move the Wrapper struct to test that Consumer and Producer are thread-safe
+    tokio::spawn(async move {
+        let mut wrapper = Wrapper::init().await;
+        wrapper.produce(message_body).await;
+        let delivery = wrapper.consume().await.unwrap();
+
+        let data = String::from_utf8(delivery.unwrap().message().data().unwrap().to_vec()).unwrap();
+        assert_eq!(data, message_body);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        wrapper.close().await;
+    });
 }

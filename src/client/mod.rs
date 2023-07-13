@@ -25,6 +25,7 @@ use rabbitmq_stream_protocol::{
         delete::Delete,
         delete_publisher::DeletePublisherCommand,
         generic::GenericResponse,
+        heart_beat::HeartBeatCommand,
         metadata::MetadataCommand,
         open::{OpenCommand, OpenResponse},
         peer_properties::{PeerPropertiesCommand, PeerPropertiesResponse},
@@ -41,6 +42,7 @@ use rabbitmq_stream_protocol::{
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseCode, ResponseKind,
 };
+use tokio_native_tls::TlsStream;
 use tracing::trace;
 
 pub use self::handler::{MessageHandler, MessageResult};
@@ -51,17 +53,73 @@ use self::{
     message::BaseMessage,
 };
 
+use pin_project::pin_project;
 use std::{
     collections::HashMap,
+    io,
+    pin::Pin,
     sync::{atomic::AtomicU64, Arc},
+    task::{Context, Poll},
+    time::{Duration, Instant},
 };
 use std::{future::Future, sync::atomic::Ordering};
-use tokio::sync::RwLock;
+use tokio::io::AsyncRead;
+use tokio::io::AsyncWrite;
+use tokio::io::ReadBuf;
 use tokio::{net::TcpStream, sync::Notify};
+use tokio::{sync::RwLock, task::JoinHandle};
 use tokio_util::codec::Framed;
 
-type SinkConnection = SplitSink<Framed<TcpStream, RabbitMqStreamCodec>, Request>;
-type StreamConnection = SplitStream<Framed<TcpStream, RabbitMqStreamCodec>>;
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio-stream")))]
+#[pin_project(project = StreamProj)]
+#[derive(Debug)]
+enum GenericTcpStream {
+    Tcp(#[pin] TcpStream),
+    SecureTcp(#[pin] TlsStream<TcpStream>),
+}
+
+impl AsyncRead for GenericTcpStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        match self.project() {
+            StreamProj::Tcp(tcp_stream) => tcp_stream.poll_read(cx, buf),
+            StreamProj::SecureTcp(tls_stream) => tls_stream.poll_read(cx, buf),
+        }
+    }
+}
+
+impl AsyncWrite for GenericTcpStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        match self.project() {
+            StreamProj::Tcp(tcp_stream) => tcp_stream.poll_write(cx, buf),
+            StreamProj::SecureTcp(tls_stream) => tls_stream.poll_write(cx, buf),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.project() {
+            StreamProj::Tcp(tcp_stream) => tcp_stream.poll_flush(cx),
+            StreamProj::SecureTcp(tls_stream) => tls_stream.poll_flush(cx),
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.project() {
+            StreamProj::Tcp(tcp_stream) => tcp_stream.poll_shutdown(cx),
+            StreamProj::SecureTcp(tls_stream) => tls_stream.poll_shutdown(cx),
+        }
+    }
+}
+
+type SinkConnection = SplitSink<Framed<GenericTcpStream, RabbitMqStreamCodec>, Request>;
+type StreamConnection = SplitStream<Framed<GenericTcpStream, RabbitMqStreamCodec>>;
 
 pub struct ClientState {
     server_properties: HashMap<String, String>,
@@ -69,6 +127,8 @@ pub struct ClientState {
     handler: Option<Arc<dyn MessageHandler>>,
     heartbeat: u32,
     max_frame_size: u32,
+    last_heatbeat: Instant,
+    heartbeat_task: Option<JoinHandle<()>>,
 }
 
 #[async_trait::async_trait]
@@ -77,6 +137,7 @@ impl MessageHandler for Client {
         match &item {
             Some(Ok(response)) => match response.kind_ref() {
                 ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
+                ResponseKind::Heartbeat(_) => self.handle_heart_beat_command().await,
                 _ => {
                     if let Some(handler) = self.state.read().await.handler.as_ref() {
                         let handler = handler.clone();
@@ -132,6 +193,8 @@ impl Client {
             handler: None,
             heartbeat: broker.heartbeat,
             max_frame_size: broker.max_frame_size,
+            last_heatbeat: Instant::now(),
+            heartbeat_task: None,
         };
         let mut client = Client {
             dispatcher,
@@ -172,6 +235,14 @@ impl Client {
                 CloseRequest::new(correlation_id, ResponseCode::Ok, "Ok".to_owned())
             })
             .await?;
+
+        let mut state = self.state.write().await;
+
+        if let Some(heartbeat_task) = state.heartbeat_task.take() {
+            heartbeat_task.abort();
+        }
+
+        drop(state);
         self.channel.close().await
     }
     pub async fn subscribe(
@@ -298,7 +369,7 @@ impl Client {
             .collect();
         let sequences = messages
             .iter()
-            .map(|message| message.publishing_id())
+            .map(rabbitmq_stream_protocol::types::PublishedMessage::publishing_id)
             .collect();
         let len = messages.len();
 
@@ -332,7 +403,24 @@ impl Client {
         ),
         ClientError,
     > {
-        let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+        let stream = if broker.tls.enabled() {
+            let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+
+            let mut tls_builder = tokio_native_tls::native_tls::TlsConnector::builder();
+            tls_builder
+                .danger_accept_invalid_certs(true)
+                .danger_accept_invalid_hostnames(true);
+
+            let conn = tokio_native_tls::TlsConnector::from(tls_builder.build()?);
+
+            let stream = conn.connect(broker.host.as_str(), stream).await?;
+
+            GenericTcpStream::SecureTcp(stream)
+        } else {
+            let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+            GenericTcpStream::Tcp(stream)
+        };
+
         let stream = Framed::new(stream, RabbitMqStreamCodec {});
 
         let (sink, stream) = stream.split();
@@ -378,10 +466,10 @@ impl Client {
         Ok(())
     }
 
-    fn max_value(&self, client: u32, server: u32) -> u32 {
+    fn negotiate_value(&self, client: u32, server: u32) -> u32 {
         match (client, server) {
             (client, server) if client == 0 || server == 0 => client.max(server),
-            (client, server) => client.max(server),
+            (client, server) => client.min(server),
         }
     }
 
@@ -470,11 +558,35 @@ impl Client {
 
     async fn handle_tune_command(&self, tunes: &TunesCommand) {
         let mut state = self.state.write().await;
-        state.heartbeat = self.max_value(self.opts.heartbeat, tunes.heartbeat);
-        state.max_frame_size = self.max_value(self.opts.max_frame_size, tunes.max_frame_size);
+        state.heartbeat = self.negotiate_value(self.opts.heartbeat, tunes.heartbeat);
+        state.max_frame_size = self.negotiate_value(self.opts.max_frame_size, tunes.max_frame_size);
 
         let heart_beat = state.heartbeat;
         let max_frame_size = state.max_frame_size;
+
+        trace!(
+            "Handling tune with frame size {} and heartbeat {}",
+            max_frame_size,
+            heart_beat
+        );
+
+        if let Some(task) = state.heartbeat_task.take() {
+            task.abort();
+        }
+
+        if heart_beat != 0 {
+            let heartbeat_interval = (heart_beat / 2).max(1);
+            let channel = self.channel.clone();
+            let heartbeat_task = tokio::spawn(async move {
+                loop {
+                    trace!("Sending heartbeat");
+                    let _ = channel.send(HeartBeatCommand::default().into()).await;
+                    tokio::time::sleep(Duration::from_secs(heartbeat_interval.into())).await;
+                }
+            });
+            state.heartbeat_task = Some(heartbeat_task);
+        }
+
         drop(state);
 
         let _ = self
@@ -483,5 +595,11 @@ impl Client {
             .await;
 
         self.tune_notifier.notify_one();
+    }
+
+    async fn handle_heart_beat_command(&self) {
+        trace!("Received heartbeat");
+        let mut state = self.state.write().await;
+        state.last_heatbeat = Instant::now();
     }
 }
