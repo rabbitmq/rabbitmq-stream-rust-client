@@ -203,7 +203,7 @@ impl AmqpEncoder for Message {
             size += f.encoded_size() + MESSAGE_FOOTER.encoded_size();
         }
 
-        size as u32
+        size
     }
 
     fn encode(&self, writer: &mut impl std::io::Write) -> Result<(), AmqpEncodeError> {

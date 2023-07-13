@@ -117,7 +117,7 @@ impl List {
         };
 
         for idx in 0..count {
-            let input1 = f(input, idx as u32, &mut dest)?;
+            let input1 = f(input, idx, &mut dest)?;
             input = input1;
         }
         Ok((input, dest))
