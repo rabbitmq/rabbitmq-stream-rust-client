@@ -17,8 +17,10 @@ pub enum ClientError {
     GenericError(#[from] Box<dyn std::error::Error + Send + Sync>),
     #[error("Client already closed")]
     AlreadyClosed,
-    #[error("tls_error")]
-    Tls(tokio_native_tls::native_tls::Error),
+    #[error(transparent)]
+    Tls(#[from] tokio_native_tls::native_tls::Error),
+    #[error("Request error: {0:?}")]
+    RequestError(ResponseCode),
 }
 
 #[derive(Error, Debug)]
@@ -32,12 +34,6 @@ pub enum ProtocolError {
 impl From<EncodeError> for ClientError {
     fn from(err: EncodeError) -> Self {
         ClientError::Protocol(ProtocolError::Encode(err))
-    }
-}
-
-impl From<tokio_native_tls::native_tls::Error> for ClientError {
-    fn from(err: tokio_native_tls::native_tls::Error) -> Self {
-        ClientError::Tls(err)
     }
 }
 
