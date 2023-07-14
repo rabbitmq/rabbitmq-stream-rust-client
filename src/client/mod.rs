@@ -1,16 +1,26 @@
-mod channel;
-mod codec;
-mod dispatcher;
-mod handler;
-mod message;
-mod metadata;
-mod metrics;
-mod options;
-use crate::{error::ClientError, RabbitMQStreamResult};
+use std::{
+    collections::HashMap,
+    io,
+    pin::Pin,
+    sync::{atomic::AtomicU64, Arc},
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
+use std::{future::Future, sync::atomic::Ordering};
+
 use futures::{
     stream::{SplitSink, SplitStream},
     Stream, StreamExt, TryFutureExt,
 };
+use pin_project::pin_project;
+use tokio::io::AsyncRead;
+use tokio::io::AsyncWrite;
+use tokio::io::ReadBuf;
+use tokio::{net::TcpStream, sync::Notify};
+use tokio::{sync::RwLock, task::JoinHandle};
+use tokio_native_tls::TlsStream;
+use tokio_util::codec::Framed;
+use tracing::trace;
 
 pub use message::ClientMessage;
 pub use metadata::{Broker, StreamMetadata};
@@ -42,8 +52,8 @@ use rabbitmq_stream_protocol::{
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseCode, ResponseKind,
 };
-use tokio_native_tls::TlsStream;
-use tracing::trace;
+
+use crate::{error::ClientError, RabbitMQStreamResult};
 
 pub use self::handler::{MessageHandler, MessageResult};
 use self::{
@@ -53,22 +63,14 @@ use self::{
     message::BaseMessage,
 };
 
-use pin_project::pin_project;
-use std::{
-    collections::HashMap,
-    io,
-    pin::Pin,
-    sync::{atomic::AtomicU64, Arc},
-    task::{Context, Poll},
-    time::{Duration, Instant},
-};
-use std::{future::Future, sync::atomic::Ordering};
-use tokio::io::AsyncRead;
-use tokio::io::AsyncWrite;
-use tokio::io::ReadBuf;
-use tokio::{net::TcpStream, sync::Notify};
-use tokio::{sync::RwLock, task::JoinHandle};
-use tokio_util::codec::Framed;
+mod channel;
+mod codec;
+mod dispatcher;
+mod handler;
+mod message;
+mod metadata;
+mod metrics;
+mod options;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio-stream")))]
 #[pin_project(project = StreamProj)]
@@ -166,6 +168,7 @@ impl MessageHandler for Client {
         Ok(())
     }
 }
+
 /// Raw API for taking to RabbitMQ stream
 ///
 /// For high level APIs check [`crate::Environment`]
@@ -444,7 +447,8 @@ impl Client {
 
         self.wait_for_tune_data().await?;
 
-        self.with_state_lock(self.open(), |state, connection_properties| {
+        let open = self.open();
+        self.with_state_lock(open, |state, connection_properties| {
             state.connection_properties = connection_properties;
         })
         .await?;
@@ -547,11 +551,18 @@ impl Client {
     }
 
     async fn open(&self) -> Result<HashMap<String, String>, ClientError> {
-        self.send_and_receive::<OpenResponse, _, _>(|correlation_id| {
-            OpenCommand::new(correlation_id, self.opts.v_host.clone())
-        })
-        .await
-        .map(|open| open.connection_properties)
+        let response = self
+            .send_and_receive::<OpenResponse, _, _>(|correlation_id| {
+                OpenCommand::new(correlation_id, self.opts.v_host.clone())
+            })
+            .await?;
+        // .map(|open| open.connection_properties);
+
+        if response.is_ok() {
+            Ok(response.connection_properties)
+        } else {
+            Err(ClientError::RequestError(response.code().clone()))
+        }
     }
 
     async fn peer_properties(&self) -> Result<HashMap<String, String>, ClientError> {

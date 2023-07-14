@@ -1,5 +1,8 @@
 use std::{collections::HashMap, io::Write};
 
+#[cfg(test)]
+use fake::Fake;
+
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
@@ -9,9 +12,6 @@ use crate::{
 };
 
 use super::Command;
-
-#[cfg(test)]
-use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Eq, Debug)]
@@ -51,7 +51,7 @@ impl Command for OpenCommand {
 #[derive(Debug, PartialEq, Eq)]
 pub struct OpenResponse {
     pub(crate) correlation_id: u32,
-    pub(crate) code: ResponseCode,
+    pub code: ResponseCode,
     pub connection_properties: HashMap<String, String>,
 }
 
@@ -59,6 +59,14 @@ impl OpenResponse {
     /// Get a reference to the open response's connection properties.
     pub fn connection_properties(&self) -> &HashMap<String, String> {
         &self.connection_properties
+    }
+
+    pub fn code(&self) -> &ResponseCode {
+        &self.code
+    }
+
+    pub fn is_ok(&self) -> bool {
+        self.code == ResponseCode::Ok
     }
 }
 
@@ -105,12 +113,12 @@ impl Decoder for OpenCommand {
 
 #[cfg(test)]
 mod tests {
-
-    use super::OpenCommand;
     use crate::{
         codec::Encoder,
         commands::{open::OpenResponse, tests::command_encode_decode_test},
     };
+
+    use super::OpenCommand;
 
     #[test]
     fn open_command_test() {

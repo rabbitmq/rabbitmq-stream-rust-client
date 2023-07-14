@@ -55,6 +55,18 @@ async fn environment_fail_to_connect_wrong_credentials() {
             ResponseCode::AuthenticationFailure
         ))
     ));
+
+    let env = Environment::builder()
+        .virtual_host("wrong_virtual_host")
+        .build()
+        .await;
+
+    assert!(matches!(
+        env,
+        Err(rabbitmq_stream_client::error::ClientError::RequestError(
+            ResponseCode::AuthenticationFailure
+        ))
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread")]
