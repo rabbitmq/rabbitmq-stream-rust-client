@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use rabbitmq_stream_client::{
     types::{ByteCapacity, Message, OffsetSpecification},
-    Environment, TlsConfiguration,
+    Environment,
 };
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -16,7 +16,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let environment = Environment::builder()
         .host("localhost")
         .port(5552)
-        // .tls(TlsConfiguration::default())
         .build()
         .await?;
 
