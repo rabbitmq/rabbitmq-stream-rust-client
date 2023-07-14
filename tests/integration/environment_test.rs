@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use fake::{Fake, Faker};
 
-use rabbitmq_stream_client::{error, Environment};
+use rabbitmq_stream_client::types::ByteCapacity;
+use rabbitmq_stream_client::{error, Environment, TlsConfiguration};
 use rabbitmq_stream_protocol::ResponseCode;
 
 use crate::common::TestEnvironment;
@@ -91,5 +94,43 @@ async fn environment_create_delete_stream_twice() {
             stream: _, //
             status: ResponseCode::StreamDoesNotExist,
         })
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn environment_create_streams_with_parameters() {
+    // In this test we don't use the TestEnvironment because we want to test
+    // The stream creation with parameters.
+    // here we can just assert that the stream creation was successful
+    // we cannot assert that the parameters were set correctly
+
+    let env = Environment::builder().build().await.unwrap();
+    let stream_to_test: String = Faker.fake();
+    let response = env
+        .stream_creator()
+        .max_age(Duration::from_secs(10))
+        .max_length(ByteCapacity::B(1))
+        .max_segment_size(ByteCapacity::B(1))
+        .create(&stream_to_test)
+        .await;
+    assert_eq!(response.is_ok(), true);
+
+    let delete_response = env.delete_stream(&stream_to_test).await;
+    assert_eq!(delete_response.is_ok(), true);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn environment_fail_tls_connection() {
+    // in this test we try to connect to a server that does not support tls
+    // the client should fail to connect
+    // and return an error.
+
+    let env = Environment::builder()
+        .tls(TlsConfiguration::default())
+        .build()
+        .await;
+    assert!(matches!(
+        env,
+        Err(rabbitmq_stream_client::error::ClientError::Tls { .. })
     ));
 }
