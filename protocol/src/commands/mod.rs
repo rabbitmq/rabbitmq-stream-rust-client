@@ -50,4 +50,19 @@ mod tests {
 
         assert!(remaining.is_empty());
     }
+
+    pub(crate) fn specific_command_encode_decode_test<T>(command: T)
+    where
+        T: Encoder + Decoder + Debug + PartialEq,
+    {
+        let mut buffer = vec![];
+
+        let _ = command.encode(&mut buffer);
+
+        let (remaining, decoded) = T::decode(&buffer).unwrap();
+
+        assert_eq!(command, decoded);
+
+        assert!(remaining.is_empty());
+    }
 }

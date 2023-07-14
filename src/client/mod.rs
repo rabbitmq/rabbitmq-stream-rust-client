@@ -551,7 +551,13 @@ impl Client {
             OpenCommand::new(correlation_id, self.opts.v_host.clone())
         })
         .await
-        .map(|open| open.connection_properties)
+        .and_then(|open| {
+            if open.is_ok() {
+                Ok(open.connection_properties)
+            } else {
+                Err(ClientError::RequestError(open.code().clone()))
+            }
+        })
     }
 
     async fn peer_properties(&self) -> Result<HashMap<String, String>, ClientError> {

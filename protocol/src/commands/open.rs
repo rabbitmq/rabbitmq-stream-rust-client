@@ -56,6 +56,17 @@ pub struct OpenResponse {
 }
 
 impl OpenResponse {
+    /// Get a reference to the generic response's code.
+    pub fn code(&self) -> &ResponseCode {
+        &self.code
+    }
+
+    pub fn is_ok(&self) -> bool {
+        self.code == ResponseCode::Ok
+    }
+}
+
+impl OpenResponse {
     /// Get a reference to the open response's connection properties.
     pub fn connection_properties(&self) -> &HashMap<String, String> {
         &self.connection_properties
@@ -75,7 +86,12 @@ impl Decoder for OpenResponse {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
         let (input, response_code) = ResponseCode::decode(input)?;
-        let (input, connection_properties) = HashMap::decode(input)?;
+
+        let (input, connection_properties) = if response_code == ResponseCode::Ok {
+            HashMap::decode(input)?
+        } else {
+            (input, HashMap::new())
+        };
 
         Ok((
             input,
@@ -106,10 +122,16 @@ impl Decoder for OpenCommand {
 #[cfg(test)]
 mod tests {
 
+    use fake::{Fake, Faker};
+
     use super::OpenCommand;
     use crate::{
         codec::Encoder,
-        commands::{open::OpenResponse, tests::command_encode_decode_test},
+        commands::{
+            open::OpenResponse,
+            tests::{command_encode_decode_test, specific_command_encode_decode_test},
+        },
+        ResponseCode,
     };
 
     #[test]
@@ -135,6 +157,8 @@ mod tests {
 
     #[test]
     fn open_response_test() {
-        command_encode_decode_test::<OpenResponse>();
+        let mut response: OpenResponse = Faker.fake();
+        response.code = ResponseCode::Ok;
+        specific_command_encode_decode_test(response);
     }
 }

@@ -188,6 +188,8 @@ where
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashMap;
+
     use byteorder::{BigEndian, WriteBytesExt};
 
     use crate::{
@@ -212,6 +214,7 @@ mod tests {
             version::PROTOCOL_VERSION,
         },
         types::Header,
+        ResponseCode,
     };
 
     use super::{Response, ResponseKind};
@@ -302,9 +305,31 @@ mod tests {
         };
     }
 
+    macro_rules! response_payload_test {
+        ($payload:expr, $variant:path, $cmd:expr) => {
+            let response = Response {
+                header: Header::new($cmd, PROTOCOL_VERSION),
+                kind: $variant($payload),
+            };
+
+            let mut buffer = vec![];
+
+            response.encode(&mut buffer).unwrap();
+
+            let (remaining, decoded) = Response::decode(&buffer).unwrap();
+
+            assert_eq!(response, decoded);
+
+            assert!(remaining.is_empty());
+        };
+    }
+
     #[test]
-    fn open_response_test() {
-        response_test!(OpenResponse, ResponseKind::Open, COMMAND_OPEN);
+    fn open_response_ok_test() {
+        use {fake::Fake, fake::Faker};
+        let mut response: OpenResponse = Faker.fake();
+        response.code = ResponseCode::Ok;
+        response_payload_test!(response, ResponseKind::Open, COMMAND_OPEN);
     }
 
     #[test]
