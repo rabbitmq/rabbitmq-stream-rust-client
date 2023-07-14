@@ -58,6 +58,21 @@ async fn environment_fail_to_connect_wrong_credentials() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn environment_fail_to_connect_v_host() {
+    let env = Environment::builder()
+        .virtual_host("wrong_virtual_host")
+        .build()
+        .await;
+
+    assert!(matches!(
+        env,
+        Err(rabbitmq_stream_client::error::ClientError::RequestError(
+            ResponseCode::VirtualHostAccessFailure
+        ))
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn environment_create_delete_stream_twice() {
     // In this test we don't use the TestEnvironment because we want to test
     // the error handling of the Environment::create_stream method.
