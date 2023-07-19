@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use fake::{Fake, Faker};
 use tokio::sync::mpsc::channel;
 
+use rabbitmq_stream_client::error::ClientError;
 use rabbitmq_stream_client::{
     types::{
         Broker, Message, MessageResult, OffsetSpecification, ResponseCode, ResponseKind,
@@ -176,15 +177,44 @@ async fn client_store_and_query_offset_test() {
 async fn client_store_query_offset_error_test() {
     let test = TestClient::create().await;
 
-    let offset: u64 = Faker.fake();
     let reference: String = Faker.fake();
 
-    let response = test
+    // the stream exists but the offset does not
+    let response_off_not_found = test
         .client
         .query_offset(reference.clone(), &test.stream)
         .await;
 
-    // assert_eq!(matches!(response, Err(Error::OffsetNotFound)), true);
+    // it should raise OffsetNotFound error
+    match response_off_not_found {
+        Ok(_) => panic!("Should not be ok"),
+        Err(e) => {
+            assert_eq!(
+                matches!(e, ClientError::RequestError(ResponseCode::OffsetNotFound)),
+                true
+            )
+        }
+    }
+
+    // the stream does not exist
+    let response_stream_does_not_exist = test
+        .client
+        .query_offset(reference.clone(), "response_stream_does_not_exist")
+        .await;
+
+    // it should raise StreamDoesNotExist error
+    match response_stream_does_not_exist {
+        Ok(_) => panic!("Should not be ok"),
+        Err(e) => {
+            assert_eq!(
+                matches!(
+                    e,
+                    ClientError::RequestError(ResponseCode::StreamDoesNotExist)
+                ),
+                true
+            )
+        }
+    }
 }
 
 /*

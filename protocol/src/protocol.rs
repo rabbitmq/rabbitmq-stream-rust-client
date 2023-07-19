@@ -49,6 +49,7 @@ pub mod responses {
     pub const RESPONSE_CODE_ACCESS_REFUSED: u16 = 16;
     pub const RESPONSE_CODE_PRECONDITION_FAILED: u16 = 17;
     pub const RESPONSE_CODE_PUBLISHER_DOES_NOT_EXIST: u16 = 18;
+    pub const RESPONSE_CODE_OFFSET_NOT_FOUND: u16 = 19;
 }
 
 // protocol version between client and server
