@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
 use fake::{Fake, Faker};
+use tokio::sync::mpsc::channel;
+
 use rabbitmq_stream_client::{
     types::{
         Broker, Message, MessageResult, OffsetSpecification, ResponseCode, ResponseKind,
@@ -9,9 +11,8 @@ use rabbitmq_stream_client::{
     Client, ClientOptions,
 };
 
-use tokio::sync::mpsc::channel;
-
 use crate::common::TestClient;
+
 #[tokio::test]
 async fn client_connection_test() {
     let client = Client::connect(ClientOptions::default()).await.unwrap();
@@ -24,6 +25,7 @@ async fn client_connection_test() {
 async fn client_create_stream_test() {
     TestClient::create().await;
 }
+
 #[tokio::test(flavor = "multi_thread")]
 async fn client_create_stream_error_test() {
     let test = TestClient::create().await;
@@ -73,7 +75,7 @@ async fn client_metadata_test() {
                 host: String::from("localhost"),
                 port: 5552,
             },
-            replicas: vec![]
+            replicas: vec![],
         }),
         response.get(&test.stream)
     );
@@ -103,6 +105,53 @@ async fn client_create_subscribe_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn client_create_subscribe_twice_error_test() {
+    // test the errors in case of double subscription
+    // test the errors in case of double unsubscription
+    let test = TestClient::create().await;
+    let response = test
+        .client
+        .subscribe(
+            1,
+            &test.stream,
+            OffsetSpecification::Next,
+            1,
+            HashMap::new(),
+        )
+        .await
+        .unwrap();
+    // first consumer with id 1 it is ok
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response_error = test
+        .client
+        .subscribe(
+            1,
+            &test.stream,
+            OffsetSpecification::Next,
+            1,
+            HashMap::new(),
+        )
+        .await
+        .unwrap();
+    // second consumer with id 1 it is not ok since it is already used
+    assert_eq!(
+        &ResponseCode::SubscriptionIdAlreadyExists,
+        response_error.code()
+    );
+
+    let response = test.client.unsubscribe(1).await.unwrap();
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    // trying to delete a consumer that does not exist
+    let response_error = test.client.unsubscribe(1).await.unwrap();
+    assert_eq!(
+        &ResponseCode::SubscriptionIdDoesNotExist,
+        response_error.code()
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn client_store_and_query_offset_test() {
     let test = TestClient::create().await;
 
@@ -121,6 +170,21 @@ async fn client_store_and_query_offset_test() {
         .unwrap();
 
     assert_eq!(offset, response);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_store_query_offset_error_test() {
+    let test = TestClient::create().await;
+
+    let offset: u64 = Faker.fake();
+    let reference: String = Faker.fake();
+
+    let response = test
+        .client
+        .query_offset(reference.clone(), &test.stream)
+        .await;
+
+    // assert_eq!(matches!(response, Err(Error::OffsetNotFound)), true);
 }
 
 /*
