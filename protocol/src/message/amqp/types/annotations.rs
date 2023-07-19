@@ -26,6 +26,13 @@ impl Annotations {
     {
         self.0.insert(key.into(), value.into())
     }
+
+    pub fn get<K>(&self, key: K) -> Option<&Value>
+    where
+        K: Into<AnnonationKey>,
+    {
+        self.0.get(&key.into())
+    }
 }
 
 impl From<&str> for AnnonationKey {
