@@ -41,6 +41,7 @@ pub enum ResponseCode {
     AccessRefused,
     PrecoditionFailed,
     PublisherDoesNotExist,
+    OffsetNotFound,
 }
 #[derive(Debug, PartialEq, Eq)]
 pub struct Response {
@@ -173,7 +174,6 @@ impl Decoder for Response {
 impl Decoder for ResponseCode {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), crate::error::DecodeError> {
         let (input, code) = read_u16(input)?;
-
         Ok((input, code.try_into()?))
     }
 }
