@@ -241,6 +241,53 @@ async fn client_declare_delete_publisher() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn client_declare_delete_publisher_twice_error() {
+    // test the errors in case of double publisher declaration
+    // the first one is ok the second one is not
+    // since the publisher id is already used
+
+    let test = TestClient::create().await;
+    let reference: String = Faker.fake();
+
+    let response = test
+        .client
+        .declare_publisher(1, Some(reference.clone()), &test.stream)
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response_error = test
+        .client
+        .declare_publisher(1, Some(reference.clone()), &test.stream)
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::PrecoditionFailed, response_error.code());
+
+    let response = test.client.delete_publisher(1).await.unwrap();
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response_error = test.client.delete_publisher(1).await.unwrap();
+    assert_eq!(&ResponseCode::PublisherDoesNotExist, response_error.code());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_declare_publisher_not_existing_stream() {
+    let test = TestClient::create().await;
+
+    let reference: String = Faker.fake();
+
+    let response = test
+        .client
+        .declare_publisher(1, Some(reference.clone()), "not_existing_stream")
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::StreamDoesNotExist, response.code());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn client_query_publisher() {
     let test = TestClient::create().await;
 
