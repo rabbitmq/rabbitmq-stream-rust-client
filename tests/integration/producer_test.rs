@@ -119,7 +119,6 @@ async fn producer_send_batch_name_with_deduplication_ok() {
                 .body(b"message".to_vec())
                 .publising_id(1)
                 .build(),
-
             // not confirmed since the publishing id is the same
             // message will be skipped by deduplication
             Message::builder()
