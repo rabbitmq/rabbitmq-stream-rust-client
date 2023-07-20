@@ -130,6 +130,7 @@ async fn producer_send_batch_name_with_deduplication_ok() {
         .unwrap();
     // only 2 messages are confirmed
     assert_eq!(2, result.len());
+    producer.close().await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -347,3 +348,47 @@ async fn producer_send_with_complex_message_ok() {
 
     consumer.handle().close().await.unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_send_after_close_error() {
+    let env = TestEnvironment::create().await;
+    let producer = env.env.producer().build(&env.stream).await.unwrap();
+    producer.clone().close().await.unwrap();
+    let closed = producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        matches!(
+            closed,
+            rabbitmq_stream_client::error::ProducerPublishError::Closed
+        ),
+        true
+    );
+}
+
+// #[tokio::test(flavor = "multi_thread")]
+// async fn producer_deduplication_send_after_close_error() {
+//     let env = TestEnvironment::create().await;
+//     let mut producer = env
+//         .env
+//         .producer()
+//         .name("my_producer")
+//         .build(&env.stream)
+//         .await
+//         .unwrap();
+//     producer.clone().close().await.unwrap();
+//     let closed = producer
+//         .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+//         .await
+//         .unwrap_err();
+//
+//     assert_eq!(
+//         matches!(
+//             closed,
+//             rabbitmq_stream_client::error::ProducerPublishError::Closed
+//         ),
+//         true
+//     );
+// }
