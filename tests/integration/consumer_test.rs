@@ -129,7 +129,6 @@ async fn consumer_thread_safe_test() {
             self.consumer.next().await
         }
 
-
         pub async fn close(self) {
             self.producer.close().await.unwrap();
             self.consumer.handle().close().await.unwrap();
