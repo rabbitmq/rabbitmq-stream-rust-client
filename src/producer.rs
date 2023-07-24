@@ -1,6 +1,3 @@
-use dashmap::DashMap;
-use futures::{future::BoxFuture, FutureExt};
-use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
 use std::future::Future;
 use std::vec;
 use std::{
@@ -11,9 +8,14 @@ use std::{
     },
     time::Duration,
 };
+
+use dashmap::DashMap;
+use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::mpsc::channel;
 use tokio::sync::{mpsc, Mutex};
 use tracing::{debug, error, trace};
+
+use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
 
 use crate::client::ClientMessage;
 use crate::MetricsCollector;
@@ -96,6 +98,7 @@ impl ProducerInternal {
         Ok(())
     }
 }
+
 /// API for publising messages to RabbitMQ stream
 #[derive(Clone)]
 pub struct Producer<T>(Arc<ProducerInternal>, PhantomData<T>);
@@ -111,7 +114,9 @@ pub struct ProducerBuilder<T> {
 
 #[derive(Clone)]
 pub struct NoDedup {}
+
 pub struct Dedup {}
+
 impl<T> ProducerBuilder<T> {
     pub async fn build(self, stream: &str) -> Result<Producer<T>, ProducerCreateError> {
         // Connect to the user specified node first, then look for the stream leader.
@@ -479,6 +484,7 @@ impl<T> Producer<T> {
             Ok(false) => {
                 let response = self.0.client.delete_publisher(self.0.producer_id).await?;
                 if response.is_ok() {
+                    self.0.client.close().await?;
                     Ok(())
                 } else {
                     Err(ProducerCloseError::Close {
