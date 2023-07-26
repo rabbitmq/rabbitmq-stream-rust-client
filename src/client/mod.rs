@@ -1,16 +1,30 @@
-mod channel;
-mod codec;
-mod dispatcher;
-mod handler;
-mod message;
-mod metadata;
-mod metrics;
-mod options;
-use crate::{error::ClientError, RabbitMQStreamResult};
+use std::convert::TryFrom;
+use std::{
+    collections::HashMap,
+    io,
+    pin::Pin,
+    sync::{atomic::AtomicU64, Arc},
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
+use std::{future::Future, sync::atomic::Ordering};
+
 use futures::{
     stream::{SplitSink, SplitStream},
     Stream, StreamExt, TryFutureExt,
 };
+use pin_project::pin_project;
+use rustls::ServerName;
+use tokio::io::AsyncRead;
+use tokio::io::AsyncWrite;
+use tokio::io::ReadBuf;
+use tokio::{net::TcpStream, sync::Notify};
+use tokio::{sync::RwLock, task::JoinHandle};
+use tokio_rustls::client::TlsStream;
+use tokio_rustls::rustls::ClientConfig;
+use tokio_rustls::{rustls, TlsConnector};
+use tokio_util::codec::Framed;
+use tracing::trace;
 
 pub use message::ClientMessage;
 pub use metadata::{Broker, StreamMetadata};
@@ -42,8 +56,8 @@ use rabbitmq_stream_protocol::{
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseCode, ResponseKind,
 };
-use tokio_native_tls::TlsStream;
-use tracing::trace;
+
+use crate::{error::ClientError, RabbitMQStreamResult};
 
 pub use self::handler::{MessageHandler, MessageResult};
 use self::{
@@ -53,22 +67,14 @@ use self::{
     message::BaseMessage,
 };
 
-use pin_project::pin_project;
-use std::{
-    collections::HashMap,
-    io,
-    pin::Pin,
-    sync::{atomic::AtomicU64, Arc},
-    task::{Context, Poll},
-    time::{Duration, Instant},
-};
-use std::{future::Future, sync::atomic::Ordering};
-use tokio::io::AsyncRead;
-use tokio::io::AsyncWrite;
-use tokio::io::ReadBuf;
-use tokio::{net::TcpStream, sync::Notify};
-use tokio::{sync::RwLock, task::JoinHandle};
-use tokio_util::codec::Framed;
+mod channel;
+mod codec;
+mod dispatcher;
+mod handler;
+mod message;
+mod metadata;
+mod metrics;
+mod options;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio-stream")))]
 #[pin_project(project = StreamProj)]
@@ -166,6 +172,7 @@ impl MessageHandler for Client {
         Ok(())
     }
 }
+
 /// Raw API for taking to RabbitMQ stream
 ///
 /// For high level APIs check [`crate::Environment`]
@@ -405,27 +412,28 @@ impl Client {
     > {
         let stream = if broker.tls.enabled() {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+            let cert_bytes = include_bytes!(
+                "/Users/gas/sw/rabbitmq_server-3.11.11/sbin/certs/ca_certificate.pem"
+            );
 
-            let mut tls_builder: tokio_native_tls::native_tls::TlsConnectorBuilder = tokio_native_tls::native_tls::TlsConnector::builder();
+            let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.as_ref()).unwrap();
+            let mut roots = rustls::RootCertStore::empty();
 
-            
-            if broker.tls.trust_hostname_enabled()   {
-                tls_builder.danger_accept_invalid_hostnames(true);
-            }
-            if broker.tls.trust_certificate_enabled()   {
-                tls_builder.danger_accept_invalid_certs(true);
-            } else {
-                if let Some(cert)=broker.tls.get_root_certificate()  {
-                    print!("Hello, World!");
-                    tls_builder.add_root_certificate(cert.clone());
-                }
-            }
+            root_cert_store
+                .iter()
+                .for_each(|cert| roots.add(&rustls::Certificate(cert.to_vec())).unwrap());
 
-            let conn = tokio_native_tls::TlsConnector::from(tls_builder.build()?);
+            let config = ClientConfig::builder()
+                .with_safe_defaults()
+                // .with_client_auth_cert(client_certs, client_keys.into_iter().next().unwrap())
+                .with_root_certificates(roots)
+                .with_no_client_auth();
 
-            let stream = conn.connect(broker.host.as_str(), stream).await?;
+            let connector = TlsConnector::from(Arc::new(config));
+            let domain = ServerName::try_from(broker.host.as_str()).unwrap();
+            let conn = connector.connect(domain, stream).await?;
 
-            GenericTcpStream::SecureTcp(stream)
+            GenericTcpStream::SecureTcp(conn)
         } else {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
             GenericTcpStream::Tcp(stream)

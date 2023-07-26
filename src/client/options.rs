@@ -44,7 +44,7 @@ impl Default for ClientOptions {
                 enabled: false,
                 trust_hostname: false,
                 trust_certificate: false,
-                certificate: None,
+                // certificate: None,
             },
         }
     }
