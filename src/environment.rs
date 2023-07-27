@@ -135,18 +135,14 @@ pub struct EnvironmentOptions {
 #[derive(Clone)]
 pub struct TlsConfiguration {
     pub(crate) enabled: bool,
-    pub(crate) trust_hostname: bool,
-    pub(crate) trust_certificate: bool,
-    // pub(crate) certificate: Option<Certificate>,
+    pub(crate) certificate_path: String,
 }
 
 impl Default for TlsConfiguration {
     fn default() -> TlsConfiguration {
         TlsConfiguration {
             enabled: true,
-            trust_certificate: false,
-            trust_hostname: false,
-            // certificate: None,
+            certificate_path: String::from(""),
         }
     }
 }
@@ -160,61 +156,37 @@ impl TlsConfiguration {
         self.enabled
     }
 
-    // pub fn get_root_certificate(&self) -> Option<&Certificate> {
-    //     self.certificate.as_ref()
-    // }
+    pub fn get_root_certificates(&self) -> String {
+        self.certificate_path.clone()
+    }
     //
-    // pub fn add_root_certificate(&mut self, certificate: Certificate) {
-    //     self.certificate = Some(certificate)
-    // }
-
-    pub fn trust_hostname(&mut self, trust_hostname: bool) {
-        self.trust_hostname = trust_hostname
-    }
-
-    pub fn trust_hostname_enabled(&self) -> bool {
-        self.trust_hostname
-    }
-
-    pub fn trust_certificate(&mut self, trust_certificate: bool) {
-        self.trust_certificate = trust_certificate
-    }
-
-    pub fn trust_certificate_enabled(&self) -> bool {
-        self.trust_certificate
+    pub fn add_root_certificate(&mut self, certificate_path: String) {
+        self.certificate_path = certificate_path
     }
 }
 
 pub struct TlsConfigurationBuilder(TlsConfiguration);
 
 impl TlsConfigurationBuilder {
-    pub fn trust_certificate(mut self, trust_certificate: bool) -> TlsConfigurationBuilder {
-        self.0.trust_certificate = trust_certificate;
-        self
-    }
-
     pub fn enable(mut self, enable: bool) -> TlsConfigurationBuilder {
         self.0.enabled = enable;
         self
     }
 
-    pub fn trust_hostname(mut self, hostname_verification: bool) -> TlsConfigurationBuilder {
-        self.0.trust_hostname = hostname_verification;
+    pub fn add_root_certificate(mut self, certificate_path: String) -> TlsConfigurationBuilder {
+        self.0.certificate_path = certificate_path;
         self
     }
-
-    // pub fn add_root_certificate(mut self, certificate: Certificate) -> TlsConfigurationBuilder {
-    //     self.0.certificate = Some(certificate);
-    //     self
-    // }
 
     pub fn build(self) -> TlsConfiguration {
         self.0
     }
 }
 
+
 impl TlsConfiguration {
     pub fn builder() -> TlsConfigurationBuilder {
         TlsConfigurationBuilder(TlsConfiguration::default())
     }
 }
+

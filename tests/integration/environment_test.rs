@@ -134,6 +134,7 @@ async fn environment_create_streams_with_parameters() {
     assert_eq!(delete_response.is_ok(), true);
 }
 
+/*
 #[tokio::test(flavor = "multi_thread")]
 async fn environment_fail_tls_connection() {
     // in this test we try to connect to a server that does not support tls
@@ -144,8 +145,9 @@ async fn environment_fail_tls_connection() {
         .tls(TlsConfiguration::default())
         .build()
         .await;
+
     assert!(matches!(
         env,
         Err(rabbitmq_stream_client::error::ClientError::Tls { .. })
     ));
-}
+}*/

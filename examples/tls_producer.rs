@@ -1,9 +1,6 @@
-use tokio_native_tls::native_tls::Certificate;
-use tracing::info;
-use tracing_subscriber::fmt::time;
-use tracing_subscriber::FmtSubscriber;
-
 use rabbitmq_stream_client::{types::Message, Environment, NoDedup, Producer, TlsConfiguration};
+use tracing::info;
+use tracing_subscriber::FmtSubscriber;
 
 const BATCH_SIZE: usize = 100;
 
@@ -14,39 +11,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    let cert =
-        include_bytes!("/Users/gas/sw/rabbitmq_server-3.11.11/sbin/certs/ca_certificate.pem");
-
-    let tls_configuration = TlsConfiguration::builder()
-        .trust_hostname(false)
-        //.trust_certificate(false)
-        .add_root_certificate(Certificate::from_pem(cert).unwrap())
+    let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
+        .add_root_certificate(String::from("/path/to/your/certificate-ca.pem"))
         .build();
 
     let environment = Environment::builder()
         .host("localhost")
-        .username("guest")
-        .password("guest")
         .port(5551)
         .tls(tls_configuration)
         .build()
         .await?;
-    println!("environment = {:?}", 1);
-    environment.stream_creator().create(&stream_name).await?;
-    println!("environment = {:?}", 2);
-    let producer = environment
-        .producer()
-        .batch_size(BATCH_SIZE)
-        .build(&stream_name)
-        .await?;
-    println!("environment = {:?}", 3);
-    // println!("producer = {:?}", producer);
 
-    batch_send_simple(&producer).await;
-
-    println!("environment = {:?}", 4);
-
-    // start_publisher(environment.clone(), &stream_name).await.expect("TODO: panic message");
+    start_publisher(environment.clone(), &stream_name).await;
 
     Ok(())
 }
@@ -57,9 +33,7 @@ async fn start_publisher(
     stream: &String,
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("im inside start_publisher");
-    let r = env.stream_creator().create(&stream).await;
-
-    println!("stream_creator = {:?}", r);
+    let _ = env.stream_creator().create(&stream).await;
 
     let producer = env.producer().batch_size(BATCH_SIZE).build(&stream).await?;
 
@@ -91,12 +65,4 @@ async fn batch_send_simple(producer: &Producer<NoDedup>) {
         .batch_send(msg, move |_| async move {})
         .await
         .unwrap();
-
-    println!("batch_send_simple = {:?}", 1);
-}
-
-#[derive(Debug)]
-enum CertLoadError {
-    TlsError(tokio_native_tls::native_tls::Error),
-    Io(String, std::io::Error),
 }

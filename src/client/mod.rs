@@ -412,12 +412,14 @@ impl Client {
     > {
         let stream = if broker.tls.enabled() {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
-            let cert_bytes = include_bytes!(
-                "/Users/gas/sw/rabbitmq_server-3.11.11/sbin/certs/ca_certificate.pem"
-            );
-
-            let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.as_ref()).unwrap();
             let mut roots = rustls::RootCertStore::empty();
+            let cert = broker.tls.get_root_certificates();
+            /*let cert_bytes = include_bytes!(
+                cert
+            );*/
+            let cert_bytes = std::fs::read(cert);
+
+            let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).unwrap();
 
             root_cert_store
                 .iter()
@@ -425,7 +427,6 @@ impl Client {
 
             let config = ClientConfig::builder()
                 .with_safe_defaults()
-                // .with_client_auth_cert(client_certs, client_keys.into_iter().next().unwrap())
                 .with_root_certificates(roots)
                 .with_no_client_auth();
 
