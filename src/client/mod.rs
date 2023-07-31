@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+
 use std::{
     collections::HashMap,
     io,
@@ -23,6 +24,7 @@ use tokio::{sync::RwLock, task::JoinHandle};
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::rustls::ClientConfig;
 use tokio_rustls::{rustls, TlsConnector};
+
 use tokio_util::codec::Framed;
 use tracing::trace;
 
@@ -324,11 +326,17 @@ impl Client {
     }
 
     pub async fn query_offset(&self, reference: String, stream: &str) -> Result<u64, ClientError> {
-        self.send_and_receive::<QueryOffsetResponse, _, _>(|correlation_id| {
-            QueryOffsetRequest::new(correlation_id, reference, stream.to_owned())
-        })
-        .await
-        .map(|query_offset| query_offset.from_response())
+        let response = self
+            .send_and_receive::<QueryOffsetResponse, _, _>(|correlation_id| {
+                QueryOffsetRequest::new(correlation_id, reference, stream.to_owned())
+            })
+            .await?;
+
+        if !response.is_ok() {
+            Err(ClientError::RequestError(response.code().clone()))
+        } else {
+            Ok(response.from_response())
+        }
     }
 
     pub async fn declare_publisher(
@@ -414,9 +422,6 @@ impl Client {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
             let mut roots = rustls::RootCertStore::empty();
             let cert = broker.tls.get_root_certificates();
-            /*let cert_bytes = include_bytes!(
-                cert
-            );*/
             let cert_bytes = std::fs::read(cert);
 
             let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).unwrap();

@@ -125,7 +125,7 @@ async fn environment_create_streams_with_parameters() {
         .stream_creator()
         .max_age(Duration::from_secs(10))
         .max_length(ByteCapacity::B(1))
-        .max_segment_size(ByteCapacity::B(1))
+        .max_segment_size(ByteCapacity::GB(1))
         .create(&stream_to_test)
         .await;
     assert_eq!(response.is_ok(), true);

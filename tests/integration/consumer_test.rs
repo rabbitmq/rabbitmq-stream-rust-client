@@ -147,3 +147,20 @@ async fn consumer_thread_safe_test() {
         wrapper.close().await;
     });
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_create_stream_not_existing_error() {
+    let env = TestEnvironment::create().await;
+    let consumer = env.env.consumer().build("stream_not_existing").await;
+
+    match consumer {
+        Err(e) => assert_eq!(
+            matches!(
+                e,
+                rabbitmq_stream_client::error::ConsumerCreateError::StreamDoesNotExist { .. }
+            ),
+            true
+        ),
+        _ => panic!("Should be StreamNotFound error"),
+    }
+}

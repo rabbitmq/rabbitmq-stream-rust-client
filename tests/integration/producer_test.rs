@@ -1,7 +1,9 @@
+use chrono::Utc;
 use fake::{Fake, Faker};
 use futures::StreamExt;
-use rabbitmq_stream_client::types::{Message, OffsetSpecification};
 use tokio::sync::mpsc::channel;
+
+use rabbitmq_stream_client::types::{Message, OffsetSpecification};
 
 use crate::common::TestEnvironment;
 
@@ -40,7 +42,7 @@ async fn producer_send_name_with_deduplication_ok() {
     let mut producer = env
         .env
         .producer()
-        .name("myconsumer")
+        .name("my_producer")
         .build(&env.stream)
         .await
         .unwrap();
@@ -86,6 +88,51 @@ async fn producer_send_name_with_deduplication_ok() {
 
     consumer.handle().close().await.unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_send_batch_name_with_deduplication_ok() {
+    let env = TestEnvironment::create().await;
+
+    let mut producer = env
+        .env
+        .producer()
+        .name("my_producer")
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let result = producer
+        .batch_send_with_confirm(vec![
+            // confirmed
+            Message::builder()
+                .body(b"message".to_vec())
+                .publising_id(0)
+                .build(),
+            // this won't be confirmed
+            // since it will skipped by deduplication
+            Message::builder()
+                .body(b"message".to_vec())
+                .publising_id(0)
+                .build(),
+            // confirmed since the publishing id is different
+            Message::builder()
+                .body(b"message".to_vec())
+                .publising_id(1)
+                .build(),
+            // not confirmed since the publishing id is the same
+            // message will be skipped by deduplication
+            Message::builder()
+                .body(b"message".to_vec())
+                .publising_id(1)
+                .build(),
+        ])
+        .await
+        .unwrap();
+    // only 2 messages are confirmed
+    assert_eq!(2, result.len());
+    producer.close().await.unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_send_with_callback() {
     let env = TestEnvironment::create().await;
@@ -185,18 +232,33 @@ async fn producer_send_with_complex_message_ok() {
         .build(&env.stream)
         .await
         .unwrap();
-
+    let now = Utc::now();
     let _ = producer
         .send_with_confirm(
             Message::builder()
                 .body(b"message".to_vec())
+                .application_properties()
+                .insert("test_key", "test_value")
+                .message_builder()
                 .properties()
+                .user_id("test_user")
+                .correlation_id(444u64)
+                .absolute_expiry_time(now)
+                .content_encoding("deflate")
+                .content_type("application/json")
+                .group_id("test_group")
+                .group_sequence(1u32)
+                .reply_to("test_reply")
+                .subject("test_subject")
+                .to("test_to")
+                .creation_time(Utc::now())
+                .reply_to_group_id("test_reply_group")
                 .message_id(32u64)
                 .message_builder()
                 .message_annotations()
-                .insert("test", "test")
-                .insert("test", true)
-                .insert("test", 3u8)
+                .insert("test_string", "string_value")
+                .insert("test_bool", true)
+                .insert("test_number", 3u8)
                 .message_builder()
                 .build(),
         )
@@ -217,5 +279,108 @@ async fn producer_send_with_complex_message_ok() {
         properties.and_then(|properties| properties.message_id.clone())
     );
 
+    assert_eq!(
+        Some("test_user".into()),
+        properties.and_then(|properties| properties.user_id.clone())
+    );
+
+    assert_eq!(
+        Some("test_group".into()),
+        properties.and_then(|properties| properties.group_id.clone())
+    );
+
+    assert_eq!(
+        Some("test_reply".into()),
+        properties.and_then(|properties| properties.reply_to.clone())
+    );
+
+    assert_eq!(
+        Some("test_subject".into()),
+        properties.and_then(|properties| properties.subject.clone())
+    );
+
+    assert_eq!(
+        Some("test_to".into()),
+        properties.and_then(|properties| properties.to.clone())
+    );
+
+    assert_eq!(
+        Some("test_reply_group".into()),
+        properties.and_then(|properties| properties.reply_to_group_id.clone())
+    );
+
+    assert_eq!(
+        Some(444u64.into()),
+        properties.and_then(|properties| properties.correlation_id.clone())
+    );
+
+    assert_eq!(
+        Some(1u32.into()),
+        properties.and_then(|properties| properties.group_sequence.clone())
+    );
+
+    assert_eq!(
+        Some("deflate".into()),
+        properties.and_then(|properties| properties.content_encoding.clone())
+    );
+
+    assert_eq!(
+        Some("application/json".into()),
+        properties.and_then(|properties| properties.content_type.clone())
+    );
+
+    let message_annotations = message.message_annotations();
+
+    assert_eq!(
+        Some("string_value".into()),
+        message_annotations.and_then(|annotations| annotations.get("test_string").cloned())
+    );
+
+    assert_eq!(
+        Some(true.into()),
+        message_annotations.and_then(|annotations| annotations.get("test_bool").cloned())
+    );
+
+    assert_eq!(
+        Some(3u8.into()),
+        message_annotations.and_then(|annotations| annotations.get("test_number").cloned())
+    );
+
     consumer.handle().close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_create_stream_not_existing_error() {
+    let env = TestEnvironment::create().await;
+    let producer = env.env.producer().build("stream_not_existing").await;
+
+    match producer {
+        Err(e) => assert_eq!(
+            matches!(
+                e,
+                rabbitmq_stream_client::error::ProducerCreateError::StreamDoesNotExist { .. }
+            ),
+            true
+        ),
+        _ => panic!("Should be StreamNotFound error"),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_send_after_close_error() {
+    let env = TestEnvironment::create().await;
+    let producer = env.env.producer().build(&env.stream).await.unwrap();
+    producer.clone().close().await.unwrap();
+    let closed = producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        matches!(
+            closed,
+            rabbitmq_stream_client::error::ProducerPublishError::Closed
+        ),
+        true
+    );
 }

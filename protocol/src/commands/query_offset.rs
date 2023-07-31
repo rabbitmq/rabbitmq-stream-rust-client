@@ -30,6 +30,12 @@ impl QueryOffsetRequest {
 }
 
 impl Encoder for QueryOffsetRequest {
+    fn encoded_size(&self) -> u32 {
+        self.correlation_id.encoded_size()
+            + self.stream.as_str().encoded_size()
+            + self.reference.as_str().encoded_size()
+    }
+
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         let size = self.reference.len();
         if size >= 256 {
@@ -40,12 +46,6 @@ impl Encoder for QueryOffsetRequest {
         self.reference.as_str().encode(writer)?;
         self.stream.as_str().encode(writer)?;
         Ok(())
-    }
-
-    fn encoded_size(&self) -> u32 {
-        self.correlation_id.encoded_size()
-            + self.stream.as_str().encoded_size()
-            + self.reference.as_str().encoded_size()
     }
 }
 
@@ -102,20 +102,28 @@ impl QueryOffsetResponse {
     pub fn from_response(&self) -> u64 {
         self.offset
     }
+
+    pub fn code(&self) -> &ResponseCode {
+        &self.response_code
+    }
+
+    pub fn is_ok(&self) -> bool {
+        self.response_code == ResponseCode::Ok
+    }
 }
 
 impl Encoder for QueryOffsetResponse {
+    fn encoded_size(&self) -> u32 {
+        self.offset.encoded_size()
+            + self.correlation_id.encoded_size()
+            + self.response_code.encoded_size()
+    }
+
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.correlation_id.encode(writer)?;
         self.response_code.encode(writer)?;
         self.offset.encode(writer)?;
         Ok(())
-    }
-
-    fn encoded_size(&self) -> u32 {
-        self.offset.encoded_size()
-            + self.correlation_id.encoded_size()
-            + self.response_code.encoded_size()
     }
 }
 

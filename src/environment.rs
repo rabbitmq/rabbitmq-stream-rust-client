@@ -183,10 +183,8 @@ impl TlsConfigurationBuilder {
     }
 }
 
-
 impl TlsConfiguration {
     pub fn builder() -> TlsConfigurationBuilder {
         TlsConfigurationBuilder(TlsConfiguration::default())
     }
 }
-

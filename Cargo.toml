@@ -40,4 +40,4 @@ dashmap = "5.3.4"
 [dev-dependencies]
 tracing-subscriber = "0.3.1"
 fake = { version = "2.4", features = ['derive'] }
-chrono = "0.4.19"
+chrono = "0.4.26"
