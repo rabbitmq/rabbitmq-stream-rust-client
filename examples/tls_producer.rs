@@ -1,7 +1,7 @@
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 
-use rabbitmq_stream_client::{Environment, NoDedup, Producer, TlsConfiguration, types::Message};
+use rabbitmq_stream_client::{types::Message, Environment, NoDedup, Producer, TlsConfiguration};
 
 const BATCH_SIZE: usize = 100;
 
@@ -23,7 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    start_publisher(environment.clone(), &stream_name).await.expect("error in publisher");
+    start_publisher(environment.clone(), &stream_name)
+        .await
+        .expect("error in publisher");
 
     Ok(())
 }
@@ -45,7 +47,7 @@ async fn start_publisher(
         info!("Sending {} simple messages", BATCH_SIZE);
         batch_send_simple(&producer).await;
     })
-        .await?;
+    .await?;
     Ok(())
 }
 
