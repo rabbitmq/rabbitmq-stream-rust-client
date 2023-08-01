@@ -1,12 +1,13 @@
-use rabbitmq_stream_client::{types::Message, Environment, NoDedup, Producer, TlsConfiguration};
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
+
+use rabbitmq_stream_client::{Environment, NoDedup, Producer, TlsConfiguration, types::Message};
 
 const BATCH_SIZE: usize = 100;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let stream_name = String::from("mixing");
+    let stream_name = String::from("tls_test_stream");
     let subscriber = FmtSubscriber::builder().finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
@@ -22,17 +23,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    start_publisher(environment.clone(), &stream_name).await;
+    start_publisher(environment.clone(), &stream_name).await.expect("error in publisher");
 
     Ok(())
 }
 
 async fn start_publisher(
     env: Environment,
-    //  opts: &Opts,
     stream: &String,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!("im inside start_publisher");
     let _ = env.stream_creator().create(&stream).await;
 
     let producer = env.producer().batch_size(BATCH_SIZE).build(&stream).await?;
@@ -46,8 +45,7 @@ async fn start_publisher(
         info!("Sending {} simple messages", BATCH_SIZE);
         batch_send_simple(&producer).await;
     })
-    .await?;
-    info!("end im inside start_publisher");
+        .await?;
     Ok(())
 }
 
