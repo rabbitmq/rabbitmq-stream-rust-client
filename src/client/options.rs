@@ -42,8 +42,7 @@ impl Default for ClientOptions {
             collector: Arc::new(NopMetricsCollector {}),
             tls: TlsConfiguration {
                 enabled: false,
-                hostname_verification: false,
-                trust_everything: false,
+                certificate_path: String::from(""),
             },
         }
     }
@@ -51,7 +50,7 @@ impl Default for ClientOptions {
 
 impl ClientOptions {
     pub fn get_tls(&self) -> TlsConfiguration {
-        self.tls
+        self.tls.clone()
     }
 
     pub fn enable_tls(&mut self) {

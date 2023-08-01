@@ -18,7 +18,7 @@ pub enum ClientError {
     #[error("Client already closed")]
     AlreadyClosed,
     #[error(transparent)]
-    Tls(#[from] tokio_native_tls::native_tls::Error),
+    Tls(#[from] tokio_rustls::rustls::Error),
     #[error("Request error: {0:?}")]
     RequestError(ResponseCode),
 }

@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use std::{
     collections::HashMap,
     io,
@@ -13,12 +15,16 @@ use futures::{
     Stream, StreamExt, TryFutureExt,
 };
 use pin_project::pin_project;
+use rustls::ServerName;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
 use tokio::io::ReadBuf;
 use tokio::{net::TcpStream, sync::Notify};
 use tokio::{sync::RwLock, task::JoinHandle};
-use tokio_native_tls::TlsStream;
+use tokio_rustls::client::TlsStream;
+use tokio_rustls::rustls::ClientConfig;
+use tokio_rustls::{rustls, TlsConnector};
+
 use tokio_util::codec::Framed;
 use tracing::trace;
 
@@ -414,17 +420,26 @@ impl Client {
     > {
         let stream = if broker.tls.enabled() {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+            let mut roots = rustls::RootCertStore::empty();
+            let cert = broker.tls.get_root_certificates();
+            let cert_bytes = std::fs::read(cert);
 
-            let mut tls_builder = tokio_native_tls::native_tls::TlsConnector::builder();
-            tls_builder
-                .danger_accept_invalid_certs(true)
-                .danger_accept_invalid_hostnames(true);
+            let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).unwrap();
 
-            let conn = tokio_native_tls::TlsConnector::from(tls_builder.build()?);
+            root_cert_store
+                .iter()
+                .for_each(|cert| roots.add(&rustls::Certificate(cert.to_vec())).unwrap());
 
-            let stream = conn.connect(broker.host.as_str(), stream).await?;
+            let config = ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
 
-            GenericTcpStream::SecureTcp(stream)
+            let connector = TlsConnector::from(Arc::new(config));
+            let domain = ServerName::try_from(broker.host.as_str()).unwrap();
+            let conn = connector.connect(domain, stream).await?;
+
+            GenericTcpStream::SecureTcp(conn)
         } else {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
             GenericTcpStream::Tcp(stream)
