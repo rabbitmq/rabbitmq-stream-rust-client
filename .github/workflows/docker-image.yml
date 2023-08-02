@@ -15,4 +15,4 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build the Docker image
-        run: docker build . --file Docker/Dockerfile --tag rabbitmq_tls_$(date +%s)
+        run: docker build . --file docker/Dockerfile --tag rabbitmq_tls_$(date +%s)
