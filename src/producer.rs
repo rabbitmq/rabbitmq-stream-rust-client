@@ -234,7 +234,7 @@ impl MessageAccumulator {
             .await
             .map_err(|err| ClientError::GenericError(Box::new(err)))?;
 
-        let val = self.message_count.fetch_add(1, Ordering::Relaxed);
+        let val: usize = self.message_count.fetch_add(1, Ordering::Relaxed);
 
         Ok(val + 1 == self.capacity)
     }
