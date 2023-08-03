@@ -77,18 +77,7 @@ pub struct ProducerInternal {
 
 impl ProducerInternal {
     async fn batch_send(&self) -> Result<(), ProducerPublishError> {
-        let mut count = 0;
-        let mut messages = Vec::with_capacity(self.batch_size);
-
-        while count != self.batch_size {
-            match self.accumulator.get().await? {
-                Some(message) => {
-                    messages.push(message);
-                    count += 1;
-                }
-                _ => break,
-            }
-        }
+        let messages = self.accumulator.get(self.batch_size).await?;
 
         if !messages.is_empty() {
             debug!("Sending batch of {} messages", messages.len());
@@ -238,14 +227,23 @@ impl MessageAccumulator {
 
         Ok(val + 1 == self.capacity)
     }
-    pub async fn get(&self) -> RabbitMQStreamResult<Option<ClientMessage>> {
-        let mut receiver = self.receiver.lock().await;
-        let msg = receiver.try_recv().ok();
 
-        if msg.is_some() {
-            self.message_count.fetch_sub(1, Ordering::Relaxed);
+    pub async fn get(&self, batch_size: usize) -> RabbitMQStreamResult<Vec<ClientMessage>> {
+        let mut messages = Vec::with_capacity(batch_size);
+        let mut count = 0;
+        let mut receiver = self.receiver.lock().await;
+        while count < batch_size {
+            match receiver.try_recv().ok() {
+                Some(message) => {
+                    messages.push(message);
+                    count += 1;
+                }
+                _ => break,
+            }
         }
-        Ok(msg)
+        self.message_count
+            .fetch_sub(messages.len(), Ordering::Relaxed);
+        Ok(messages)
     }
 }
 
