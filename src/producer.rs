@@ -236,7 +236,7 @@ impl MessageAccumulator {
 
         let val = self.message_count.fetch_add(1, Ordering::Relaxed);
 
-        Ok(val + 1 == self.capacity)
+        Ok(val >= self.capacity - 1)
     }
     pub async fn get(&self) -> RabbitMQStreamResult<Option<ClientMessage>> {
         let mut receiver = self.receiver.lock().await;
