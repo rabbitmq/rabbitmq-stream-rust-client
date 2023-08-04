@@ -9,15 +9,13 @@ on:
       - main
 
 jobs:
-  build_docker_image:
+  build_and_test:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
       - name: Build the Docker image
         run: make build-tls-docker-image
 
-  build_and_test:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
