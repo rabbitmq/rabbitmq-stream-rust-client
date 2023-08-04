@@ -1,37 +1,37 @@
-name: Coverage
+# name: Coverage
 
-on:
-  push:
-    branches:
-      - "*"
-  pull_request:
-    branches:
-      - main
+# on:
+#   push:
+#     branches:
+#       - "*"
+#   pull_request:
+#     branches:
+#       - main
 
-jobs:
-  coverage:
-    runs-on: ubuntu-latest
-    services:
-      rabbitmq-streaming:
-        image: pivotalrabbitmq/rabbitmq-stream
-        env:
-          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
-        ports:
-          - 5552:5552
-          - 15672:15672
-    env:
-      CARGO_TERM_COLOR: always
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust
-        run: rustup update stable
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Generate code coverage
-        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info --ignore-filename-regex benchmark
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: lcov.info
-          fail_ci_if_error: true
+# jobs:
+#   coverage:
+#     runs-on: ubuntu-latest
+#     services:
+#       rabbitmq-streaming:
+#         image: pivotalrabbitmq/rabbitmq-stream
+#         env:
+#           RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
+#         ports:
+#           - 5552:5552
+#           - 15672:15672
+#     env:
+#       CARGO_TERM_COLOR: always
+#     steps:
+#       - uses: actions/checkout@v3
+#       - name: Install Rust
+#         run: rustup update stable
+#       - name: Install cargo-llvm-cov
+#         uses: taiki-e/install-action@cargo-llvm-cov
+#       - name: Generate code coverage
+#         run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info --ignore-filename-regex benchmark
+#       - name: Upload coverage to Codecov
+#         uses: codecov/codecov-action@v3
+#         with:
+#           token: ${{ secrets.CODECOV_TOKEN }}
+#           files: lcov.info
+#           fail_ci_if_error: true

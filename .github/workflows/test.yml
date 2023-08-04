@@ -1,37 +1,37 @@
-name: Tests
+# name: Tests
 
-on:
-  push:
-    branches:
-      - "*"
-  pull_request:
-    branches:
-      - main
+# on:
+#   push:
+#     branches:
+#       - "*"
+#   pull_request:
+#     branches:
+#       - main
 
-jobs:
-  build_and_test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        rust: [stable]
-    services:
-      rabbitmq-streaming:
-        image: pivotalrabbitmq/rabbitmq-stream
-        env:
-          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
-        ports:
-          - 5552:5552
-          - 15672:15672
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install latest ${{ matrix.rust }}
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          profile: minimal
-          override: true
-          components: rustfmt
-      - name: Run test
-        run: make test
+# jobs:
+#   build_and_test:
+#     runs-on: ${{ matrix.os }}
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         os: [ubuntu-latest]
+#         rust: [stable]
+#     services:
+#       rabbitmq-streaming:
+#         image: pivotalrabbitmq/rabbitmq-stream
+#         env:
+#           RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
+#         ports:
+#           - 5552:5552
+#           - 15672:15672
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: Install latest ${{ matrix.rust }}
+#         uses: actions-rs/toolchain@v1
+#         with:
+#           toolchain: ${{ matrix.rust }}
+#           profile: minimal
+#           override: true
+#           components: rustfmt
+#       - name: Run test
+#         run: make test

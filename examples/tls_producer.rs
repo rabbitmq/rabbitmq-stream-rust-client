@@ -13,7 +13,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
-        .add_root_certificate(String::from("/path/to/your/certificate-ca.pem"))
+        .add_root_certificate(
+            // String::from("/path/to/your/certificate-ca.pem")
+            String::from("/Users/gas/git/rabbitmq/rabbitmq-stream-rust-client/docker/certs/ca_certificate.pem")
+        )
         .build();
 
     let environment = Environment::builder()

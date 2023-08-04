@@ -27,5 +27,8 @@ rabbitmq-server:
 		--pull always \
 		pivotalrabbitmq/rabbitmq-stream
 
+build-tls-docker-image:
+	cd docker && docker build -t rabbitmq_tls -f Dockerfile .
+
 help:
 	cat Makefile
