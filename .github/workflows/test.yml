@@ -9,13 +9,14 @@ on:
       - main
 
 jobs:
-  build_and_test:
+  build_docker_image:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v2
       - name: Build the Docker image
         run: make build-tls-docker-image
-
+  build_and_test:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -24,7 +25,7 @@ jobs:
         rust: [stable]
     services:
       rabbitmq-streaming:
-        image: build-tls-docker-image
+        image: rabbitmq_tls
         env:
           RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
         ports:
