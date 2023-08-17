@@ -419,6 +419,13 @@ impl Client {
         ClientError,
     > {
         let stream = if broker.tls.enabled() {
+            if broker.tls.trust_everything()  {
+
+            }
+
+            else {
+
+            }
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
             let mut roots = rustls::RootCertStore::empty();
             let cert = broker.tls.get_root_certificates();
@@ -638,4 +645,49 @@ impl Client {
         let mut state = self.state.write().await;
         state.last_heatbeat = Instant::now();
     }
+
+    async fn enable_tls(&self, broker: &ClientOptions, trust_certificate: bool)->Result<ClientConfig,ClientError> {
+        let config: ClientConfig;
+        let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+
+        if trust_certificate == true    {
+        let mut roots = rustls::RootCertStore::empty();
+        let cert = broker.tls.get_root_certificates();
+        let cert_bytes = std::fs::read(cert);
+
+        let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).unwrap();
+
+        root_cert_store
+            .iter()
+            .for_each(|cert| roots.add(&rustls::Certificate(cert.to_vec())).unwrap());
+
+            
+        config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+
+        
+
+        }
+        else {
+
+            mod danger {
+        
+                pub struct NoCertificateVerification {}
+    
+            }    
+
+            config = ClientConfig::builder()
+            .dangerous()
+            .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
+
+        }
+        
+        
+        Ok(config)
+
+    
+}
+
 }
