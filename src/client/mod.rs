@@ -22,8 +22,9 @@ use tokio::io::ReadBuf;
 use tokio::{net::TcpStream, sync::Notify};
 use tokio::{sync::RwLock, task::JoinHandle};
 use tokio_rustls::client::TlsStream;
-use tokio_rustls::rustls::ClientConfig;
+//use tokio_rustls::rustls::ClientConfig;
 use tokio_rustls::{rustls, TlsConnector};
+use rustls::ClientConfig;
 
 use tokio_util::codec::Framed;
 use tracing::trace;
@@ -419,6 +420,13 @@ impl Client {
         ClientError,
     > {
         let stream = if broker.tls.enabled() {
+            if broker.tls.trust_everything()  {
+
+            }
+
+            else {
+
+            }
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
             let mut roots = rustls::RootCertStore::empty();
             let cert = broker.tls.get_root_certificates();
@@ -638,4 +646,67 @@ impl Client {
         let mut state = self.state.write().await;
         state.last_heatbeat = Instant::now();
     }
+
+    async fn enable_tls(&self, broker: &ClientOptions, trust_certificate: bool)->Result<ClientConfig,ClientError> {
+        let config: ClientConfig;
+        let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
+
+        if trust_certificate == true    {
+        let mut roots = rustls::RootCertStore::empty();
+        let cert = broker.tls.get_root_certificates();
+        let cert_bytes = std::fs::read(cert);
+
+        let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).unwrap();
+
+        root_cert_store
+            .iter()
+            .for_each(|cert| roots.add(&rustls::Certificate(cert.to_vec())).unwrap());
+
+            
+        config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+
+        
+
+        }
+        else {
+
+            mod danger {
+                use std::time::SystemTime;
+
+                use tokio_rustls::rustls;
+                use tokio_rustls::rustls::client::{ServerCertVerified, ServerCertVerifier};
+
+                pub struct NoCertificateVerification {}
+
+                impl ServerCertVerifier for NoCertificateVerification {
+                    fn verify_server_cert(
+                        &self,
+                        _end_entity: &rustls::Certificate,
+                        _intermediates: &[rustls::Certificate],
+                        _server_name: &rustls::ServerName,
+                        _scts: &mut dyn Iterator<Item = &[u8]>,
+                        _ocsp_response: &[u8],
+                        _now: SystemTime,
+                    ) -> Result<ServerCertVerified, rustls::Error> {
+                        Ok(ServerCertVerified::assertion())
+                    }
+                }
+            }
+
+            config = ClientConfig::builder()
+                .with_safe_defaults()
+                .with_custom_certificate_verifier(Arc::new(danger::NoCertificateVerification {}))
+                .with_no_client_auth();
+
+        }
+        
+        
+        Ok(config)
+
+    
+}
+
 }

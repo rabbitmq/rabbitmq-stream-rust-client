@@ -135,6 +135,7 @@ pub struct EnvironmentOptions {
 #[derive(Clone)]
 pub struct TlsConfiguration {
     pub(crate) enabled: bool,
+    pub(crate) trust_everything: bool,
     pub(crate) certificate_path: String,
 }
 
@@ -142,6 +143,7 @@ impl Default for TlsConfiguration {
     fn default() -> TlsConfiguration {
         TlsConfiguration {
             enabled: true,
+            trust_everything: false,
             certificate_path: String::from(""),
         }
     }
@@ -154,6 +156,14 @@ impl TlsConfiguration {
 
     pub fn enabled(&self) -> bool {
         self.enabled
+    }
+
+    pub fn set_trust_everything(&mut self, trust_everhthing: bool) {
+        self.trust_everything = trust_everhthing
+    }
+
+    pub fn trust_everything(&self) -> bool {
+        self.trust_everything
     }
 
     pub fn get_root_certificates(&self) -> String {
