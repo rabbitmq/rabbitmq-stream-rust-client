@@ -43,7 +43,9 @@ impl Default for ClientOptions {
             tls: TlsConfiguration {
                 enabled: false,
                 trust_everything: false,
-                certificate_path: String::from(""),
+                root_certificates_path: String::from(""),
+                client_certificates_path: String::from(""),
+                client_keys_path: String::from(""),
             },
         }
     }

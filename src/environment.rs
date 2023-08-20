@@ -136,7 +136,9 @@ pub struct EnvironmentOptions {
 pub struct TlsConfiguration {
     pub(crate) enabled: bool,
     pub(crate) trust_everything: bool,
-    pub(crate) certificate_path: String,
+    pub(crate) root_certificates_path: String,
+    pub(crate) client_certificates_path: String,
+    pub(crate) client_keys_path: String,
 }
 
 impl Default for TlsConfiguration {
@@ -144,7 +146,9 @@ impl Default for TlsConfiguration {
         TlsConfiguration {
             enabled: true,
             trust_everything: false,
-            certificate_path: String::from(""),
+            root_certificates_path: String::from(""),
+            client_certificates_path: String::from(""),
+            client_keys_path: String::from(""),
         }
     }
 }
@@ -158,21 +162,36 @@ impl TlsConfiguration {
         self.enabled
     }
 
-    pub fn set_trust_everything(&mut self, trust_everhthing: bool) {
+    pub fn trust_everything(&mut self, trust_everhthing: bool) {
         self.trust_everything = trust_everhthing
     }
 
-    pub fn trust_everything(&self) -> bool {
+    pub fn get_everything_enabled(&self) -> bool {
         self.trust_everything
     }
 
-    pub fn get_root_certificates(&self) -> String {
-        self.certificate_path.clone()
+    pub fn get_root_certificates_path(&self) -> String {
+        self.root_certificates_path.clone()
     }
     //
-    pub fn add_root_certificate(&mut self, certificate_path: String) {
-        self.certificate_path = certificate_path
+    pub fn add_root_certificates_path(&mut self, certificate_path: String) {
+        self.root_certificates_path = certificate_path
     }
+
+    pub fn get_client_certificates_path(&self) -> String {
+        self.client_certificates_path.clone()
+    }
+
+    pub fn get_client_keys_path(&self) -> String {
+        self.client_keys_path.clone()
+    }
+    //
+    pub fn add_client_certificates_keys(&mut self, certificate_path: String, client_private_key_path: String) {
+        self.client_certificates_path = certificate_path;
+        self.client_keys_path = client_private_key_path;
+    
+    }
+
 }
 
 pub struct TlsConfigurationBuilder(TlsConfiguration);
@@ -183,8 +202,14 @@ impl TlsConfigurationBuilder {
         self
     }
 
-    pub fn add_root_certificate(mut self, certificate_path: String) -> TlsConfigurationBuilder {
-        self.0.certificate_path = certificate_path;
+    pub fn add_root_certificates(mut self, certificate_path: String) -> TlsConfigurationBuilder {
+        self.0.root_certificates_path = certificate_path;
+        self
+    }
+
+    pub fn add_client_certificates_keys(mut self, certificate_path: String, client_private_key_path: String) -> TlsConfigurationBuilder {
+        self.0.client_certificates_path = certificate_path;
+        self.0.client_keys_path = client_private_key_path;
         self
     }
 
