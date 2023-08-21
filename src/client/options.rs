@@ -42,7 +42,7 @@ impl Default for ClientOptions {
             collector: Arc::new(NopMetricsCollector {}),
             tls: TlsConfiguration {
                 enabled: false,
-                trust_everything: false,
+                trust_certificates: false,
                 root_certificates_path: String::from(""),
                 client_certificates_path: String::from(""),
                 client_keys_path: String::from(""),

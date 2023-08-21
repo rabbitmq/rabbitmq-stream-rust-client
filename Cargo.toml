@@ -36,8 +36,6 @@ thiserror = "1.0"
 async-trait = "0.1.51"
 rand = "0.8"
 dashmap = "5.3.4"
-webpki = "0.22.0"
-webpki-roots = "0.25.2"
 
 [dev-dependencies]
 tracing-subscriber = "0.3.1"
