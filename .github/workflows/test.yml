@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build the Docker image
-        run: make rabbitmq-server-tls
+        run: make build-tls-docker-image
   build_and_test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -22,14 +22,15 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         rust: [stable]
-#    services:
-#      rabbitmq-streaming:
-#        image: docker.io/library/rabbitmq_tls
-#        env:
-#          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
-#        ports:
-#          - 5552:5552
-#          - 15672:15672
+    services:
+      rabbitmq-streaming:
+        image: rabbitmq_tls
+
+        env:
+          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
+        ports:
+          - 5552:5552
+          - 15672:15672
     steps:
       - uses: actions/checkout@v2
       - name: Install latest ${{ matrix.rust }}
