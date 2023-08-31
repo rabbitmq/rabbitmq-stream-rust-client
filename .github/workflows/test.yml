@@ -15,31 +15,28 @@ jobs:
       matrix:
         os: [ ubuntu-latest ]
         rust: [ stable ]
-    container:
-      image: pivotalrabbitmq/rabbitmq-stream
-      env:
-        RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
-        RABBITMQ_SSL_CACERTFILE: "/cert/ca_certificate.pem"
-        RABBITMQ_SSL_CERTFILE: "/cert/server_certificate.pem"
-        RABBITMQ_SSL_KEYFILE: "/cert/server_key.pem"
-      volumes:
-        - ${{ github.workspace }}/docker/certs:/cert
-      ports:
-        - 5552:5552
-        - 15672:15672
-        - 5551:5551
+    services:
+      rabbitmq-streaming:
+        image: pivotalrabbitmq/rabbitmq-stream
+        env:
+          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
+          RABBITMQ_SSL_CACERTFILE: "/cert/ca_certificate.pem"
+          RABBITMQ_SSL_CERTFILE: "/cert/server_certificate.pem"
+          RABBITMQ_SSL_KEYFILE: "/cert/server_key.pem"
+        volumes:
+          - docker/certs:/cert
+        ports:
+          - 5552:5552
+          - 15672:15672
+          - 5551:5551
     steps:
       - uses: actions/checkout@v2
       - name: Install latest ${{ matrix.rust }}
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          profile: default
-#          override: true
-#          components: rustfmt, clippy, rust-src
-      - name: cargo fmt
-        run: cargo fmt --all -- --check
-      - name: cargo clippy
-        run: cargo clippy --all -- -D warnings
-      - name: cargo test
-        run: cargo test --all -- --nocapture
+          profile: minimal
+          override: true
+          components: rustfmt
+      - name: Run test
+        run: make test
