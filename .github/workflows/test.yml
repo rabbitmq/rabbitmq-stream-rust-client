@@ -11,10 +11,6 @@ on:
 jobs:
   build_docker_image:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Build the Docker image
-        run: make build-tls-docker-image
   build_and_test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -24,13 +20,18 @@ jobs:
         rust: [stable]
     services:
       rabbitmq-streaming:
-        image: rabbitmq_tls
-
+        image: pivotalrabbitmq/rabbitmq-stream
         env:
           RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
+          RABBITMQ_SSL_CACERTFILE: "/cert/ca_certificate.pem"
+          RABBITMQ_SSL_CERTFILE: "/cert/server_certificate.pem"
+          RABBITMQ_SSL_KEYFILE: "/cert/server_key.pem"
+        volumes:
+          - ${{ github.workspace }}/docker/certs:/cert
         ports:
           - 5552:5552
           - 15672:15672
+          - 5551:5551
     steps:
       - uses: actions/checkout@v2
       - name: Install latest ${{ matrix.rust }}
