@@ -15,8 +15,7 @@ jobs:
       matrix:
         os: [ ubuntu-latest ]
         rust: [ stable ]
-    services:
-      rabbitmq-streaming:
+    container:
         image: pivotalrabbitmq/rabbitmq-stream
         env:
           RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
@@ -24,19 +23,19 @@ jobs:
           RABBITMQ_SSL_CERTFILE: "/cert/server_certificate.pem"
           RABBITMQ_SSL_KEYFILE: "/cert/server_key.pem"
         volumes:
-          - ${{ github.workspace }}/docker/certs:/certc
+          - ${{ github.workspace }}/docker/certs:/cert
         ports:
           - 5552:5552
           - 15672:15672
           - 5551:5551
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install latest ${{ matrix.rust }}
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          profile: minimal
-          override: true
-          components: rustfmt
-      - name: Run test
+          profile: default
+#          override: true
+#          components: rustfmt
+      - name: Run tests
         run: make test
