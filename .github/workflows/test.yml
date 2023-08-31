@@ -7,17 +7,14 @@ on:
   pull_request:
     branches:
       - main
-
 jobs:
-  build_docker_image:
-    runs-on: ubuntu-latest
   build_and_test:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        rust: [stable]
+        os: [ ubuntu-latest ]
+        rust: [ stable ]
     services:
       rabbitmq-streaming:
         image: pivotalrabbitmq/rabbitmq-stream
