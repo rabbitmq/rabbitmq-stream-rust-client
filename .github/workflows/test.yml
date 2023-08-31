@@ -24,7 +24,7 @@ jobs:
           RABBITMQ_SSL_CERTFILE: "/cert/server_certificate.pem"
           RABBITMQ_SSL_KEYFILE: "/cert/server_key.pem"
         volumes:
-          - ${{ github.workspace }}/docker/certs:/cert
+          - ${{ github.workspace }}/docker/certs:/certc
         ports:
           - 5552:5552
           - 15672:15672
