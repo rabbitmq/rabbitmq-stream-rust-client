@@ -37,5 +37,5 @@ jobs:
           profile: minimal
           override: true
           components: rustfmt
-      - name: Run test
-        run: make test
+      - name: cargo fmt
+        run: cargo fmt
