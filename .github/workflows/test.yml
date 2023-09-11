@@ -9,23 +9,48 @@ on:
       - main
 
 jobs:
-  build_and_test:
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        rust: [stable]
-    services:
-      rabbitmq-streaming:
-        image: pivotalrabbitmq/rabbitmq-stream
-        env:
-          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
-        ports:
-          - 5552:5552
-          - 15672:15672
+        os: [ ubuntu-latest ]
+        rust: [ stable ]
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build and export
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          tags: rabbitmq_tls:latest
+          outputs: type=docker,dest=/tmp/rabbitmq_tls.tar
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: rabbitmq_tls
+          path: /tmp/rabbitmq_tls.tar
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: rabbitmq_tls
+          path: /tmp
+      - name: Load image
+        run: |
+          docker load --input /tmp/rabbitmq_tls.tar
+          docker image ls -a
+          docker run -d --rm --name rabbitmq-stream-client-test \
+          -p 5552:5552 -p 5672:5672 -p 5671:5671 -p 15672:15672 \
+          -e RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost" \
+          rabbitmq_tls
+      - name: wait for running
+        run: |
+          docker exec rabbitmq-stream-client-test /bin/bash -c 'ps -aux'
+          docker exec rabbitmq-stream-client-test /bin/bash -c 'sleep 10'
+          docker exec rabbitmq-stream-client-test /bin/bash -c 'rabbitmqctl status'
+          docker exec rabbitmq-stream-client-test /bin/bash -c 'rabbitmqctl wait --pid 1 --timeout 70'
       - name: Install latest ${{ matrix.rust }}
         uses: actions-rs/toolchain@v1
         with:
@@ -33,5 +58,17 @@ jobs:
           profile: minimal
           override: true
           components: rustfmt
-      - name: Run test
+      - name: List files
+        run: ls -la
+      - name: Run tests
         run: make test
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info --ignore-filename-regex benchmark
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          fail_ci_if_error: true
