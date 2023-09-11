@@ -141,14 +141,43 @@ async fn environment_tls_connection_trust_certificates() {
     let tls_configuration: TlsConfiguration =
         TlsConfiguration::builder().trust_certificates(true).build();
 
-    let environment = Environment::builder()
+    let env = Environment::builder()
         .host("localhost")
         .port(5551)
         .tls(tls_configuration)
         .build()
         .await;
 
-    assert!(matches!(environment, Ok(Environment { .. })));
+    assert!(matches!(env, Ok(Environment { .. })));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn environment_fail_tls_connection_wrong_certificates() {
+    let pwd = std::env::current_dir().unwrap();
+    // here we pass the wrong certificate
+    // the connection should fail with IO error
+    let path = pwd
+        .join(".ci/certs/server_certificate.pem") // wrong certificate
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
+        .trust_certificates(false)
+        .add_root_certificates(path)
+        .build();
+
+    let env = Environment::builder()
+        .host("localhost")
+        .port(5551)
+        .tls(tls_configuration)
+        .build()
+        .await;
+
+    assert!(matches!(
+        env,
+        Err(rabbitmq_stream_client::error::ClientError::Io { .. })
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -164,30 +193,12 @@ async fn environment_tls_connection_with_root_ca() {
         .add_root_certificates(path)
         .build();
 
-    let environment = Environment::builder()
+    let env = Environment::builder()
         .host("localhost")
         .port(5551)
         .tls(tls_configuration)
         .build()
         .await;
 
-    assert!(matches!(environment, Ok(Environment { .. })));
+    assert!(matches!(env, Ok(Environment { .. })));
 }
-
-/*
-#[tokio::test(flavor = "multi_thread")]
-async fn environment_fail_tls_connection() {
-    // in this test we try to connect to a server that does not support tls
-    // the client should fail to connect
-    // and return an error.
-
-    let env = Environment::builder()
-        .tls(TlsConfiguration::default())
-        .build()
-        .await;
-
-    assert!(matches!(
-        env,
-        Err(rabbitmq_stream_client::error::ClientError::Tls { .. })
-    ));
-}*/

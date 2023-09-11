@@ -63,6 +63,28 @@ use rabbitmq_stream_client::Environment;
 let environment = Environment::builder().build().await?;
 ```
 
+##### Building the environment with TLS
+
+```rust,no_run
+use rabbitmq_stream_client::Environment;
+
+let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
+.add_root_certificates(String::from(".ci/certs/ca_certificate.pem"))
+.build();
+
+// Use this configuration if you want to trust the certificates
+// without providing the root certificate
+let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
+     .trust_certificates(true)
+     .build();
+
+let environment = Environment::builder()
+    .host("localhost")
+    .port(5551) // specify the TLS port of the node
+    .tls(tls_configuration)
+    .build()
+```
+
 ##### Publishing messages
 
 ```rust,no_run
