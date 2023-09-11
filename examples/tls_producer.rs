@@ -12,11 +12,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+    // to make this example work you need to run the following command
+    // `make rabbitmq-server`
+    // it will start a rabbitmq server with compatible TLS certificates
     let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
-        .trust_certificates(true)
-        // .add_root_certificate(String::from("/path/to/your/certificate-ca.pem"))
-        // .add_root_certificates(String::from(".ci/certs/ca_certificate.pem"))
+        .add_root_certificates(String::from(".ci/certs/ca_certificate.pem"))
         .build();
+
+
+    // Use this configuration if you want to trust the certificates
+    // without providing the root certificate
+
+    // let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
+    //     .trust_certificates(true)
+    //     .build();
 
     let environment = Environment::builder()
         .host("localhost")
