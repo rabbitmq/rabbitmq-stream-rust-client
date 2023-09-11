@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use fake::{Fake, Faker};
 
-use rabbitmq_stream_client::{Environment, error, TlsConfiguration};
 use rabbitmq_stream_client::types::ByteCapacity;
+use rabbitmq_stream_client::{error, Environment, TlsConfiguration};
 use rabbitmq_stream_protocol::ResponseCode;
 
 use crate::common::TestEnvironment;
@@ -134,14 +134,12 @@ async fn environment_create_streams_with_parameters() {
     assert_eq!(delete_response.is_ok(), true);
 }
 
-
 #[tokio::test(flavor = "multi_thread")]
 async fn environment_tls_connection_trust_certificates() {
     // the test validates that the client can connect to a server
     // that uses tls and the client trusts the server certificate
-    let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
-        .trust_certificates(true)
-        .build();
+    let tls_configuration: TlsConfiguration =
+        TlsConfiguration::builder().trust_certificates(true).build();
 
     let environment = Environment::builder()
         .host("localhost")
@@ -150,11 +148,7 @@ async fn environment_tls_connection_trust_certificates() {
         .build()
         .await;
 
-
-    assert!(matches!(
-        environment,
-        Ok(Environment { .. })
-    ));
+    assert!(matches!(environment, Ok(Environment { .. })));
 }
 
 /*
