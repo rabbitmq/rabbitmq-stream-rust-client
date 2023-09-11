@@ -19,7 +19,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_root_certificates(String::from(".ci/certs/ca_certificate.pem"))
         .build();
 
-
     // Use this configuration if you want to trust the certificates
     // without providing the root certificate
 
