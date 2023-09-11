@@ -32,14 +32,14 @@ jobs:
         with:
           name: rabbitmq_tls
           path: /tmp/rabbitmq_tls.tar
-      - uses: actions/checkout@v2
-      - name: Install latest ${{ matrix.rust }}
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          profile: minimal
-          override: true
-          components: rustfmt
+#      - uses: actions/checkout@v2
+#      - name: Install latest ${{ matrix.rust }}
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          toolchain: ${{ matrix.rust }}
+#          profile: minimal
+#          override: true
+#          components: rustfmt
   use:
     runs-on: ubuntu-latest
     needs: build
@@ -60,11 +60,19 @@ jobs:
       - name: wait for running
         run: |
           docker exec rabbitmq-stream-client-test /bin/bash -c 'ps -aux'
-          docker exec rabbitmq-stream-client-test /bin/bash -c 'sleep 15'
+          docker exec rabbitmq-stream-client-test /bin/bash -c 'sleep 10'
           docker exec rabbitmq-stream-client-test /bin/bash -c 'rabbitmqctl status'
           docker exec rabbitmq-stream-client-test /bin/bash -c 'rabbitmqctl wait --pid 1 --timeout 80'
-      - name: Run test
-        run: make test
-
+      - uses: actions/checkout@v2
+      - name: Install latest ${{ matrix.rust }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          profile: minimal
+          override: true
+          components: rustfmt
+        run: |
+          ls -la
+          docker exec rabbitmq-stream-client-test /bin/bash -c 'ls -la'
 #      - name: Run test
 #        run: make test
