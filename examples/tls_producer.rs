@@ -13,7 +13,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
-        .add_root_certificates(String::from("/path/to/your/certificate-ca.pem"))
+        .trust_certificates(true)
+        // .add_root_certificate(String::from("/path/to/your/certificate-ca.pem"))
+// .add_client_certificate(String::from("/path/to/your/client-certificate.pem"))
         .build();
 
     let environment = Environment::builder()
