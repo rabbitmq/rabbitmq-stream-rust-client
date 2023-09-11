@@ -151,6 +151,29 @@ async fn environment_tls_connection_trust_certificates() {
     assert!(matches!(environment, Ok(Environment { .. })));
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn environment_tls_connection_with_root_ca() {
+    let pwd = std::env::current_dir().unwrap();
+    let path = pwd
+        .join(".ci/certs/ca_certificate.pem")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
+        .add_root_certificates(path)
+        .build();
+
+    let environment = Environment::builder()
+        .host("localhost")
+        .port(5551)
+        .tls(tls_configuration)
+        .build()
+        .await;
+
+    assert!(matches!(environment, Ok(Environment { .. })));
+}
+
 /*
 #[tokio::test(flavor = "multi_thread")]
 async fn environment_fail_tls_connection() {

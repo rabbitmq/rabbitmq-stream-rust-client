@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
         .trust_certificates(true)
         // .add_root_certificate(String::from("/path/to/your/certificate-ca.pem"))
-        // .add_client_certificate(String::from("/path/to/your/client-certificate.pem"))
+        // .add_root_certificates(String::from(".ci/certs/ca_certificate.pem"))
         .build();
 
     let environment = Environment::builder()
