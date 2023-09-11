@@ -20,8 +20,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     // Use this configuration if you want to trust the certificates
-    // without providing the root certificate
+    // without providing the root certificate and the client certificates
 
+    // let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
+    //     .add_root_certificates(String::from(".ci/certs/ca_certificate.pem"))
+    //     .add_client_certificates_keys(
+    //         String::from(".ci/certs/client_certificate.pem"),
+    //         String::from(".ci/certs/client_key.pem"),
+    //     )
+    //     .build();
+
+    // Use this configuration if you want to trust the certificates
+    // without providing the root certificate
     // let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
     //     .trust_certificates(true)
     //     .build();

@@ -442,7 +442,6 @@ impl Client {
             let connector = TlsConnector::from(Arc::new(config));
             let domain = ServerName::try_from(broker.host.as_str()).unwrap();
             let conn = connector.connect(domain, stream).await?;
-
             GenericTcpStream::SecureTcp(conn)
         } else {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;

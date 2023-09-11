@@ -202,3 +202,44 @@ async fn environment_tls_connection_with_root_ca() {
 
     assert!(matches!(env, Ok(Environment { .. })));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn environment_tls_connection_with_root_ca_and_client_certificates() {
+    // the test validates that the client can connect to a server
+    // that uses tls and the client certificates trusted by the server
+    // to have a 100% the ssl_options.fail_if_no_peer_cert should be
+    // ssl_options.fail_if_no_peer_cert = true
+    // but for the scope of this test the current server configuration is enough
+    let pwd = std::env::current_dir().unwrap();
+    let path_ca = pwd
+        .join(".ci/certs/ca_certificate.pem")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let path_client_cert = pwd
+        .join(".ci/certs/client_certificate.pem")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let path_client_key = pwd
+        .join(".ci/certs/client_key.pem")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
+        .add_root_certificates(path_ca)
+        .add_client_certificates_keys(path_client_cert, path_client_key)
+        .build();
+
+    let env = Environment::builder()
+        .host("localhost")
+        .port(5551)
+        .tls(tls_configuration)
+        .build()
+        .await;
+
+    assert!(matches!(env, Ok(Environment { .. })));
+}
