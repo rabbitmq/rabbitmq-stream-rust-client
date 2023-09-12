@@ -9,33 +9,42 @@
 <br/>
 
 <div align="center">
+ <strong>
+   A Work in progress Rust Client for RabbitMQ Stream
+ </strong>
+</div>
 
-    <a href="https://github.com/rabbitmq/rabbitmq-stream-rust-client/actions?query=workflow%3ATests">
-        <img src="https://github.com/rabbitmq/rabbitmq-stream-rust-client/workflows/Tests/badge.svg"
-             alt="Tests status"/>
-    </a>
+<br />
 
-    <a href="https://crates.io/crates/rabbitmq-stream-client">
-        <img src="https://img.shields.io/crates/d/rabbitmq-stream-client.svg?style=flat-square"
-             alt="Download"/>
-    </a>
-    <a href="https://docs.rs/rabbitmq-stream-client">
-        <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
-             alt="docs.rs docs"/>
-    </a>
+<div align="center">
 
-    <a href="https://deps.rs/repo/github/rabbitmq/rabbitmq-stream-rust-client">
-        <img src="https://deps.rs/repo/github/rabbitmq/rabbitmq-stream-rust-client/status.svg"
-             alt="deps"/>
-    </a>
+  <a href="https://github.com/rabbitmq/rabbitmq-stream-rust-client/actions?query=workflow%3ATests">
+    <img src="https://github.com/rabbitmq/rabbitmq-stream-rust-client/workflows/Tests/badge.svg"
+    alt="Tests status" />
+  </a>
+  
+  <a href="https://crates.io/crates/rabbitmq-stream-client">
+    <img src="https://img.shields.io/crates/d/rabbitmq-stream-client.svg?style=flat-square"
+      alt="Download" />
+  </a>
+  <a href="https://docs.rs/rabbitmq-stream-client">
+    <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
+      alt="docs.rs docs" />
+  </a>
 
-    <a href="https://codecov.io/gh/rabbitmq/rabbitmq-stream-rust-client">
-        <img src="https://codecov.io/gh/rabbitmq/rabbitmq-stream-rust-client/branch/main/graph/badge.svg?token=2DHIQ20BDE"
-             alt="codecov"/>
-    </a>
+   <a href="https://deps.rs/repo/github/rabbitmq/rabbitmq-stream-rust-client">
+    <img src="https://deps.rs/repo/github/rabbitmq/rabbitmq-stream-rust-client/status.svg"
+      alt="deps" />
+  </a>
+
+  <a href="https://codecov.io/gh/rabbitmq/rabbitmq-stream-rust-client">
+    <img src="https://codecov.io/gh/rabbitmq/rabbitmq-stream-rust-client/branch/main/graph/badge.svg?token=2DHIQ20BDE" alt="codecov"/>
+  </a>
+
 
 
 </div>
+
 
 # RabbitMQ Stream Client
 
