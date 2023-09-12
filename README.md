@@ -1,13 +1,5 @@
 <h1 align="center">RabbitMQ Stream Rust</h1>
-
-<div align="center">
-    <strong>
-        A Work in progress Rust Client for RabbitMQ Stream
-    </strong>
-</div>
-
 <br/>
-
 <div align="center">
  <strong>
    A Work in progress Rust Client for RabbitMQ Stream
@@ -101,9 +93,9 @@ use rabbitmq_stream_client::{Environment, types::Message};
 let environment = Environment::builder().build().await?;
 let producer = environment.producer().name("myproducer").build("mystream").await?;
 for i in 0..10 {
-producer
-.send(Message::builder().body(format!("message{}", i)).build())
-.await?;
+    producer
+      .send(Message::builder().body(format!("message{}", i)).build())
+      .await?;
 }
 producer.close().await?;
 ```
@@ -119,9 +111,9 @@ let environment = Environment::builder().build().await?;
 let mut consumer = environment.consumer().build("mystream").await?;
 let handle = consumer.handle();
 task::spawn(async move {
-while let Some(delivery) = consumer.next().await {
-println!("Got message {:?}",delivery);
-}
+    while let Some(delivery) = consumer.next().await {
+           println!("Got message {:?}",delivery);
+    }
 });
 // wait 10 second and then close the consumer
 sleep(Duration::from_secs(10)).await;
