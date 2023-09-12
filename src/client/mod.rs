@@ -15,7 +15,9 @@ use futures::{
     Stream, StreamExt, TryFutureExt,
 };
 use pin_project::pin_project;
+use rustls::PrivateKey;
 use rustls::ServerName;
+use std::{fs::File, io::BufReader, path::Path};
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
 use tokio::io::ReadBuf;
@@ -420,25 +422,26 @@ impl Client {
     > {
         let stream = if broker.tls.enabled() {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
-            let mut roots = rustls::RootCertStore::empty();
-            let cert = broker.tls.get_root_certificates();
-            let cert_bytes = std::fs::read(cert);
+            let config: ClientConfig;
 
-            let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).unwrap();
-
-            root_cert_store
-                .iter()
-                .for_each(|cert| roots.add(&rustls::Certificate(cert.to_vec())).unwrap());
-
-            let config = ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
+            if !broker.tls.trust_certificates_enabled() {
+                let roots = Self::build_root_store(Some(Path::new(
+                    &broker.tls.get_root_certificates_path(),
+                )))
+                .await?;
+                config = Self::build_tls_client_configuration(
+                    broker.tls.get_client_certificates_path(),
+                    &roots,
+                    broker,
+                )
+                .await?;
+            } else {
+                config = Self::build_tls_client_configuration_untrusted().await?;
+            }
 
             let connector = TlsConnector::from(Arc::new(config));
             let domain = ServerName::try_from(broker.host.as_str()).unwrap();
             let conn = connector.connect(domain, stream).await?;
-
             GenericTcpStream::SecureTcp(conn)
         } else {
             let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
@@ -637,5 +640,99 @@ impl Client {
         trace!("Received heartbeat");
         let mut state = self.state.write().await;
         state.last_heatbeat = Instant::now();
+    }
+
+    async fn build_root_store(
+        root_ca_cert: Option<&Path>,
+    ) -> std::io::Result<rustls::RootCertStore> {
+        let mut roots = rustls::RootCertStore::empty();
+        let cert_bytes = std::fs::read(root_ca_cert.unwrap());
+
+        let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).unwrap();
+
+        root_cert_store
+            .iter()
+            .for_each(|cert| roots.add(&rustls::Certificate(cert.to_vec())).unwrap());
+        Ok(roots)
+    }
+
+    async fn build_client_certificates(
+        client_cert: &Path,
+    ) -> std::io::Result<Vec<rustls::Certificate>> {
+        let mut pem = BufReader::new(File::open(client_cert)?);
+        let certs = rustls_pemfile::certs(&mut pem)?;
+        let certs = certs.into_iter().map(rustls::Certificate);
+        Ok(certs.collect())
+    }
+
+    async fn build_client_private_keys(
+        client_private_key: &Path,
+    ) -> std::io::Result<Vec<PrivateKey>> {
+        let mut pem = BufReader::new(File::open(client_private_key)?);
+        let keys = rustls_pemfile::pkcs8_private_keys(&mut pem)?;
+        let keys = keys.into_iter().map(PrivateKey);
+        Ok(keys.collect())
+    }
+
+    async fn build_tls_client_configuration(
+        client_certificate_path: String,
+        roots: &rustls::RootCertStore,
+        broker: &ClientOptions,
+    ) -> Result<ClientConfig, ClientError> {
+        let config: ClientConfig;
+
+        if client_certificate_path.is_empty() {
+            config = ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(roots.clone())
+                .with_no_client_auth();
+        } else {
+            let client_certs = Self::build_client_certificates(Path::new(
+                &broker.tls.get_client_certificates_path(),
+            ))
+            .await?;
+            let client_keys =
+                Self::build_client_private_keys(Path::new(&broker.tls.get_client_keys_path()))
+                    .await?;
+            config = ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(roots.clone())
+                .with_client_auth_cert(client_certs, client_keys.into_iter().next().unwrap())
+                .unwrap();
+        }
+
+        Ok(config)
+    }
+
+    async fn build_tls_client_configuration_untrusted() -> Result<ClientConfig, ClientError> {
+        mod danger {
+            use std::time::SystemTime;
+
+            use tokio_rustls::rustls;
+            use tokio_rustls::rustls::client::{ServerCertVerified, ServerCertVerifier};
+
+            pub struct NoCertificateVerification {}
+
+            impl ServerCertVerifier for NoCertificateVerification {
+                fn verify_server_cert(
+                    &self,
+                    _end_entity: &rustls::Certificate,
+                    _intermediates: &[rustls::Certificate],
+                    _server_name: &rustls::ServerName,
+                    _scts: &mut dyn Iterator<Item = &[u8]>,
+                    _ocsp_response: &[u8],
+                    _now: SystemTime,
+                ) -> Result<ServerCertVerified, rustls::Error> {
+                    Ok(ServerCertVerified::assertion())
+                }
+            }
+        }
+
+        let config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_custom_certificate_verifier(Arc::new(danger::NoCertificateVerification {}))
+            .with_no_client_auth();
+
+        Ok(config)
     }
 }
