@@ -164,3 +164,24 @@ async fn consumer_create_stream_not_existing_error() {
         _ => panic!("Should be StreamNotFound error"),
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_store_and_query_offset_test() {
+    let env = TestEnvironment::create().await;
+    let consumer = env
+        .env
+        .consumer()
+        .name("test-name")
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let offset: u64 = Faker.fake();
+
+    consumer.store_offset(offset).await.unwrap();
+
+    let response = consumer.query_offset().await.unwrap();
+
+    assert_eq!(offset, response);
+}
