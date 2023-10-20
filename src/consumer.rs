@@ -18,7 +18,7 @@ use rabbitmq_stream_protocol::{
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tracing::trace;
 
-use crate::{error::ClientError, RabbitMQStreamResult};
+use crate::error::ConsumerStoreOffsetError;
 
 use crate::{
     client::{MessageHandler, MessageResult},
@@ -150,24 +150,42 @@ impl Consumer {
         self.internal.is_closed()
     }
 
-    pub async fn store_offset(&self, offset: u64) -> RabbitMQStreamResult<()> {
-        assert!(self.name.is_some(), "consumer name not set");
-        self.internal
+    pub async fn store_offset(&self, offset: u64) -> Result<(), ConsumerStoreOffsetError> {
+        if self.name.is_none() {
+            return Err(ConsumerStoreOffsetError::NameMissing);
+        }
+
+        let result = self
+            .internal
             .client
             .store_offset(
                 self.name.clone().unwrap().as_str(),
                 self.internal.stream.as_str(),
                 offset,
             )
-            .await
+            .await;
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(e) => Err(ConsumerStoreOffsetError::Client(e)),
+        }
     }
 
-    pub async fn query_offset(&self) -> Result<u64, ClientError> {
-        assert!(self.name.is_some(), "consumer name not set");
-        self.internal
+    pub async fn query_offset(&self) -> Result<u64, ConsumerStoreOffsetError> {
+        if self.name.is_none() {
+            return Err(ConsumerStoreOffsetError::NameMissing);
+        }
+
+        let result = self
+            .internal
             .client
             .query_offset(self.name.clone().unwrap(), self.internal.stream.as_str())
-            .await
+            .await;
+
+        match result {
+            Ok(r) => Ok(r),
+            Err(e) => Err(ConsumerStoreOffsetError::Client(e)),
+        }
     }
 }
 

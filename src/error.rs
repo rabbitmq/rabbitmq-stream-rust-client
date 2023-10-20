@@ -24,6 +24,14 @@ pub enum ClientError {
 }
 
 #[derive(Error, Debug)]
+pub enum ConsumerStoreOffsetError {
+    #[error("Failed to store offset, missing consumer name")]
+    NameMissing,
+    #[error(transparent)]
+    Client(#[from] ClientError),
+}
+
+#[derive(Error, Debug)]
 pub enum ProtocolError {
     #[error("Encode Error {0:?}")]
     Encode(EncodeError),

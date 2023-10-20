@@ -4,7 +4,9 @@ use crate::common::TestEnvironment;
 use fake::{Fake, Faker};
 use futures::StreamExt;
 use rabbitmq_stream_client::{
-    error::{ConsumerCloseError, ConsumerDeliveryError, ProducerCloseError},
+    error::{
+        ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError, ProducerCloseError,
+    },
     types::{Delivery, Message, OffsetSpecification},
     Consumer, NoDedup, Producer,
 };
@@ -184,4 +186,28 @@ async fn consumer_store_and_query_offset_test() {
     let response = consumer.query_offset().await.unwrap();
 
     assert_eq!(offset, response);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_store_and_query_offset_missing_name_test() {
+    let env = TestEnvironment::create().await;
+    let consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let offset: u64 = Faker.fake();
+
+    assert!(matches!(
+        consumer.store_offset(offset).await,
+        Err(ConsumerStoreOffsetError::NameMissing),
+    ));
+
+    assert!(matches!(
+        consumer.query_offset().await,
+        Err(ConsumerStoreOffsetError::NameMissing),
+    ));
 }
