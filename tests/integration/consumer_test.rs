@@ -5,11 +5,14 @@ use fake::{Fake, Faker};
 use futures::StreamExt;
 use rabbitmq_stream_client::{
     error::{
-        ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError, ProducerCloseError,
+        ClientError, ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError,
+        ProducerCloseError,
     },
     types::{Delivery, Message, OffsetSpecification},
     Consumer, NoDedup, Producer,
 };
+
+use rabbitmq_stream_protocol::ResponseCode;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
@@ -186,6 +189,26 @@ async fn consumer_store_and_query_offset_test() {
     let response = consumer.query_offset().await.unwrap();
 
     assert_eq!(offset, response);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_query_missing_offset_test() {
+    let env = TestEnvironment::create().await;
+    let consumer = env
+        .env
+        .consumer()
+        .name("test-name-new")
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        consumer.query_offset().await,
+        Err(ConsumerStoreOffsetError::Client(ClientError::RequestError(
+            ResponseCode::OffsetNotFound
+        ))),
+    ))
 }
 
 #[tokio::test(flavor = "multi_thread")]
