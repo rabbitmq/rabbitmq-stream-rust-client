@@ -151,40 +151,26 @@ impl Consumer {
     }
 
     pub async fn store_offset(&self, offset: u64) -> Result<(), ConsumerStoreOffsetError> {
-        if self.name.is_none() {
-            return Err(ConsumerStoreOffsetError::NameMissing);
-        }
-
-        let result = self
-            .internal
-            .client
-            .store_offset(
-                self.name.clone().unwrap().as_str(),
-                self.internal.stream.as_str(),
-                offset,
-            )
-            .await;
-
-        match result {
-            Ok(()) => Ok(()),
-            Err(e) => Err(ConsumerStoreOffsetError::Client(e)),
+        if let Some(name) = &self.name {
+            self.internal
+                .client
+                .store_offset(name.as_str(), self.internal.stream.as_str(), offset)
+                .await
+                .map(Ok)?
+        } else {
+            Err(ConsumerStoreOffsetError::NameMissing)
         }
     }
 
     pub async fn query_offset(&self) -> Result<u64, ConsumerStoreOffsetError> {
-        if self.name.is_none() {
-            return Err(ConsumerStoreOffsetError::NameMissing);
-        }
-
-        let result = self
-            .internal
-            .client
-            .query_offset(self.name.clone().unwrap(), self.internal.stream.as_str())
-            .await;
-
-        match result {
-            Ok(r) => Ok(r),
-            Err(e) => Err(ConsumerStoreOffsetError::Client(e)),
+        if let Some(name) = &self.name {
+            self.internal
+                .client
+                .query_offset(name.clone(), self.internal.stream.as_str())
+                .await
+                .map(Ok)?
+        } else {
+            Err(ConsumerStoreOffsetError::NameMissing)
         }
     }
 }
