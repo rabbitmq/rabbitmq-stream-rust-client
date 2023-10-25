@@ -51,6 +51,7 @@ impl Environment {
     /// Returns a builder for creating a consumer
     pub fn consumer(&self) -> ConsumerBuilder {
         ConsumerBuilder {
+            consumer_name: None,
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
         }

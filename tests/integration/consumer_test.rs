@@ -4,10 +4,15 @@ use crate::common::TestEnvironment;
 use fake::{Fake, Faker};
 use futures::StreamExt;
 use rabbitmq_stream_client::{
-    error::{ConsumerCloseError, ConsumerDeliveryError, ProducerCloseError},
+    error::{
+        ClientError, ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError,
+        ProducerCloseError,
+    },
     types::{Delivery, Message, OffsetSpecification},
     Consumer, NoDedup, Producer,
 };
+
+use rabbitmq_stream_protocol::ResponseCode;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
@@ -163,4 +168,131 @@ async fn consumer_create_stream_not_existing_error() {
         ),
         _ => panic!("Should be StreamNotFound error"),
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_store_and_query_offset_test() {
+    let env = TestEnvironment::create().await;
+    let consumer = env
+        .env
+        .consumer()
+        .name("test-name")
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let offset: u64 = Faker.fake();
+
+    consumer.store_offset(offset).await.unwrap();
+
+    let response = consumer.query_offset().await.unwrap();
+
+    assert_eq!(offset, response);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_query_missing_offset_test() {
+    let env = TestEnvironment::create().await;
+    let consumer = env
+        .env
+        .consumer()
+        .name("test-name-new")
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        consumer.query_offset().await,
+        Err(ConsumerStoreOffsetError::Client(ClientError::RequestError(
+            ResponseCode::OffsetNotFound
+        ))),
+    ))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_store_and_query_offset_missing_name_test() {
+    let env = TestEnvironment::create().await;
+    let consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let offset: u64 = Faker.fake();
+
+    assert!(matches!(
+        consumer.store_offset(offset).await,
+        Err(ConsumerStoreOffsetError::NameMissing),
+    ));
+
+    assert!(matches!(
+        consumer.query_offset().await,
+        Err(ConsumerStoreOffsetError::NameMissing),
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_test_with_store_offset() {
+    let env = TestEnvironment::create().await;
+    let reference: String = Faker.fake();
+    let offset_to_store = 4;
+
+    let message_count = 10;
+    let mut producer = env
+        .env
+        .producer()
+        .name(&reference)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let mut consumer_store = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::Next)
+        .name("consumer-1")
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    for n in 0..message_count {
+        let _ = producer
+            .send_with_confirm(Message::builder().body(format!("message{}", n)).build())
+            .await
+            .unwrap();
+    }
+
+    for i in 0..message_count {
+        let delivery = consumer_store.next().await.unwrap();
+
+        // Store an offset
+        if i == offset_to_store {
+            //Store the 5th element produced
+            let result = consumer_store
+                .store_offset(delivery.unwrap().offset())
+                .await;
+        }
+    }
+
+    consumer_store.handle().close().await.unwrap();
+
+    let mut consumer_query = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::First)
+        .name("consumer-1")
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let offset = consumer_query.query_offset().await.unwrap();
+
+    assert!(offset == offset_to_store);
+
+    consumer_query.handle().close().await.unwrap();
+    producer.close().await.unwrap();
 }

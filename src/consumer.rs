@@ -14,8 +14,11 @@ use std::{
 use rabbitmq_stream_protocol::{
     commands::subscribe::OffsetSpecification, message::Message, ResponseKind,
 };
+
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tracing::trace;
+
+use crate::error::ConsumerStoreOffsetError;
 
 use crate::{
     client::{MessageHandler, MessageResult},
@@ -28,6 +31,8 @@ use rand::{seq::SliceRandom, SeedableRng};
 
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
+    // Mandatory in case of manual offset tracking
+    name: Option<String>,
     receiver: Receiver<Result<Delivery, ConsumerDeliveryError>>,
     internal: Arc<ConsumerInternal>,
 }
@@ -50,6 +55,7 @@ impl ConsumerInternal {
 
 /// Builder for [`Consumer`]
 pub struct ConsumerBuilder {
+    pub(crate) consumer_name: Option<String>,
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
 }
@@ -110,6 +116,7 @@ impl ConsumerBuilder {
 
         if response.is_ok() {
             Ok(Consumer {
+                name: self.consumer_name,
                 receiver: rx,
                 internal: consumer,
             })
@@ -125,6 +132,11 @@ impl ConsumerBuilder {
         self.offset_specification = offset_specification;
         self
     }
+
+    pub fn name(mut self, consumer_name: &str) -> Self {
+        self.consumer_name = Some(String::from(consumer_name));
+        self
+    }
 }
 
 impl Consumer {
@@ -136,6 +148,30 @@ impl Consumer {
     /// Check if the consumer is closed
     pub fn is_closed(&self) -> bool {
         self.internal.is_closed()
+    }
+
+    pub async fn store_offset(&self, offset: u64) -> Result<(), ConsumerStoreOffsetError> {
+        if let Some(name) = &self.name {
+            self.internal
+                .client
+                .store_offset(name.as_str(), self.internal.stream.as_str(), offset)
+                .await
+                .map(Ok)?
+        } else {
+            Err(ConsumerStoreOffsetError::NameMissing)
+        }
+    }
+
+    pub async fn query_offset(&self) -> Result<u64, ConsumerStoreOffsetError> {
+        if let Some(name) = &self.name {
+            self.internal
+                .client
+                .query_offset(name.clone(), self.internal.stream.as_str())
+                .await
+                .map(Ok)?
+        } else {
+            Err(ConsumerStoreOffsetError::NameMissing)
+        }
     }
 }
 
