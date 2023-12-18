@@ -28,7 +28,7 @@ jobs:
           tags: rabbitmq_tls:latest
           outputs: type=docker,dest=/tmp/rabbitmq_tls.tar
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rabbitmq_tls
           path: /tmp/rabbitmq_tls.tar
