@@ -56,10 +56,6 @@ async fn start_subscriber(
     client: &Client,
     notifier: Arc<Notify>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let _ = client
-        .subscribe(1, stream, OffsetSpecification::Next, 1, HashMap::new())
-        .await?;
-
     let client_inner = client.clone();
     let notifier_inner = notifier.clone();
     let counter = Arc::new(AtomicI32::new(0));
@@ -92,7 +88,11 @@ async fn start_subscriber(
         }
         Ok(())
     };
-
     client.set_handler(handler).await;
+
+    let _ = client
+        .subscribe(1, stream, OffsetSpecification::Next, 1, HashMap::new())
+        .await?;
+
     Ok(())
 }
