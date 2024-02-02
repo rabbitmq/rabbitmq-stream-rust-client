@@ -15,7 +15,7 @@ pub struct MessageBody {
 
 impl MessageBody {
     pub fn data(&self) -> Option<&Vec<u8>> {
-        self.data.get(0)
+        self.data.first()
     }
 
     pub fn value(&self) -> Option<&Value> {
