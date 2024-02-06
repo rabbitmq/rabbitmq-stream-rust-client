@@ -29,11 +29,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     start_publisher(
         environment.clone(),
         &opts,
-        opts.streams.get(0).unwrap().clone(),
+        opts.streams.first().unwrap().clone(),
     )
     .await?;
 
-    start_consumer(environment, &opts, opts.streams.get(0).unwrap().clone()).await?;
+    start_consumer(environment, &opts, opts.streams.first().unwrap().clone()).await?;
     loop {
         tokio::time::sleep(Duration::from_secs(60)).await;
     }
