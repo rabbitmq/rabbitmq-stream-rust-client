@@ -1,6 +1,9 @@
 use futures::Stream;
 use rabbitmq_stream_protocol::Response;
-use std::sync::{atomic::AtomicU32, Arc};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU32, Ordering},
+    Arc,
+};
 use tracing::trace;
 
 use dashmap::DashMap;
@@ -17,7 +20,7 @@ use super::{channel::ChannelReceiver, handler::MessageHandler};
 pub(crate) struct Dispatcher<T>(DispatcherState<T>);
 
 pub(crate) struct DispatcherState<T> {
-    requests: Arc<DashMap<u32, Sender<Response>>>,
+    requests: Arc<RequestsMap>,
     correlation_id: Arc<AtomicU32>,
     handler: Arc<RwLock<Option<T>>>,
 }
@@ -32,13 +35,49 @@ impl<T> Clone for DispatcherState<T> {
     }
 }
 
+struct RequestsMap {
+    requests: DashMap<u32, Sender<Response>>,
+    closed: AtomicBool,
+}
+
+impl RequestsMap {
+    fn new() -> RequestsMap {
+        RequestsMap {
+            requests: DashMap::new(),
+            closed: AtomicBool::new(false),
+        }
+    }
+
+    fn insert(&self, correlation_id: u32, sender: Sender<Response>) -> bool {
+        if self.closed.load(Ordering::Relaxed) {
+            return false;
+        }
+        self.requests.insert(correlation_id, sender);
+        true
+    }
+
+    fn remove(&self, correlation_id: u32) -> Option<Sender<Response>> {
+        self.requests.remove(&correlation_id).map(|r| r.1)
+    }
+
+    fn close(&self) {
+        self.closed.store(true, Ordering::Relaxed);
+        self.requests.clear();
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.requests.len()
+    }
+}
+
 impl<T> Dispatcher<T>
 where
     T: MessageHandler,
 {
     pub fn new() -> Dispatcher<T> {
         Dispatcher(DispatcherState {
-            requests: Arc::new(DashMap::new()),
+            requests: Arc::new(RequestsMap::new()),
             correlation_id: Arc::new(AtomicU32::new(0)),
             handler: Arc::new(RwLock::new(None)),
         })
@@ -47,13 +86,13 @@ where
     #[cfg(test)]
     pub fn with_handler(handler: T) -> Dispatcher<T> {
         Dispatcher(DispatcherState {
-            requests: Arc::new(DashMap::new()),
+            requests: Arc::new(RequestsMap::new()),
             correlation_id: Arc::new(AtomicU32::new(0)),
             handler: Arc::new(RwLock::new(Some(handler))),
         })
     }
 
-    pub async fn response_channel(&self) -> (u32, Receiver<Response>) {
+    pub fn response_channel(&self) -> Option<(u32, Receiver<Response>)> {
         let (tx, rx) = channel(1);
 
         let correlation_id = self
@@ -61,9 +100,11 @@ where
             .correlation_id
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        self.0.requests.insert(correlation_id, tx);
-
-        (correlation_id, rx)
+        if self.0.requests.insert(correlation_id, tx) {
+            Some((correlation_id, rx))
+        } else {
+            None
+        }
     }
 
     #[cfg(test)]
@@ -75,6 +116,7 @@ where
         let mut guard = self.0.handler.write().await;
         *guard = Some(handler);
     }
+
     pub async fn start<R>(&self, stream: ChannelReceiver<R>)
     where
         R: Stream<Item = Result<Response, ClientError>> + Unpin + Send,
@@ -89,10 +131,10 @@ where
     T: MessageHandler,
 {
     pub async fn dispatch(&self, correlation_id: u32, response: Response) {
-        let receiver = self.requests.remove(&correlation_id);
+        let receiver = self.requests.remove(correlation_id);
 
         if let Some(rcv) = receiver {
-            let _ = rcv.1.send(response).await;
+            let _ = rcv.send(response).await;
         }
     }
 
@@ -103,6 +145,7 @@ where
     }
 
     pub async fn close(self, error: Option<ClientError>) {
+        self.requests.close();
         if let Some(handler) = self.handler.read().await.as_ref() {
             if let Some(err) = error {
                 let _ = handler.handle_message(Some(Err(err))).await;
@@ -265,7 +308,7 @@ mod tests {
 
         dispatcher.start(rx).await;
 
-        let (correlation_id, mut rx) = dispatcher.response_channel().await;
+        let (correlation_id, mut rx) = dispatcher.response_channel().unwrap();
 
         let req: Request = PeerPropertiesCommand::new(correlation_id, HashMap::new()).into();
 
@@ -297,5 +340,20 @@ mod tests {
         let response = push_rx.recv().await;
 
         assert!(matches!(response, Some(..)));
+    }
+
+    #[tokio::test]
+    async fn should_reject_requests_after_closing() {
+        let mock_source = MockIO::push();
+
+        let dispatcher = Dispatcher::with_handler(|_| async { Ok(()) });
+
+        let maybe_channel = dispatcher.response_channel();
+        assert!(maybe_channel.is_some());
+
+        dispatcher.0.requests.close();
+
+        let maybe_channel = dispatcher.response_channel();
+        assert!(maybe_channel.is_none());
     }
 }

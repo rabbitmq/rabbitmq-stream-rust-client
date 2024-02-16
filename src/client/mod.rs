@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use std::ops::DerefMut;
 use std::{
     collections::HashMap,
     io,
@@ -21,8 +22,8 @@ use std::{fs::File, io::BufReader, path::Path};
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
 use tokio::io::ReadBuf;
+use tokio::sync::RwLock;
 use tokio::{net::TcpStream, sync::Notify};
-use tokio::{sync::RwLock, task::JoinHandle};
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::rustls::ClientConfig;
 use tokio_rustls::{rustls, TlsConnector};
@@ -79,6 +80,7 @@ mod message;
 mod metadata;
 mod metrics;
 mod options;
+mod task;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio-stream")))]
 #[pin_project(project = StreamProj)]
@@ -138,7 +140,7 @@ pub struct ClientState {
     heartbeat: u32,
     max_frame_size: u32,
     last_heatbeat: Instant,
-    heartbeat_task: Option<JoinHandle<()>>,
+    heartbeat_task: Option<task::TaskHandle>,
 }
 
 #[async_trait::async_trait]
@@ -249,9 +251,7 @@ impl Client {
 
         let mut state = self.state.write().await;
 
-        if let Some(heartbeat_task) = state.heartbeat_task.take() {
-            heartbeat_task.abort();
-        }
+        state.heartbeat_task.take();
 
         drop(state);
         self.channel.close().await
@@ -476,6 +476,9 @@ impl Client {
         })
         .await?;
 
+        // Start heartbeat task after connection is established
+        self.start_hearbeat_task(self.state.write().await.deref_mut());
+
         Ok(())
     }
 
@@ -545,13 +548,15 @@ impl Client {
         T: FromResponse,
         M: FnOnce(u32) -> R,
     {
-        let (correlation_id, mut receiver) = self.dispatcher.response_channel().await;
+        let Some((correlation_id, mut receiver)) = self.dispatcher.response_channel() else {
+            return Err(ClientError::ConnectionClosed);
+        };
 
         self.channel
             .send(msg_factory(correlation_id).into())
             .await?;
 
-        let response = receiver.recv().await.expect("It should contain a response");
+        let response = receiver.recv().await.ok_or(ClientError::ConnectionClosed)?;
 
         self.handle_response::<T>(response).await
     }
@@ -609,21 +614,8 @@ impl Client {
             heart_beat
         );
 
-        if let Some(task) = state.heartbeat_task.take() {
-            task.abort();
-        }
-
-        if heart_beat != 0 {
-            let heartbeat_interval = (heart_beat / 2).max(1);
-            let channel = self.channel.clone();
-            let heartbeat_task = tokio::spawn(async move {
-                loop {
-                    trace!("Sending heartbeat");
-                    let _ = channel.send(HeartBeatCommand::default().into()).await;
-                    tokio::time::sleep(Duration::from_secs(heartbeat_interval.into())).await;
-                }
-            });
-            state.heartbeat_task = Some(heartbeat_task);
+        if state.heartbeat_task.take().is_some() {
+            self.start_hearbeat_task(&mut state);
         }
 
         drop(state);
@@ -634,6 +626,23 @@ impl Client {
             .await;
 
         self.tune_notifier.notify_one();
+    }
+
+    fn start_hearbeat_task(&self, state: &mut ClientState) {
+        if state.heartbeat == 0 {
+            return;
+        }
+        let heartbeat_interval = (state.heartbeat / 2).max(1);
+        let channel = self.channel.clone();
+        let heartbeat_task = tokio::spawn(async move {
+            loop {
+                trace!("Sending heartbeat");
+                let _ = channel.send(HeartBeatCommand::default().into()).await;
+                tokio::time::sleep(Duration::from_secs(heartbeat_interval.into())).await;
+            }
+        })
+        .into();
+        state.heartbeat_task = Some(heartbeat_task);
     }
 
     async fn handle_heart_beat_command(&self) {

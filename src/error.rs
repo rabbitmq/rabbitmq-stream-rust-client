@@ -17,6 +17,8 @@ pub enum ClientError {
     GenericError(#[from] Box<dyn std::error::Error + Send + Sync>),
     #[error("Client already closed")]
     AlreadyClosed,
+    #[error("Connection closed")]
+    ConnectionClosed,
     #[error(transparent)]
     Tls(#[from] tokio_rustls::rustls::Error),
     #[error("Request error: {0:?}")]
