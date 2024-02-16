@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.4.1...rabbitmq-stream-client-v0.4.2) - 2024-02-16
+
+### Other
+- fix release-plz third attempt
+- fix release-plz second attempt
+- fix release-plz
+- raw client example: set handler before subscribtion ([#211](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/211))
+- Add ClientOptionsBuilder ([#210](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/210))
+
 ## [0.4.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.4.0...rabbitmq-stream-client-v0.4.1) - 2023-10-25
 
 ### Added
