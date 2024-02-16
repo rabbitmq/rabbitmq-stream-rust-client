@@ -12,6 +12,7 @@ changelog_update = true
 [[package]]
 name = "benchmark"
 publish = false
+release = false
 changelog_update = false
 
 [[package]]
