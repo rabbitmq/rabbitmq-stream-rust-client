@@ -94,7 +94,7 @@ let environment = Environment::builder().build().await?;
 let producer = environment.producer().name("myproducer").build("mystream").await?;
 for i in 0..10 {
     producer
-      .send(Message::builder().body(format!("message{}", i)).build())
+      .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
       .await?;
 }
 producer.close().await?;
@@ -111,10 +111,13 @@ let environment = Environment::builder().build().await?;
 let mut consumer = environment.consumer().build("mystream").await?;
 let handle = consumer.handle();
 task::spawn(async move {
-    while let Some(delivery) = consumer.next().await {
-           println!("Got message {:?}",delivery);
-    }
-});
+        while let Some(delivery) = consumer.next().await {
+            let d = delivery.unwrap();
+            println!("Got message: {:#?} with offset: {}",
+                     d.message().data().map(|data| String::from_utf8(data.to_vec()).unwrap()),
+                     d.offset(),);
+        }
+    });
 // wait 10 second and then close the consumer
 sleep(Duration::from_secs(10)).await;
 handle.close().await?;
