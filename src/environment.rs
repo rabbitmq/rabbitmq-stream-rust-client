@@ -126,6 +126,11 @@ impl EnvironmentBuilder {
         self.0.client_options.collector = Arc::new(collector);
         self
     }
+
+    pub fn load_balancer_mode(mut self, load_balancer_mode: bool) -> EnvironmentBuilder {
+        self.0.client_options.load_balancer_mode = load_balancer_mode;
+        self
+    }
 }
 #[derive(Clone, Default)]
 pub struct EnvironmentOptions {

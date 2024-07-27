@@ -69,19 +69,27 @@ impl ConsumerBuilder {
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
             // This is desired behavior in case there is only one node in the cluster.
-            if let Some(replica) = metadata.replicas.choose(&mut StdRng::from_entropy()) {
-                tracing::debug!(
-                    "Picked replica {:?} out of possible candidates {:?} for stream {}",
-                    replica,
-                    metadata.replicas,
-                    stream
-                );
-                client = Client::connect(ClientOptions {
-                    host: replica.host.clone(),
-                    port: replica.port as u16,
-                    ..self.environment.options.client_options
-                })
-                .await?;
+            let load_balancer_mode = self
+                .environment
+                .options
+                .client_options
+                .load_balancer_mode
+                .clone();
+            if !load_balancer_mode {
+                if let Some(replica) = metadata.replicas.choose(&mut StdRng::from_entropy()) {
+                    tracing::debug!(
+                        "Picked replica {:?} out of possible candidates {:?} for stream {}",
+                        replica,
+                        metadata.replicas,
+                        stream
+                    );
+                    client = Client::connect(ClientOptions {
+                        host: replica.host.clone(),
+                        port: replica.port as u16,
+                        ..self.environment.options.client_options
+                    })
+                    .await?;
+                }
             }
         } else {
             return Err(ConsumerCreateError::StreamDoesNotExist {

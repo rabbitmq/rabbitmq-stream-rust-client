@@ -119,13 +119,21 @@ impl<T> ProducerBuilder<T> {
                 metadata.leader,
                 stream
             );
-            client.close().await?;
-            client = Client::connect(ClientOptions {
-                host: metadata.leader.host.clone(),
-                port: metadata.leader.port as u16,
-                ..self.environment.options.client_options
-            })
-            .await?;
+            let load_balancer_mode = self
+                .environment
+                .options
+                .client_options
+                .load_balancer_mode
+                .clone();
+            if !load_balancer_mode {
+                client.close().await?;
+                client = Client::connect(ClientOptions {
+                    host: metadata.leader.host.clone(),
+                    port: metadata.leader.port as u16,
+                    ..self.environment.options.client_options
+                })
+                .await?
+            };
         } else {
             return Err(ProducerCreateError::StreamDoesNotExist {
                 stream: stream.into(),
