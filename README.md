@@ -86,6 +86,19 @@ let environment = Environment::builder()
     .build()
 ```
 
+##### Building the environment with a load balancer
+
+```rust,no_run
+use rabbitmq_stream_client::Environment;
+
+
+let environment = Environment::builder()
+    .load_balancer_mode(true)
+    .build()
+```
+
+
+
 ##### Publishing messages
 
 ```rust,no_run
