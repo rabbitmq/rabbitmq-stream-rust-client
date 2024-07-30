@@ -121,7 +121,7 @@ impl EnvironmentBuilder {
     }
     pub fn metrics_collector(
         mut self,
-        collector: impl MetricsCollector + Send + Sync + 'static,
+        collector: impl MetricsCollector + 'static,
     ) -> EnvironmentBuilder {
         self.0.client_options.collector = Arc::new(collector);
         self
