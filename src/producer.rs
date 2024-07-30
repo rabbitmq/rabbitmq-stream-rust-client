@@ -119,7 +119,7 @@ impl<T> ProducerBuilder<T> {
                 metadata.leader,
                 stream
             );
-            let load_balancer_mode: bool = self.environment.options.client_options.load_balancer_mode;
+            let load_balancer_mode = self.environment.options.client_options.load_balancer_mode;
             if load_balancer_mode {
                 // Producer must connect to leader node
                 let options: ClientOptions = self.environment.options.client_options.clone();
