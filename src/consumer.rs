@@ -82,10 +82,11 @@ impl ConsumerBuilder {
                     loop {
                         let temp_client = Client::connect(options.clone()).await?;
                         let mapping = temp_client.connection_properties().await;
-                        let advertised_host = mapping.get("advertised_host").unwrap();
-                        if *advertised_host == replica.host.clone() {
-                            client = temp_client;
-                            break;
+                        if let Some(advertised_host) = mapping.get("advertised_host") {
+                            if *advertised_host == replica.host.clone() {
+                                client = temp_client;
+                                break;
+                            }
                         }
                     }
                 } else {
