@@ -76,12 +76,27 @@ impl ConsumerBuilder {
                     metadata.replicas,
                     stream
                 );
-                client = Client::connect(ClientOptions {
-                    host: replica.host.clone(),
-                    port: replica.port as u16,
-                    ..self.environment.options.client_options
-                })
-                .await?;
+                let load_balancer_mode = self.environment.options.client_options.load_balancer_mode;
+                if load_balancer_mode {
+                    let options = self.environment.options.client_options.clone();
+                    loop {
+                        let temp_client = Client::connect(options.clone()).await?;
+                        let mapping = temp_client.connection_properties().await;
+                        if let Some(advertised_host) = mapping.get("advertised_host") {
+                            if *advertised_host == replica.host.clone() {
+                                client = temp_client;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    client = Client::connect(ClientOptions {
+                        host: replica.host.clone(),
+                        port: replica.port as u16,
+                        ..self.environment.options.client_options
+                    })
+                    .await?;
+                }
             }
         } else {
             return Err(ConsumerCreateError::StreamDoesNotExist {
@@ -100,7 +115,6 @@ impl ConsumerBuilder {
             waker: AtomicWaker::new(),
             metrics_collector: collector,
         });
-
         let msg_handler = ConsumerMessageHandler(consumer.clone());
         client.set_handler(msg_handler).await;
 

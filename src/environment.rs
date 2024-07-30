@@ -121,9 +121,14 @@ impl EnvironmentBuilder {
     }
     pub fn metrics_collector(
         mut self,
-        collector: impl MetricsCollector + Send + Sync + 'static,
+        collector: impl MetricsCollector + 'static,
     ) -> EnvironmentBuilder {
         self.0.client_options.collector = Arc::new(collector);
+        self
+    }
+
+    pub fn load_balancer_mode(mut self, load_balancer_mode: bool) -> EnvironmentBuilder {
+        self.0.client_options.load_balancer_mode = load_balancer_mode;
         self
     }
 }

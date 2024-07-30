@@ -12,6 +12,7 @@ pub struct ClientOptions {
     pub(crate) v_host: String,
     pub(crate) heartbeat: u32,
     pub(crate) max_frame_size: u32,
+    pub(crate) load_balancer_mode: bool,
     pub(crate) tls: TlsConfiguration,
     pub(crate) collector: Arc<dyn MetricsCollector>,
 }
@@ -39,6 +40,7 @@ impl Default for ClientOptions {
             v_host: "/".to_owned(),
             heartbeat: 60,
             max_frame_size: 1048576,
+            load_balancer_mode: false,
             collector: Arc::new(NopMetricsCollector {}),
             tls: TlsConfiguration {
                 enabled: false,
@@ -117,6 +119,11 @@ impl ClientOptionsBuilder {
         self
     }
 
+    pub fn load_balancer_mode(mut self, load_balancer_mode: bool) -> Self {
+        self.0.load_balancer_mode = load_balancer_mode;
+        self
+    }
+
     pub fn build(self) -> ClientOptions {
         self.0
     }
@@ -145,6 +152,7 @@ mod tests {
                 client_keys_path: String::from(""),
             })
             .collector(Arc::new(NopMetricsCollector {}))
+            .load_balancer_mode(true)
             .build();
         assert_eq!(options.host, "test");
         assert_eq!(options.port, 8888);
@@ -154,5 +162,6 @@ mod tests {
         assert_eq!(options.heartbeat, 10000);
         assert_eq!(options.max_frame_size, 1);
         assert_eq!(options.tls.enabled, true);
+        assert_eq!(options.load_balancer_mode, true);
     }
 }
