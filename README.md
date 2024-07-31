@@ -1,8 +1,8 @@
-<h1 align="center">RabbitMQ Stream Rust</h1>
+<h1 align="center">RabbitMQ Streams Client for Rust</h1>
 <br/>
 <div align="center">
  <strong>
-   A Work in progress Rust Client for RabbitMQ Stream
+   A work-in-progress Rust client for RabbitMQ Streams
  </strong>
 </div>
 
@@ -40,7 +40,7 @@
 
 # RabbitMQ Stream Client
 
-A Rust Client for [RabbitMQ Stream Queues](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)
+This is a Rust client library for working with [RabbitMQ Streams](https://www.rabbitmq.com/docs/streams).
 
 ### Installation
 

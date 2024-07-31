@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.4.2...rabbitmq-stream-client-v0.4.3) - 2024-07-30
+
+### Other
+- Add Client Workaround With a Load Balancer ([#220](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/220))
+- Update README.md
+- udpate producer and consumer ([#217](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/217))
+
 ## [0.4.2](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.4.1...rabbitmq-stream-client-v0.4.2) - 2024-02-16
 
 ### Other
