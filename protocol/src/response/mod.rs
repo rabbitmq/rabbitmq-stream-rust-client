@@ -7,7 +7,8 @@ use crate::{
     },
     commands::{
         close::CloseResponse, credit::CreditResponse, deliver::DeliverCommand,
-        generic::GenericResponse, heart_beat::HeartbeatResponse, metadata::MetadataResponse,
+        exchange_command_versions::ExchangeCommandVersionsResponse, generic::GenericResponse,
+        heart_beat::HeartbeatResponse, metadata::MetadataResponse,
         metadata_update::MetadataUpdateCommand, open::OpenResponse,
         peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
         publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
@@ -66,6 +67,7 @@ pub enum ResponseKind {
     QueryOffset(QueryOffsetResponse),
     QueryPublisherSequence(QueryPublisherResponse),
     Credit(CreditResponse),
+    ExchangeCommandVersions(ExchangeCommandVersionsResponse),
 }
 
 impl Response {
@@ -92,6 +94,9 @@ impl Response {
             ResponseKind::Heartbeat(_) => None,
             ResponseKind::Deliver(_) => None,
             ResponseKind::Credit(_) => None,
+            ResponseKind::ExchangeCommandVersions(exchange_command_versions) => {
+                Some(exchange_command_versions.correlation_id)
+            }
         }
     }
 
@@ -164,7 +169,10 @@ impl Decoder for Response {
 
             COMMAND_QUERY_PUBLISHER_SEQUENCE => QueryPublisherResponse::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::QueryPublisherSequence(kind)))?,
-
+            COMMAND_EXCHANGE_COMMAND_VERSIONS => ExchangeCommandVersionsResponse::decode(input)
+                .map(|(remaining, kind)| {
+                    (remaining, ResponseKind::ExchangeCommandVersions(kind))
+                })?,
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
@@ -195,7 +203,8 @@ mod tests {
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
-            close::CloseResponse, deliver::DeliverCommand, generic::GenericResponse,
+            close::CloseResponse, deliver::DeliverCommand,
+            exchange_command_versions::ExchangeCommandVersionsResponse, generic::GenericResponse,
             heart_beat::HeartbeatResponse, metadata::MetadataResponse,
             metadata_update::MetadataUpdateCommand, open::OpenResponse,
             peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
@@ -213,6 +222,7 @@ mod tests {
             },
             version::PROTOCOL_VERSION,
         },
+        response::COMMAND_EXCHANGE_COMMAND_VERSIONS,
         types::Header,
         ResponseCode,
     };
@@ -238,6 +248,9 @@ mod tests {
                     query_publisher.encoded_size()
                 }
                 ResponseKind::Credit(credit) => credit.encoded_size(),
+                ResponseKind::ExchangeCommandVersions(exchange_command_versions) => {
+                    exchange_command_versions.encoded_size()
+                }
             }
         }
 
@@ -263,6 +276,9 @@ mod tests {
                     query_publisher.encode(writer)
                 }
                 ResponseKind::Credit(credit) => credit.encode(writer),
+                ResponseKind::ExchangeCommandVersions(exchange_command_versions) => {
+                    exchange_command_versions.encode(writer)
+                }
             }
         }
     }
@@ -421,6 +437,15 @@ mod tests {
             HeartbeatResponse,
             ResponseKind::Heartbeat,
             COMMAND_HEARTBEAT
+        );
+    }
+
+    #[test]
+    fn exchange_command_versions_response_test() {
+        response_test!(
+            ExchangeCommandVersionsResponse,
+            ResponseKind::ExchangeCommandVersions,
+            COMMAND_EXCHANGE_COMMAND_VERSIONS
         );
     }
 }

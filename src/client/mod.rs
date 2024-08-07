@@ -16,6 +16,9 @@ use futures::{
     Stream, StreamExt, TryFutureExt,
 };
 use pin_project::pin_project;
+use rabbitmq_stream_protocol::commands::exchange_command_versions::{
+    ExchangeCommandVersionsRequest, ExchangeCommandVersionsResponse,
+};
 use rustls::PrivateKey;
 use rustls::ServerName;
 use std::{fs::File, io::BufReader, path::Path};
@@ -409,6 +412,17 @@ impl Client {
         })
         .await
         .map(|sequence| sequence.from_response())
+    }
+
+    pub async fn exchange_command_versions(
+        &self,
+        min_version: u16,
+        max_version: u16,
+    ) -> RabbitMQStreamResult<ExchangeCommandVersionsResponse> {
+        self.send_and_receive::<ExchangeCommandVersionsResponse, _, _>(|correlation_id| {
+            ExchangeCommandVersionsRequest::new(correlation_id, min_version, max_version)
+        })
+        .await
     }
 
     async fn create_connection(

@@ -280,7 +280,7 @@ async fn consumer_test_with_store_offset() {
 
     consumer_store.handle().close().await.unwrap();
 
-    let mut consumer_query = env
+    let consumer_query = env
         .env
         .consumer()
         .offset(OffsetSpecification::First)

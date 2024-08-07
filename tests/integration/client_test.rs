@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use fake::{Fake, Faker};
-use rabbitmq_stream_protocol::commands::close::CloseRequest;
 use tokio::sync::mpsc::channel;
 
 use rabbitmq_stream_client::error::ClientError;
@@ -377,4 +376,12 @@ async fn client_handle_unexpected_connection_interruption() {
     options.set_port(5672);
     let res = Client::connect(options).await;
     assert!(matches!(res, Err(ClientError::ConnectionClosed)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_exchange_command_versions() {
+    let test = TestClient::create().await;
+
+    let response = test.client.exchange_command_versions(1, 1).await.unwrap();
+    assert_eq!(&ResponseCode::Ok, response.code());
 }

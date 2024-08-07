@@ -5,6 +5,7 @@ pub mod declare_publisher;
 pub mod delete;
 pub mod delete_publisher;
 pub mod deliver;
+pub mod exchange_command_versions;
 pub mod generic;
 pub mod heart_beat;
 pub mod metadata;
