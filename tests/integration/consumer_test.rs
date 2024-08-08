@@ -54,6 +54,65 @@ async fn consumer_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn consumer_test_offset_specification_offset() {
+    let env = TestEnvironment::create().await;
+    let reference: String = Faker.fake();
+    let mut messages_received = 0;
+    let mut first_offset = 0;
+
+    let message_count = 10;
+    let mut producer = env
+        .env
+        .producer()
+        .name(&reference)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let mut consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::Offset(5))
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    for n in 0..message_count - 1 {
+        let _ = producer
+            .send_with_confirm(Message::builder().body(format!("message{}", n)).build())
+            .await
+            .unwrap();
+    }
+
+    let _ = producer
+        .send_with_confirm(
+            Message::builder()
+                .body(format!("marker{}", message_count - 1))
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    while let Some(delivery) = consumer.next().await {
+        let d = delivery.unwrap();
+        if first_offset == 0 {
+            first_offset = d.offset();
+        }
+        messages_received += 1;
+
+        if String::from_utf8_lossy(d.message().data().unwrap()).contains("marker") {
+            break;
+        }
+    }
+
+    consumer.handle().close().await.unwrap();
+    producer.close().await.unwrap();
+
+    assert!(first_offset == 5);
+    assert!(messages_received == 5);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn consumer_close_test() {
     let env = TestEnvironment::create().await;
 
