@@ -73,6 +73,8 @@ pub struct ProducerInternal {
     waiting_confirmations: WaiterMap,
     closed: Arc<AtomicBool>,
     accumulator: MessageAccumulator,
+    publish_version: u16,
+    filter_value_extractor: Option<fn(Message) -> String>,
 }
 
 impl ProducerInternal {
@@ -99,6 +101,7 @@ pub struct ProducerBuilder<T> {
     pub batch_size: usize,
     pub batch_publishing_delay: Duration,
     pub(crate) data: PhantomData<T>,
+    pub filter_value_extractor: Option<fn(Message) -> String>,
 }
 
 #[derive(Clone)]
@@ -170,6 +173,18 @@ impl<T> ProducerBuilder<T> {
         };
 
         if response.is_ok() {
+            let mut publish_version = 1;
+            if let Some(filter_value_extractor) = self.filter_value_extractor {
+                publish_version = 2;
+                let exchange_command_version = client.exchange_command_versions(1, 2).await?;
+                let (_, max_version) = exchange_command_version.key_version(2);
+                if max_version < publish_version {
+                    return Err(ProducerCreateError::VersionNotSupport {
+                        client_version: publish_version,
+                        server_version: max_version,
+                    });
+                }
+            }
             let producer = ProducerInternal {
                 producer_id,
                 batch_size: self.batch_size,
@@ -177,8 +192,10 @@ impl<T> ProducerBuilder<T> {
                 client,
                 publish_sequence,
                 waiting_confirmations,
+                publish_version,
                 closed: Arc::new(AtomicBool::new(false)),
                 accumulator: MessageAccumulator::new(self.batch_size),
+                filter_value_extractor: self.filter_value_extractor,
             };
 
             let internal_producer = Arc::new(producer);
@@ -211,7 +228,13 @@ impl<T> ProducerBuilder<T> {
             batch_size: self.batch_size,
             batch_publishing_delay: self.batch_publishing_delay,
             data: PhantomData,
+            filter_value_extractor: None,
         }
+    }
+
+    pub fn filter_value_extractor(mut self, filter_value_extractor: fn(Message) -> String) -> Self {
+        self.filter_value_extractor = Some(filter_value_extractor);
+        self
     }
 }
 
@@ -437,7 +460,11 @@ impl<T> Producer<T> {
             Some(publishing_id) => *publishing_id,
             None => self.0.publish_sequence.fetch_add(1, Ordering::Relaxed),
         };
-        let msg = ClientMessage::new(publishing_id, message.clone());
+        let mut msg = ClientMessage::new(publishing_id, message.clone(), None);
+
+        if let Some(f) = self.0.filter_value_extractor.as_ref() {
+            msg.filter_value(f)
+        }
 
         let waiter = ProducerMessageWaiter::waiter_with_cb(cb, message);
         self.0.waiting_confirmations.insert(publishing_id, waiter);
@@ -470,7 +497,11 @@ impl<T> Producer<T> {
                 None => self.0.publish_sequence.fetch_add(1, Ordering::Relaxed),
             };
 
-            wrapped_msgs.push(ClientMessage::new(publishing_id, message));
+            let mut client_message = ClientMessage::new(publishing_id, message, None);
+            if let Some(f) = self.0.filter_value_extractor.as_ref() {
+                client_message.filter_value(f)
+            }
+            wrapped_msgs.push(client_message);
 
             self.0
                 .waiting_confirmations

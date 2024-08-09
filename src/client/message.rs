@@ -1,8 +1,10 @@
 use rabbitmq_stream_protocol::message::Message;
+use std::sync::Arc;
 
 pub trait BaseMessage {
     fn publishing_id(&self) -> Option<u64>;
     fn to_message(self) -> Message;
+    fn filter_value(&self) -> Option<String>;
 }
 
 impl BaseMessage for Message {
@@ -13,20 +15,30 @@ impl BaseMessage for Message {
     fn to_message(self) -> Message {
         self
     }
+
+    fn filter_value(&self) -> Option<String> {
+        None
+    }
 }
 
 #[derive(Debug)]
 pub struct ClientMessage {
     publishing_id: u64,
     message: Message,
+    filter_value: Option<String>,
 }
 
 impl ClientMessage {
-    pub fn new(publishing_id: u64, message: Message) -> Self {
+    pub fn new(publishing_id: u64, message: Message, filter_value: Option<String>) -> Self {
         Self {
             publishing_id,
             message,
+            filter_value,
         }
+    }
+
+    pub fn filter_value(&mut self, filter_value_extractor: &fn(Message) -> String) {
+        self.filter_value = Some(filter_value_extractor(self.message.clone()));
     }
 }
 
@@ -37,5 +49,9 @@ impl BaseMessage for ClientMessage {
 
     fn to_message(self) -> Message {
         self.message
+    }
+
+    fn filter_value(&self) -> Option<String> {
+        self.filter_value.clone()
     }
 }

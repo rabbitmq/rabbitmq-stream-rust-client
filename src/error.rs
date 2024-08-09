@@ -88,6 +88,12 @@ pub enum ProducerCreateError {
 
     #[error(transparent)]
     Client(#[from] ClientError),
+
+    #[error("Server publish version {server_version} not support client pulish version {client_version}")]
+    VersionNotSupport {
+        client_version: u16,
+        server_version: u16,
+    }
 }
 
 #[derive(Error, Debug)]

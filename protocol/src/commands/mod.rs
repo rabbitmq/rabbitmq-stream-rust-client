@@ -1,3 +1,5 @@
+use crate::protocol::version::PROTOCOL_VERSION;
+
 pub mod close;
 pub mod create_stream;
 pub mod credit;
@@ -26,6 +28,9 @@ pub mod unsubscribe;
 
 pub trait Command {
     fn key(&self) -> u16;
+    fn version(&self) -> u16 {
+        PROTOCOL_VERSION
+    }
 }
 
 #[cfg(test)]

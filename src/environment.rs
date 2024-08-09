@@ -45,6 +45,7 @@ impl Environment {
             batch_size: 100,
             batch_publishing_delay: Duration::from_millis(100),
             data: PhantomData,
+            filter_value_extractor: None,
         }
     }
 

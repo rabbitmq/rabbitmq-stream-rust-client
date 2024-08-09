@@ -11,7 +11,6 @@ use crate::{
         store_offset::StoreOffset, subscribe::SubscribeCommand, tune::TunesCommand,
         unsubscribe::UnSubscribeCommand, Command,
     },
-    protocol::version::PROTOCOL_VERSION,
     types::Header,
     Request, RequestKind,
 };
@@ -21,7 +20,7 @@ where
 {
     fn from(cmd: T) -> Self {
         Request {
-            header: Header::new(cmd.key(), PROTOCOL_VERSION),
+            header: Header::new(cmd.key(), cmd.version()),
             kind: cmd.into(),
         }
     }

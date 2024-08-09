@@ -380,11 +380,11 @@ impl Client {
             .into()
             .into_iter()
             .map(|message| {
-                let publishing_id = message
+                let publishing_id: u64 = message
                     .publishing_id()
                     .unwrap_or_else(|| self.publish_sequence.fetch_add(1, Ordering::Relaxed));
 
-                PublishedMessage::new(publishing_id, message.to_message())
+                PublishedMessage::new(publishing_id, message.to_message(), message.filter_value())
             })
             .collect();
         let sequences = messages
