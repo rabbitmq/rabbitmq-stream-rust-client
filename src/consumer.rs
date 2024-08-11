@@ -40,6 +40,7 @@ pub struct Consumer {
 struct ConsumerInternal {
     client: Client,
     stream: String,
+    offset_specification: OffsetSpecification,
     subscription_id: u8,
     sender: Sender<Result<Delivery, ConsumerDeliveryError>>,
     closed: Arc<AtomicBool>,
@@ -110,6 +111,7 @@ impl ConsumerBuilder {
             subscription_id,
             stream: stream.to_string(),
             client: client.clone(),
+            offset_specification: self.offset_specification.clone(),
             sender: tx,
             closed: Arc::new(AtomicBool::new(false)),
             waker: AtomicWaker::new(),
@@ -243,6 +245,12 @@ impl MessageHandler for ConsumerMessageHandler {
                     let len = delivery.messages.len();
                     trace!("Got delivery with messages {}", len);
                     for message in delivery.messages {
+                        if let OffsetSpecification::Offset(offset_) = self.0.offset_specification {
+                            if offset_ > offset {
+                                offset += 1;
+                                continue;
+                            }
+                        }
                         let _ = self
                             .0
                             .sender

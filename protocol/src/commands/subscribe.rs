@@ -94,7 +94,7 @@ impl Command for SubscribeCommand {
 }
 
 #[cfg_attr(test, derive(fake::Dummy))]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum OffsetSpecification {
     First,
     Last,
