@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.4.2...rabbitmq-stream-protocol-v0.4.3) - 2024-08-11
+
+### Fixed
+- fixing bug when consuming from OffsetSpecification:Offset ([#223](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/223))
+
 ## [0.4.2](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.4.1...rabbitmq-stream-protocol-v0.4.2) - 2024-02-16
 
 ### Other
