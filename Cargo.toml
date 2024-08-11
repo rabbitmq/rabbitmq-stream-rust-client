@@ -1,6 +1,6 @@
 [package]
 name = "rabbitmq-stream-client"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["wolf4ood <enrico.risa@gmail.com>", "korsmakolnikov <korsmakolnikov@gmail.com>", "gsantomaggio <g.santomaggio@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0 OR MPL-2.0"
