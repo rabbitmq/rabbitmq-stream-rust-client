@@ -351,7 +351,7 @@ async fn client_publish() {
 
     let sequences = test
         .client
-        .publish(1, Message::builder().body(b"message".to_vec()).build())
+        .publish(1, Message::builder().body(b"message".to_vec()).build(), 1)
         .await
         .unwrap();
 
@@ -382,6 +382,6 @@ async fn client_handle_unexpected_connection_interruption() {
 async fn client_exchange_command_versions() {
     let test = TestClient::create().await;
 
-    let response = test.client.exchange_command_versions(1, 1).await.unwrap();
+    let response = test.client.exchange_command_versions().await.unwrap();
     assert_eq!(&ResponseCode::Ok, response.code());
 }

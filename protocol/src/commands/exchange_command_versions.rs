@@ -3,7 +3,7 @@ use std::io::Write;
 use crate::{
     codec::{decoder::read_vec, Decoder, Encoder},
     error::{DecodeError, EncodeError},
-    protocol::commands::{COMMAND_EXCHANGE_COMMAND_VERSIONS, COMMAND_PUBLISH},
+    protocol::commands::COMMAND_EXCHANGE_COMMAND_VERSIONS,
     response::{FromResponse, ResponseCode},
 };
 
@@ -15,7 +15,13 @@ use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Eq, Debug)]
-struct ExchangeCommandVersion(u16, u16, u16);
+pub struct ExchangeCommandVersion(u16, u16, u16);
+
+impl ExchangeCommandVersion {
+    pub fn new(key: u16, min_version: u16, max_version: u16) -> Self {
+        return ExchangeCommandVersion(key, min_version, max_version);
+    }
+}
 
 impl Encoder for ExchangeCommandVersion {
     fn encoded_size(&self) -> u32 {
@@ -64,42 +70,27 @@ impl Decoder for Vec<ExchangeCommandVersion> {
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Eq, Debug)]
 pub struct ExchangeCommandVersionsRequest {
-    correlation_id: u32,
-    key: u16,
-    min_version: u16,
-    max_version: u16,
+    pub(crate) correlation_id: u32,
+    commands: Vec<ExchangeCommandVersion>,
 }
 
 impl ExchangeCommandVersionsRequest {
-    pub fn new(correlation_id: u32, min_version: u16, max_version: u16) -> Self {
+    pub fn new(correlation_id: u32, commands: Vec<ExchangeCommandVersion>) -> Self {
         Self {
             correlation_id,
-            min_version,
-            max_version,
-            key: COMMAND_PUBLISH,
+            commands,
         }
     }
 }
 
 impl Encoder for ExchangeCommandVersionsRequest {
     fn encoded_size(&self) -> u32 {
-        self.correlation_id.encoded_size()
-            + vec![ExchangeCommandVersion(
-                self.key,
-                self.min_version,
-                self.max_version,
-            )]
-            .encoded_size()
+        self.correlation_id.encoded_size() + self.commands.encoded_size()
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.correlation_id.encode(writer)?;
-        vec![ExchangeCommandVersion(
-            self.key,
-            self.min_version,
-            self.max_version,
-        )]
-        .encode(writer)?;
+        self.commands.encode(writer)?;
         Ok(())
     }
 }
@@ -114,27 +105,13 @@ impl Decoder for ExchangeCommandVersionsRequest {
     fn decode(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
         let (input, correlation_id) = u32::decode(input)?;
         let (input, commands) = <Vec<ExchangeCommandVersion>>::decode(input)?;
-        let command = commands.get(0);
-        match command {
-            Some(&ExchangeCommandVersion(key, min_version, max_version)) => Ok((
-                input,
-                ExchangeCommandVersionsRequest {
-                    correlation_id,
-                    key,
-                    min_version,
-                    max_version,
-                },
-            )),
-            None => Ok((
-                input,
-                ExchangeCommandVersionsRequest {
-                    correlation_id,
-                    key: 0,
-                    min_version: 0,
-                    max_version: 0,
-                },
-            )),
-        }
+        Ok((
+            input,
+            ExchangeCommandVersionsRequest {
+                correlation_id,
+                commands,
+            },
+        ))
     }
 }
 
@@ -147,17 +124,17 @@ pub struct ExchangeCommandVersionsResponse {
 }
 
 impl ExchangeCommandVersionsResponse {
-    // pub fn new(
-    //     correlation_id: u32,
-    //     response_code: ResponseCode,
-    //     commands: Vec<ExchangeCommandVersion>,
-    // ) -> Self {
-    //     Self {
-    //         correlation_id,
-    //         response_code,
-    //         commands,
-    //     }
-    // }
+    pub fn new(
+        correlation_id: u32,
+        response_code: ResponseCode,
+        commands: Vec<ExchangeCommandVersion>,
+    ) -> Self {
+        Self {
+            correlation_id,
+            response_code,
+            commands,
+        }
+    }
 
     pub fn code(&self) -> &ResponseCode {
         &self.response_code

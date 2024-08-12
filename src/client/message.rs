@@ -1,5 +1,4 @@
 use rabbitmq_stream_protocol::message::Message;
-use std::sync::Arc;
 
 pub trait BaseMessage {
     fn publishing_id(&self) -> Option<u64>;
@@ -37,7 +36,7 @@ impl ClientMessage {
         }
     }
 
-    pub fn filter_value(&mut self, filter_value_extractor: &fn(Message) -> String) {
+    pub fn filter_value_extract(&mut self, filter_value_extractor: &fn(Message) -> String) {
         self.filter_value = Some(filter_value_extractor(self.message.clone()));
     }
 }

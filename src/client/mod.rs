@@ -193,6 +193,7 @@ pub struct Client {
     opts: ClientOptions,
     tune_notifier: Arc<Notify>,
     publish_sequence: Arc<AtomicU64>,
+    filtering_supported: bool,
 }
 
 impl Client {
@@ -219,9 +220,16 @@ impl Client {
             state: Arc::new(RwLock::new(state)),
             tune_notifier: Arc::new(Notify::new()),
             publish_sequence: Arc::new(AtomicU64::new(1)),
+            filtering_supported: false,
         };
 
         client.initialize(receiver).await?;
+
+        let command_versions = client.exchange_command_versions().await?;
+        let (_, max_version) = command_versions.key_version(2);
+        if max_version >= 2 {
+            client.filtering_supported = true
+        }
 
         Ok(client)
     }
@@ -375,6 +383,7 @@ impl Client {
         &self,
         publisher_id: u8,
         messages: impl Into<Vec<T>>,
+        version: u16,
     ) -> RabbitMQStreamResult<Vec<u64>> {
         let messages: Vec<PublishedMessage> = messages
             .into()
@@ -383,8 +392,8 @@ impl Client {
                 let publishing_id: u64 = message
                     .publishing_id()
                     .unwrap_or_else(|| self.publish_sequence.fetch_add(1, Ordering::Relaxed));
-
-                PublishedMessage::new(publishing_id, message.to_message(), message.filter_value())
+                let filter_value = message.filter_value();
+                PublishedMessage::new(publishing_id, message.to_message(), filter_value)
             })
             .collect();
         let sequences = messages
@@ -394,7 +403,7 @@ impl Client {
         let len = messages.len();
 
         // TODO batch publish with max frame size check
-        self.send(PublishCommand::new(publisher_id, messages))
+        self.send(PublishCommand::new(publisher_id, messages, version))
             .await?;
 
         self.opts.collector.publish(len as u64).await;
@@ -416,13 +425,15 @@ impl Client {
 
     pub async fn exchange_command_versions(
         &self,
-        min_version: u16,
-        max_version: u16,
     ) -> RabbitMQStreamResult<ExchangeCommandVersionsResponse> {
         self.send_and_receive::<ExchangeCommandVersionsResponse, _, _>(|correlation_id| {
-            ExchangeCommandVersionsRequest::new(correlation_id, min_version, max_version)
+            ExchangeCommandVersionsRequest::new(correlation_id, vec![])
         })
         .await
+    }
+
+    pub fn filtering_supported(&self) -> bool {
+        self.filtering_supported
     }
 
     async fn create_connection(

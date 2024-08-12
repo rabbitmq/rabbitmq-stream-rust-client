@@ -3,7 +3,7 @@ use fake::{Fake, Faker};
 use futures::StreamExt;
 use tokio::sync::mpsc::channel;
 
-use rabbitmq_stream_client::types::{Message, OffsetSpecification};
+use rabbitmq_stream_client::types::{Message, OffsetSpecification, SimpleValue};
 
 use crate::common::TestEnvironment;
 
@@ -375,6 +375,50 @@ async fn producer_send_after_close_error() {
         .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
         .await
         .unwrap_err();
+
+    assert_eq!(
+        matches!(
+            closed,
+            rabbitmq_stream_client::error::ProducerPublishError::Closed
+        ),
+        true
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_send_filtering_message() {
+    let env = TestEnvironment::create().await;
+    let producer = env
+        .env
+        .producer()
+        .filter_value_extractor(|message| {
+            let app_properties = message.application_properties();
+            match app_properties {
+                Some(properties) => {
+                    let value = properties.get("region").and_then(|item| match item {
+                        SimpleValue::String(s) => Some(s.clone()),
+                        _ => None,
+                    });
+                    value.unwrap_or(String::from(""))
+                }
+                None => String::from(""),
+            }
+        })
+        .build(&env.stream)
+        .await
+        .unwrap();
+    producer.clone().close().await.unwrap();
+
+    let message_builder = Message::builder();
+    let mut application_properties = message_builder.application_properties();
+    application_properties = application_properties.insert("region", "emea");
+
+    let message = application_properties
+        .message_builder()
+        .body(b"message".to_vec())
+        .build();
+
+    let closed = producer.send_with_confirm(message).await.unwrap_err();
 
     assert_eq!(
         matches!(

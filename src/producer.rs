@@ -83,7 +83,9 @@ impl ProducerInternal {
 
         if !messages.is_empty() {
             debug!("Sending batch of {} messages", messages.len());
-            self.client.publish(self.producer_id, messages).await?;
+            self.client
+                .publish(self.producer_id, messages, self.publish_version)
+                .await?;
         }
 
         Ok(())
@@ -115,6 +117,17 @@ impl<T> ProducerBuilder<T> {
         // The leader is the recommended node for writing, because writing to a replica will redundantly pass these messages
         // to the leader anyway - it is the only one capable of writing.
         let mut client = self.environment.create_client().await?;
+
+        let mut publish_version = 1;
+
+        if self.filter_value_extractor.is_some() {
+            if client.filtering_supported() {
+                publish_version = 2
+            } else {
+                return Err(ProducerCreateError::FilteringNotSupport);
+            }
+        }
+
         let metrics_collector = self.environment.options.client_options.collector.clone();
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             tracing::debug!(
@@ -173,18 +186,6 @@ impl<T> ProducerBuilder<T> {
         };
 
         if response.is_ok() {
-            let mut publish_version = 1;
-            if let Some(filter_value_extractor) = self.filter_value_extractor {
-                publish_version = 2;
-                let exchange_command_version = client.exchange_command_versions(1, 2).await?;
-                let (_, max_version) = exchange_command_version.key_version(2);
-                if max_version < publish_version {
-                    return Err(ProducerCreateError::VersionNotSupport {
-                        client_version: publish_version,
-                        server_version: max_version,
-                    });
-                }
-            }
             let producer = ProducerInternal {
                 producer_id,
                 batch_size: self.batch_size,
@@ -463,7 +464,7 @@ impl<T> Producer<T> {
         let mut msg = ClientMessage::new(publishing_id, message.clone(), None);
 
         if let Some(f) = self.0.filter_value_extractor.as_ref() {
-            msg.filter_value(f)
+            msg.filter_value_extract(f)
         }
 
         let waiter = ProducerMessageWaiter::waiter_with_cb(cb, message);
@@ -499,7 +500,7 @@ impl<T> Producer<T> {
 
             let mut client_message = ClientMessage::new(publishing_id, message, None);
             if let Some(f) = self.0.filter_value_extractor.as_ref() {
-                client_message.filter_value(f)
+                client_message.filter_value_extract(f)
             }
             wrapped_msgs.push(client_message);
 
@@ -510,7 +511,7 @@ impl<T> Producer<T> {
 
         self.0
             .client
-            .publish(self.0.producer_id, wrapped_msgs)
+            .publish(self.0.producer_id, wrapped_msgs, self.0.publish_version)
             .await?;
 
         Ok(())
