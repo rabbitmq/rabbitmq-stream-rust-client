@@ -55,6 +55,7 @@ impl Environment {
             consumer_name: None,
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
+            filter_configuration: None,
         }
     }
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {

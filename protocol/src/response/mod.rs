@@ -120,7 +120,6 @@ impl Decoder for Response {
         let (input, _) = read_u32(input)?;
 
         let (input, header) = Header::decode(input)?;
-
         let (input, kind) = match header.key() {
             COMMAND_OPEN => {
                 OpenResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Open(kind)))?

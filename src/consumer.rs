@@ -12,7 +12,9 @@ use std::{
 };
 
 use rabbitmq_stream_protocol::{
-    commands::subscribe::OffsetSpecification, message::Message, ResponseKind,
+    commands::subscribe::OffsetSpecification,
+    message::{self, Message},
+    ResponseKind,
 };
 
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -45,6 +47,7 @@ struct ConsumerInternal {
     closed: Arc<AtomicBool>,
     waker: AtomicWaker,
     metrics_collector: Arc<dyn MetricsCollector>,
+    filter_configuration: Option<FilterConfiguration>,
 }
 
 impl ConsumerInternal {
@@ -53,11 +56,34 @@ impl ConsumerInternal {
     }
 }
 
+#[derive(Clone)]
+pub struct FilterConfiguration {
+    filter_values: Vec<String>,
+    pub predicate: Arc<dyn Fn(&Message) -> bool + Send + Sync>,
+    match_unfiltered: bool,
+}
+
+impl FilterConfiguration {
+    pub fn new(
+        filter_values: Vec<String>,
+        predicate: impl Fn(&Message) -> bool + 'static + Send + Sync,
+        match_unfiltered: bool,
+    ) -> Self {
+        let f = Arc::new(predicate);
+        Self {
+            filter_values,
+            match_unfiltered,
+            predicate: f,
+        }
+    }
+}
+
 /// Builder for [`Consumer`]
 pub struct ConsumerBuilder {
     pub(crate) consumer_name: Option<String>,
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
+    pub(crate) filter_configuration: Option<FilterConfiguration>,
 }
 
 impl ConsumerBuilder {
@@ -114,9 +140,27 @@ impl ConsumerBuilder {
             closed: Arc::new(AtomicBool::new(false)),
             waker: AtomicWaker::new(),
             metrics_collector: collector,
+            filter_configuration: self.filter_configuration.clone(),
         });
         let msg_handler = ConsumerMessageHandler(consumer.clone());
         client.set_handler(msg_handler).await;
+
+        let mut properties = HashMap::new();
+        if let Some(filter_input) = self.filter_configuration {
+            if !client.filtering_supported() {
+                return Err(ConsumerCreateError::FilteringNotSupport);
+            }
+            for (index, item) in filter_input.filter_values.iter().enumerate() {
+                let key = format!("filter.{}", index);
+                properties.insert(key, item.to_owned());
+            }
+
+            let match_unfiltered_key = "match-unfiltered".to_string();
+            properties.insert(
+                match_unfiltered_key,
+                filter_input.match_unfiltered.to_string(),
+            );
+        }
 
         let response = client
             .subscribe(
@@ -124,7 +168,7 @@ impl ConsumerBuilder {
                 stream,
                 self.offset_specification,
                 1,
-                HashMap::new(),
+                properties,
             )
             .await?;
 
@@ -149,6 +193,11 @@ impl ConsumerBuilder {
 
     pub fn name(mut self, consumer_name: &str) -> Self {
         self.consumer_name = Some(String::from(consumer_name));
+        self
+    }
+
+    pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
+        self.filter_configuration = filter_configuration;
         self
     }
 }
@@ -242,7 +291,18 @@ impl MessageHandler for ConsumerMessageHandler {
 
                     let len = delivery.messages.len();
                     trace!("Got delivery with messages {}", len);
-                    for message in delivery.messages {
+
+                    // // client filter
+                    let messages = match &self.0.filter_configuration {
+                        Some(filter_input) => delivery
+                            .messages
+                            .into_iter()
+                            .filter(|message| filter_input.predicate.as_ref()(message))
+                            .collect::<Vec<Message>>(),
+                        None => delivery.messages,
+                    };
+
+                    for message in messages {
                         let _ = self
                             .0
                             .sender

@@ -136,6 +136,9 @@ pub enum ConsumerCreateError {
 
     #[error(transparent)]
     Client(#[from] ClientError),
+
+    #[error("Filtering is not supported by the broker (requires RabbitMQ 3.13+ and stream_filtering feature flag activated)")]
+    FilteringNotSupport,
 }
 
 #[derive(Error, Debug)]
