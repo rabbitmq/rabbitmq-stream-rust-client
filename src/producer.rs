@@ -74,7 +74,7 @@ pub struct ProducerInternal {
     closed: Arc<AtomicBool>,
     accumulator: MessageAccumulator,
     publish_version: u16,
-    filter_value_extractor: Option<fn(Message) -> String>,
+    filter_value_extractor: Option<Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>>,
 }
 
 impl ProducerInternal {
@@ -103,7 +103,7 @@ pub struct ProducerBuilder<T> {
     pub batch_size: usize,
     pub batch_publishing_delay: Duration,
     pub(crate) data: PhantomData<T>,
-    pub filter_value_extractor: Option<fn(Message) -> String>,
+    pub filter_value_extractor: Option<Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>>,
 }
 
 #[derive(Clone)]
@@ -233,8 +233,12 @@ impl<T> ProducerBuilder<T> {
         }
     }
 
-    pub fn filter_value_extractor(mut self, filter_value_extractor: fn(Message) -> String) -> Self {
-        self.filter_value_extractor = Some(filter_value_extractor);
+    pub fn filter_value_extractor(
+        mut self,
+        filter_value_extractor: impl Fn(&Message) -> String + Send + Sync + 'static,
+    ) -> Self {
+        let f = Arc::new(filter_value_extractor);
+        self.filter_value_extractor = Some(f);
         self
     }
 }
@@ -464,7 +468,7 @@ impl<T> Producer<T> {
         let mut msg = ClientMessage::new(publishing_id, message.clone(), None);
 
         if let Some(f) = self.0.filter_value_extractor.as_ref() {
-            msg.filter_value_extract(f)
+            msg.filter_value_extract(f.as_ref())
         }
 
         let waiter = ProducerMessageWaiter::waiter_with_cb(cb, message);
@@ -500,7 +504,7 @@ impl<T> Producer<T> {
 
             let mut client_message = ClientMessage::new(publishing_id, message, None);
             if let Some(f) = self.0.filter_value_extractor.as_ref() {
-                client_message.filter_value_extract(f)
+                client_message.filter_value_extract(f.as_ref())
             }
             wrapped_msgs.push(client_message);
 

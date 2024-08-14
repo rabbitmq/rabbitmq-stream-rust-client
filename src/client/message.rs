@@ -36,8 +36,8 @@ impl ClientMessage {
         }
     }
 
-    pub fn filter_value_extract(&mut self, filter_value_extractor: &fn(Message) -> String) {
-        self.filter_value = Some(filter_value_extractor(self.message.clone()));
+    pub fn filter_value_extract(&mut self, filter_value_extractor: impl Fn(&Message) -> String) {
+        self.filter_value = Some(filter_value_extractor(&self.message));
     }
 }
 

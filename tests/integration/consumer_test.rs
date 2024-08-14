@@ -13,6 +13,7 @@ use rabbitmq_stream_client::{
 };
 
 use rabbitmq_stream_protocol::ResponseCode;
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
@@ -335,16 +336,17 @@ async fn consumer_test_with_filtering() {
             .send_with_confirm(Message::builder().body("filtering").build())
             .await
             .unwrap();
-    }
 
-    for _ in 0..message_count {
         let _ = producer
             .send_with_confirm(Message::builder().body("not filtering").build())
             .await
             .unwrap();
     }
 
-    tokio::task::spawn(async move {
+    let response = Arc::new(tokio::sync::Mutex::new(vec![]));
+    let response_clone = Arc::clone(&response);
+
+    let task = tokio::task::spawn(async move {
         loop {
             let delivery = consumer.next().await.unwrap();
 
@@ -355,8 +357,21 @@ async fn consumer_test_with_filtering() {
                 .map(|data| String::from_utf8(data.to_vec()).unwrap())
                 .unwrap();
 
-            assert!(data == "filtering".to_string());
+            let mut r = response_clone.lock().await;
+            r.push(data);
         }
     });
+
+    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(3), task).await;
+    let repsonse_length = response.lock().await.len();
+    let filtering_response_length = response
+        .lock()
+        .await
+        .iter()
+        .filter(|item| item == &&"filtering")
+        .collect::<Vec<_>>()
+        .len();
+
+    assert!(repsonse_length == filtering_response_length);
     producer.close().await.unwrap();
 }
