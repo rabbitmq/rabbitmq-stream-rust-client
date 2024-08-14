@@ -109,6 +109,21 @@ impl Encoder for PublishedMessage {
         self.message.encode(writer)?;
         Ok(())
     }
+
+    fn encoded_size_version_2(&self) -> u32 {
+        self.publishing_id.encoded_size()
+            + self.filter_value.encoded_size()
+            + 4
+            + self.message.encoded_size()
+    }
+
+    fn encode_version_2(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        self.publishing_id.encode(writer)?;
+        self.filter_value.encode(writer)?;
+        self.message.encoded_size().encode(writer)?;
+        self.message.encode(writer)?;
+        Ok(())
+    }
 }
 
 impl Encoder for Vec<PublishedMessage> {
@@ -120,6 +135,20 @@ impl Encoder for Vec<PublishedMessage> {
         writer.write_u32::<BigEndian>(self.len() as u32)?;
         for x in self {
             x.encode(writer)?;
+        }
+        Ok(())
+    }
+
+    fn encoded_size_version_2(&self) -> u32 {
+        4 + self
+            .iter()
+            .fold(0, |acc, v| acc + v.encoded_size_version_2())
+    }
+
+    fn encode_version_2(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
+        writer.write_u32::<BigEndian>(self.len() as u32)?;
+        for x in self {
+            x.encode_version_2(writer)?;
         }
         Ok(())
     }

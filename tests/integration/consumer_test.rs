@@ -9,10 +9,11 @@ use rabbitmq_stream_client::{
         ProducerCloseError,
     },
     types::{Delivery, Message, OffsetSpecification},
-    Consumer, NoDedup, Producer,
+    Consumer, FilterConfiguration, NoDedup, Producer,
 };
 
 use rabbitmq_stream_protocol::ResponseCode;
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
@@ -339,7 +340,7 @@ async fn consumer_test_with_store_offset() {
 
     consumer_store.handle().close().await.unwrap();
 
-    let mut consumer_query = env
+    let consumer_query = env
         .env
         .consumer()
         .offset(OffsetSpecification::First)
@@ -353,5 +354,83 @@ async fn consumer_test_with_store_offset() {
     assert!(offset == offset_to_store);
 
     consumer_query.handle().close().await.unwrap();
+    producer.close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_test_with_filtering() {
+    let env = TestEnvironment::create().await;
+    let reference: String = Faker.fake();
+
+    let message_count = 10;
+    let mut producer = env
+        .env
+        .producer()
+        .name(&reference)
+        .filter_value_extractor(|_| "filtering".to_string())
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let filter_configuration = FilterConfiguration::new(
+        vec!["filtering".to_string()],
+        |message| {
+            String::from_utf8(message.data().unwrap().to_vec()).unwrap_or("".to_string())
+                == "filtering".to_string()
+        },
+        false,
+    );
+
+    let mut consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::First)
+        .filter_input(Some(filter_configuration))
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    for _ in 0..message_count {
+        let _ = producer
+            .send_with_confirm(Message::builder().body("filtering").build())
+            .await
+            .unwrap();
+
+        let _ = producer
+            .send_with_confirm(Message::builder().body("not filtering").build())
+            .await
+            .unwrap();
+    }
+
+    let response = Arc::new(tokio::sync::Mutex::new(vec![]));
+    let response_clone = Arc::clone(&response);
+
+    let task = tokio::task::spawn(async move {
+        loop {
+            let delivery = consumer.next().await.unwrap();
+
+            let d = delivery.unwrap();
+            let data = d
+                .message()
+                .data()
+                .map(|data| String::from_utf8(data.to_vec()).unwrap())
+                .unwrap();
+
+            let mut r = response_clone.lock().await;
+            r.push(data);
+        }
+    });
+
+    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(3), task).await;
+    let repsonse_length = response.lock().await.len();
+    let filtering_response_length = response
+        .lock()
+        .await
+        .iter()
+        .filter(|item| item == &&"filtering")
+        .collect::<Vec<_>>()
+        .len();
+
+    assert!(repsonse_length == filtering_response_length);
     producer.close().await.unwrap();
 }

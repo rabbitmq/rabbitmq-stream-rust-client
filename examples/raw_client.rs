@@ -39,6 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Message::builder()
                     .body(format!("message {}", i).as_bytes().to_vec())
                     .build(),
+                1,
             )
             .await
             .unwrap();

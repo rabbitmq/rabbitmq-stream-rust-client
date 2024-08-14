@@ -30,13 +30,15 @@ use crate::{message::Message, ResponseCode};
 pub struct PublishedMessage {
     pub(crate) publishing_id: u64,
     pub(crate) message: Message,
+    pub(crate) filter_value: Option<String>,
 }
 
 impl PublishedMessage {
-    pub fn new(publishing_id: u64, message: Message) -> Self {
+    pub fn new(publishing_id: u64, message: Message, filter_value: Option<String>) -> Self {
         Self {
             publishing_id,
             message,
+            filter_value,
         }
     }
 

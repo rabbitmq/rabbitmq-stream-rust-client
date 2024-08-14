@@ -45,6 +45,7 @@ impl Environment {
             batch_size: 100,
             batch_publishing_delay: Duration::from_millis(100),
             data: PhantomData,
+            filter_value_extractor: None,
         }
     }
 
@@ -54,6 +55,7 @@ impl Environment {
             consumer_name: None,
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
+            filter_configuration: None,
         }
     }
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {
