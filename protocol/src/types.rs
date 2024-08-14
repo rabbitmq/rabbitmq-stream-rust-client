@@ -30,6 +30,7 @@ use crate::{message::Message, ResponseCode};
 pub struct PublishedMessage {
     pub(crate) publishing_id: u64,
     pub(crate) message: Message,
+    #[cfg_attr(test, dummy(expr = "None"))]
     pub(crate) filter_value: Option<String>,
 }
 

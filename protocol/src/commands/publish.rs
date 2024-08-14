@@ -10,6 +10,7 @@ use crate::{
 use super::Command;
 
 use crate::types::PublishedMessage;
+
 #[cfg(test)]
 use fake::Fake;
 
@@ -18,6 +19,7 @@ use fake::Fake;
 pub struct PublishCommand {
     publisher_id: u8,
     published_messages: Vec<PublishedMessage>,
+    #[cfg_attr(test, dummy(faker = "1"))]
     version: u16,
 }
 
