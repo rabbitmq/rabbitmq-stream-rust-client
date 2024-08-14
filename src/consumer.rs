@@ -12,9 +12,7 @@ use std::{
 };
 
 use rabbitmq_stream_protocol::{
-    commands::subscribe::OffsetSpecification,
-    message::{self, Message},
-    ResponseKind,
+    commands::subscribe::OffsetSpecification, message::Message, ResponseKind,
 };
 
 use tokio::sync::mpsc::{channel, Receiver, Sender};

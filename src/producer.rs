@@ -27,6 +27,7 @@ use crate::{
 };
 
 type WaiterMap = Arc<DashMap<u64, ProducerMessageWaiter>>;
+type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
 
 type ConfirmCallback = Arc<
     dyn Fn(Result<ConfirmationStatus, ProducerPublishError>) -> BoxFuture<'static, ()>
@@ -74,7 +75,7 @@ pub struct ProducerInternal {
     closed: Arc<AtomicBool>,
     accumulator: MessageAccumulator,
     publish_version: u16,
-    filter_value_extractor: Option<Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>>,
+    filter_value_extractor: Option<FilterValueExtractor>,
 }
 
 impl ProducerInternal {
@@ -103,7 +104,7 @@ pub struct ProducerBuilder<T> {
     pub batch_size: usize,
     pub batch_publishing_delay: Duration,
     pub(crate) data: PhantomData<T>,
-    pub filter_value_extractor: Option<Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>>,
+    pub filter_value_extractor: Option<FilterValueExtractor>,
 }
 
 #[derive(Clone)]

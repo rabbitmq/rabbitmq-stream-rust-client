@@ -4,7 +4,7 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_PUBLISH,
-    protocol::version::{PROTOCOL_VERSION, PROTOCOL_VERSION_2},
+    protocol::version::PROTOCOL_VERSION_2,
 };
 
 use super::Command;

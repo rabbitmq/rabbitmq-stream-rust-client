@@ -19,7 +19,7 @@ pub struct ExchangeCommandVersion(u16, u16, u16);
 
 impl ExchangeCommandVersion {
     pub fn new(key: u16, min_version: u16, max_version: u16) -> Self {
-        return ExchangeCommandVersion(key, min_version, max_version);
+        ExchangeCommandVersion(key, min_version, max_version)
     }
 }
 
@@ -149,7 +149,7 @@ impl ExchangeCommandVersionsResponse {
             match i {
                 ExchangeCommandVersion(match_key_command, min_version, max_version) => {
                     if *match_key_command == key_command {
-                        return (min_version.clone(), max_version.clone());
+                        return (*min_version, *max_version);
                     }
                 }
             }
