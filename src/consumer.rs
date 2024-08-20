@@ -29,6 +29,8 @@ use futures::{task::AtomicWaker, Stream};
 use rand::rngs::StdRng;
 use rand::{seq::SliceRandom, SeedableRng};
 
+type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
+
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
     // Mandatory in case of manual offset tracking
@@ -58,22 +60,25 @@ impl ConsumerInternal {
 #[derive(Clone)]
 pub struct FilterConfiguration {
     filter_values: Vec<String>,
-    pub predicate: Arc<dyn Fn(&Message) -> bool + Send + Sync>,
+    pub predicate: FilterPredicate,
     match_unfiltered: bool,
 }
 
 impl FilterConfiguration {
-    pub fn new(
-        filter_values: Vec<String>,
-        predicate: impl Fn(&Message) -> bool + 'static + Send + Sync,
-        match_unfiltered: bool,
-    ) -> Self {
-        let f = Arc::new(predicate);
+    pub fn new(filter_values: Vec<String>, match_unfiltered: bool) -> Self {
         Self {
             filter_values,
             match_unfiltered,
-            predicate: f,
+            predicate: None,
         }
+    }
+
+    pub fn post_filter(
+        mut self,
+        predicate: impl Fn(&Message) -> bool + 'static + Send + Sync,
+    ) -> FilterConfiguration {
+        self.predicate = Some(Arc::new(predicate));
+        self
     }
 }
 
@@ -294,11 +299,18 @@ impl MessageHandler for ConsumerMessageHandler {
 
                     // // client filter
                     let messages = match &self.0.filter_configuration {
-                        Some(filter_input) => delivery
-                            .messages
-                            .into_iter()
-                            .filter(|message| filter_input.predicate.as_ref()(message))
-                            .collect::<Vec<Message>>(),
+                        Some(filter_input) => {
+                            if let Some(f) = &filter_input.predicate {
+                                delivery
+                                    .messages
+                                    .into_iter()
+                                    .filter(|message| f(message))
+                                    .collect::<Vec<Message>>()
+                            } else {
+                                delivery.messages
+                            }
+                        }
+
                         None => delivery.messages,
                     };
 

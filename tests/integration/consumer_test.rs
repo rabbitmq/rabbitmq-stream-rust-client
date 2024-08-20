@@ -372,14 +372,11 @@ async fn consumer_test_with_filtering() {
         .await
         .unwrap();
 
-    let filter_configuration = FilterConfiguration::new(
-        vec!["filtering".to_string()],
-        |message| {
+    let filter_configuration = FilterConfiguration::new(vec!["filtering".to_string()], false)
+        .post_filter(|message| {
             String::from_utf8(message.data().unwrap().to_vec()).unwrap_or("".to_string())
                 == "filtering".to_string()
-        },
-        false,
-    );
+        });
 
     let mut consumer = env
         .env
@@ -433,4 +430,96 @@ async fn consumer_test_with_filtering() {
 
     assert!(repsonse_length == filtering_response_length);
     producer.close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn consumer_test_with_filtering_match_unfiltered() {
+    let env = TestEnvironment::create().await;
+    let reference: String = Faker.fake();
+
+    let message_count = 10;
+    let mut producer = env
+        .env
+        .producer()
+        .name(&reference)
+        .filter_value_extractor(|message| {
+            String::from_utf8(message.data().unwrap().to_vec()).unwrap()
+        })
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    // publish filtering message
+    for i in 0..message_count {
+        producer
+            .send_with_confirm(Message::builder().body(i.to_string()).build())
+            .await
+            .unwrap();
+    }
+
+    producer.close().await.unwrap();
+
+    let mut producer = env
+        .env
+        .producer()
+        .name(&reference)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    // publish unset filter value
+    for i in 0..message_count {
+        producer
+            .send_with_confirm(Message::builder().body(i.to_string()).build())
+            .await
+            .unwrap();
+    }
+
+    producer.close().await.unwrap();
+
+    let filter_configuration =
+        FilterConfiguration::new(vec!["1".to_string()], true).post_filter(|message| {
+            String::from_utf8(message.data().unwrap().to_vec()).unwrap_or("".to_string())
+                == "1".to_string()
+        });
+
+    let mut consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::First)
+        .filter_input(Some(filter_configuration))
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let response = Arc::new(tokio::sync::Mutex::new(vec![]));
+    let response_clone = Arc::clone(&response);
+
+    let task = tokio::task::spawn(async move {
+        loop {
+            let delivery = consumer.next().await.unwrap();
+
+            let d = delivery.unwrap();
+            let data = d
+                .message()
+                .data()
+                .map(|data| String::from_utf8(data.to_vec()).unwrap())
+                .unwrap();
+
+            let mut r = response_clone.lock().await;
+            r.push(data);
+        }
+    });
+
+    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(3), task).await;
+    let repsonse_length = response.lock().await.len();
+    let filtering_response_length = response
+        .lock()
+        .await
+        .iter()
+        .filter(|item| item == &&"1")
+        .collect::<Vec<_>>()
+        .len();
+
+    assert!(repsonse_length == filtering_response_length);
 }
