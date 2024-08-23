@@ -52,7 +52,7 @@ jobs:
           docker exec rabbitmq-stream-client-test /bin/bash -c 'rabbitmqctl status'
           docker exec rabbitmq-stream-client-test /bin/bash -c 'rabbitmqctl wait --pid 1 --timeout 70'
       - name: Install latest ${{ matrix.rust }}
-        uses: actions-rs/toolchain@v2
+        uses: actions-rs/toolchain@v1.0.6
         with:
           toolchain: ${{ matrix.rust }}
           profile: minimal
