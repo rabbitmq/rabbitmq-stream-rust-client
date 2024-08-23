@@ -106,7 +106,18 @@ impl Decoder for PublishedMessage {
         let (input, publishing_id) = u64::decode(input)?;
         let (input, body) = read_vec::<u8>(input)?;
         let (_, message) = Message::decode(&body)?;
-        Ok((input, PublishedMessage::new(publishing_id, message)))
+        Ok((input, PublishedMessage::new(publishing_id, message, None)))
+    }
+
+    fn decode_version_2(input: &[u8]) -> Result<(&[u8], Self), DecodeError> {
+        let (input, publishing_id) = u64::decode(input)?;
+        let (input, body) = read_vec::<u8>(input)?;
+        let (input, filter_value) = <Option<String>>::decode(input)?;
+        let (_, message) = Message::decode(&body)?;
+        Ok((
+            input,
+            PublishedMessage::new(publishing_id, message, filter_value),
+        ))
     }
 }
 

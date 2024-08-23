@@ -2,7 +2,8 @@ use crate::{
     commands::{
         close::CloseRequest, create_stream::CreateStreamCommand, credit::CreditCommand,
         declare_publisher::DeclarePublisherCommand, delete::Delete,
-        delete_publisher::DeletePublisherCommand, heart_beat::HeartBeatCommand,
+        delete_publisher::DeletePublisherCommand,
+        exchange_command_versions::ExchangeCommandVersionsRequest, heart_beat::HeartBeatCommand,
         metadata::MetadataCommand, open::OpenCommand, peer_properties::PeerPropertiesCommand,
         publish::PublishCommand, query_offset::QueryOffsetRequest,
         query_publisher_sequence::QueryPublisherRequest,
@@ -10,7 +11,6 @@ use crate::{
         store_offset::StoreOffset, subscribe::SubscribeCommand, tune::TunesCommand,
         unsubscribe::UnSubscribeCommand, Command,
     },
-    protocol::version::PROTOCOL_VERSION,
     types::Header,
     Request, RequestKind,
 };
@@ -20,7 +20,7 @@ where
 {
     fn from(cmd: T) -> Self {
         Request {
-            header: Header::new(cmd.key(), PROTOCOL_VERSION),
+            header: Header::new(cmd.key(), cmd.version()),
             kind: cmd.into(),
         }
     }
@@ -128,5 +128,10 @@ impl From<StoreOffset> for RequestKind {
 impl From<UnSubscribeCommand> for RequestKind {
     fn from(cmd: UnSubscribeCommand) -> Self {
         RequestKind::Unsubscribe(cmd)
+    }
+}
+impl From<ExchangeCommandVersionsRequest> for RequestKind {
+    fn from(cmd: ExchangeCommandVersionsRequest) -> Self {
+        RequestKind::ExchangeCommandVersions(cmd)
     }
 }

@@ -5,7 +5,8 @@ use crate::{
     commands::{
         close::CloseRequest, create_stream::CreateStreamCommand, credit::CreditCommand,
         declare_publisher::DeclarePublisherCommand, delete::Delete,
-        delete_publisher::DeletePublisherCommand, heart_beat::HeartBeatCommand,
+        delete_publisher::DeletePublisherCommand,
+        exchange_command_versions::ExchangeCommandVersionsRequest, heart_beat::HeartBeatCommand,
         metadata::MetadataCommand, open::OpenCommand, peer_properties::PeerPropertiesCommand,
         publish::PublishCommand, query_offset::QueryOffsetRequest,
         query_publisher_sequence::QueryPublisherRequest,
@@ -58,6 +59,7 @@ pub enum RequestKind {
     QueryPublisherSequence(QueryPublisherRequest),
     StoreOffset(StoreOffset),
     Unsubscribe(UnSubscribeCommand),
+    ExchangeCommandVersions(ExchangeCommandVersionsRequest),
 }
 
 impl Encoder for RequestKind {
@@ -82,6 +84,9 @@ impl Encoder for RequestKind {
             RequestKind::QueryPublisherSequence(query_publisher) => query_publisher.encoded_size(),
             RequestKind::StoreOffset(store_offset) => store_offset.encoded_size(),
             RequestKind::Unsubscribe(unsubscribe) => unsubscribe.encoded_size(),
+            RequestKind::ExchangeCommandVersions(exchange_command_versions) => {
+                exchange_command_versions.encoded_size()
+            }
         }
     }
 
@@ -106,6 +111,9 @@ impl Encoder for RequestKind {
             RequestKind::QueryPublisherSequence(query_publisher) => query_publisher.encode(writer),
             RequestKind::StoreOffset(store_offset) => store_offset.encode(writer),
             RequestKind::Unsubscribe(unsubcribe) => unsubcribe.encode(writer),
+            RequestKind::ExchangeCommandVersions(exchange_command_versions) => {
+                exchange_command_versions.encode(writer)
+            }
         }
     }
 }
@@ -171,6 +179,9 @@ impl Decoder for Request {
             COMMAND_UNSUBSCRIBE => {
                 UnSubscribeCommand::decode(input).map(|(i, kind)| (i, kind.into()))?
             }
+            COMMAND_EXCHANGE_COMMAND_VERSIONS => {
+                ExchangeCommandVersionsRequest::decode(input).map(|(i, kind)| (i, kind.into()))?
+            }
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Request { header, kind: cmd }))
@@ -185,10 +196,11 @@ mod tests {
         commands::{
             close::CloseRequest, create_stream::CreateStreamCommand, credit::CreditCommand,
             declare_publisher::DeclarePublisherCommand, delete::Delete,
-            delete_publisher::DeletePublisherCommand, heart_beat::HeartBeatCommand,
-            metadata::MetadataCommand, open::OpenCommand, peer_properties::PeerPropertiesCommand,
-            publish::PublishCommand, query_offset::QueryOffsetRequest,
-            query_publisher_sequence::QueryPublisherRequest,
+            delete_publisher::DeletePublisherCommand,
+            exchange_command_versions::ExchangeCommandVersionsRequest,
+            heart_beat::HeartBeatCommand, metadata::MetadataCommand, open::OpenCommand,
+            peer_properties::PeerPropertiesCommand, publish::PublishCommand,
+            query_offset::QueryOffsetRequest, query_publisher_sequence::QueryPublisherRequest,
             sasl_authenticate::SaslAuthenticateCommand, sasl_handshake::SaslHandshakeCommand,
             store_offset::StoreOffset, subscribe::SubscribeCommand, tune::TunesCommand,
             unsubscribe::UnSubscribeCommand, Command,
@@ -306,5 +318,10 @@ mod tests {
         assert_eq!(request, decoded);
 
         assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn request_exchange_command_versions_test() {
+        request_encode_decode_test::<ExchangeCommandVersionsRequest>()
     }
 }

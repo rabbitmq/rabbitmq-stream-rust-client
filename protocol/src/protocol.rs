@@ -25,6 +25,11 @@ pub mod commands {
     pub const COMMAND_OPEN: u16 = 21;
     pub const COMMAND_CLOSE: u16 = 22;
     pub const COMMAND_HEARTBEAT: u16 = 23;
+    pub const COMMAND_ROUTE: u16 = 24;
+    pub const COMMAND_PARTITIONS: u16 = 25;
+    pub const COMMAND_CONSUMER_UPDATE: u16 = 26;
+    pub const COMMAND_EXCHANGE_COMMAND_VERSIONS: u16 = 27;
+    pub const COMMAND_STREAMS_STATS: u16 = 28;
 }
 
 // server responses
@@ -57,4 +62,5 @@ pub mod responses {
 #[allow(unused)]
 pub mod version {
     pub const PROTOCOL_VERSION: u16 = 1;
+    pub const PROTOCOL_VERSION_2: u16 = 2;
 }

@@ -4,11 +4,13 @@ use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_PUBLISH,
+    protocol::version::PROTOCOL_VERSION_2,
 };
 
 use super::Command;
 
 use crate::types::PublishedMessage;
+
 #[cfg(test)]
 use fake::Fake;
 
@@ -17,25 +19,36 @@ use fake::Fake;
 pub struct PublishCommand {
     publisher_id: u8,
     published_messages: Vec<PublishedMessage>,
+    #[cfg_attr(test, dummy(faker = "1"))]
+    version: u16,
 }
 
 impl PublishCommand {
-    pub fn new(publisher_id: u8, published_messages: Vec<PublishedMessage>) -> Self {
+    pub fn new(publisher_id: u8, published_messages: Vec<PublishedMessage>, version: u16) -> Self {
         Self {
             publisher_id,
             published_messages,
+            version,
         }
     }
 }
 
 impl Encoder for PublishCommand {
     fn encoded_size(&self) -> u32 {
-        self.publisher_id.encoded_size() + self.published_messages.encoded_size()
+        if self.version == PROTOCOL_VERSION_2 {
+            self.publisher_id.encoded_size() + self.published_messages.encoded_size_version_2()
+        } else {
+            self.publisher_id.encoded_size() + self.published_messages.encoded_size()
+        }
     }
 
     fn encode(&self, writer: &mut impl Write) -> Result<(), EncodeError> {
         self.publisher_id.encode(writer)?;
-        self.published_messages.encode(writer)?;
+        if self.version == PROTOCOL_VERSION_2 {
+            self.published_messages.encode_version_2(writer)?;
+        } else {
+            self.published_messages.encode(writer)?;
+        }
         Ok(())
     }
 }
@@ -43,6 +56,10 @@ impl Encoder for PublishCommand {
 impl Command for PublishCommand {
     fn key(&self) -> u16 {
         COMMAND_PUBLISH
+    }
+
+    fn version(&self) -> u16 {
+        self.version
     }
 }
 
@@ -56,6 +73,7 @@ impl Decoder for PublishCommand {
             PublishCommand {
                 publisher_id,
                 published_messages,
+                version: 1,
             },
         ))
     }

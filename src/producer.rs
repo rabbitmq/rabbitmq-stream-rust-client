@@ -27,6 +27,7 @@ use crate::{
 };
 
 type WaiterMap = Arc<DashMap<u64, ProducerMessageWaiter>>;
+type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
 
 type ConfirmCallback = Arc<
     dyn Fn(Result<ConfirmationStatus, ProducerPublishError>) -> BoxFuture<'static, ()>
@@ -73,6 +74,8 @@ pub struct ProducerInternal {
     waiting_confirmations: WaiterMap,
     closed: Arc<AtomicBool>,
     accumulator: MessageAccumulator,
+    publish_version: u16,
+    filter_value_extractor: Option<FilterValueExtractor>,
 }
 
 impl ProducerInternal {
@@ -81,7 +84,9 @@ impl ProducerInternal {
 
         if !messages.is_empty() {
             debug!("Sending batch of {} messages", messages.len());
-            self.client.publish(self.producer_id, messages).await?;
+            self.client
+                .publish(self.producer_id, messages, self.publish_version)
+                .await?;
         }
 
         Ok(())
@@ -99,6 +104,7 @@ pub struct ProducerBuilder<T> {
     pub batch_size: usize,
     pub batch_publishing_delay: Duration,
     pub(crate) data: PhantomData<T>,
+    pub filter_value_extractor: Option<FilterValueExtractor>,
 }
 
 #[derive(Clone)]
@@ -112,6 +118,17 @@ impl<T> ProducerBuilder<T> {
         // The leader is the recommended node for writing, because writing to a replica will redundantly pass these messages
         // to the leader anyway - it is the only one capable of writing.
         let mut client = self.environment.create_client().await?;
+
+        let mut publish_version = 1;
+
+        if self.filter_value_extractor.is_some() {
+            if client.filtering_supported() {
+                publish_version = 2
+            } else {
+                return Err(ProducerCreateError::FilteringNotSupport);
+            }
+        }
+
         let metrics_collector = self.environment.options.client_options.collector.clone();
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             tracing::debug!(
@@ -177,8 +194,10 @@ impl<T> ProducerBuilder<T> {
                 client,
                 publish_sequence,
                 waiting_confirmations,
+                publish_version,
                 closed: Arc::new(AtomicBool::new(false)),
                 accumulator: MessageAccumulator::new(self.batch_size),
+                filter_value_extractor: self.filter_value_extractor,
             };
 
             let internal_producer = Arc::new(producer);
@@ -211,7 +230,17 @@ impl<T> ProducerBuilder<T> {
             batch_size: self.batch_size,
             batch_publishing_delay: self.batch_publishing_delay,
             data: PhantomData,
+            filter_value_extractor: None,
         }
+    }
+
+    pub fn filter_value_extractor(
+        mut self,
+        filter_value_extractor: impl Fn(&Message) -> String + Send + Sync + 'static,
+    ) -> Self {
+        let f = Arc::new(filter_value_extractor);
+        self.filter_value_extractor = Some(f);
+        self
     }
 }
 
@@ -437,7 +466,11 @@ impl<T> Producer<T> {
             Some(publishing_id) => *publishing_id,
             None => self.0.publish_sequence.fetch_add(1, Ordering::Relaxed),
         };
-        let msg = ClientMessage::new(publishing_id, message.clone());
+        let mut msg = ClientMessage::new(publishing_id, message.clone(), None);
+
+        if let Some(f) = self.0.filter_value_extractor.as_ref() {
+            msg.filter_value_extract(f.as_ref())
+        }
 
         let waiter = ProducerMessageWaiter::waiter_with_cb(cb, message);
         self.0.waiting_confirmations.insert(publishing_id, waiter);
@@ -470,7 +503,11 @@ impl<T> Producer<T> {
                 None => self.0.publish_sequence.fetch_add(1, Ordering::Relaxed),
             };
 
-            wrapped_msgs.push(ClientMessage::new(publishing_id, message));
+            let mut client_message = ClientMessage::new(publishing_id, message, None);
+            if let Some(f) = self.0.filter_value_extractor.as_ref() {
+                client_message.filter_value_extract(f.as_ref())
+            }
+            wrapped_msgs.push(client_message);
 
             self.0
                 .waiting_confirmations
@@ -479,7 +516,7 @@ impl<T> Producer<T> {
 
         self.0
             .client
-            .publish(self.0.producer_id, wrapped_msgs)
+            .publish(self.0.producer_id, wrapped_msgs, self.0.publish_version)
             .await?;
 
         Ok(())

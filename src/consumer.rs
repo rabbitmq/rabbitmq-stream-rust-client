@@ -29,6 +29,8 @@ use futures::{task::AtomicWaker, Stream};
 use rand::rngs::StdRng;
 use rand::{seq::SliceRandom, SeedableRng};
 
+type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
+
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
     // Mandatory in case of manual offset tracking
@@ -46,6 +48,7 @@ struct ConsumerInternal {
     closed: Arc<AtomicBool>,
     waker: AtomicWaker,
     metrics_collector: Arc<dyn MetricsCollector>,
+    filter_configuration: Option<FilterConfiguration>,
 }
 
 impl ConsumerInternal {
@@ -54,11 +57,37 @@ impl ConsumerInternal {
     }
 }
 
+#[derive(Clone)]
+pub struct FilterConfiguration {
+    filter_values: Vec<String>,
+    pub predicate: FilterPredicate,
+    match_unfiltered: bool,
+}
+
+impl FilterConfiguration {
+    pub fn new(filter_values: Vec<String>, match_unfiltered: bool) -> Self {
+        Self {
+            filter_values,
+            match_unfiltered,
+            predicate: None,
+        }
+    }
+
+    pub fn post_filter(
+        mut self,
+        predicate: impl Fn(&Message) -> bool + 'static + Send + Sync,
+    ) -> FilterConfiguration {
+        self.predicate = Some(Arc::new(predicate));
+        self
+    }
+}
+
 /// Builder for [`Consumer`]
 pub struct ConsumerBuilder {
     pub(crate) consumer_name: Option<String>,
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
+    pub(crate) filter_configuration: Option<FilterConfiguration>,
 }
 
 impl ConsumerBuilder {
@@ -116,9 +145,27 @@ impl ConsumerBuilder {
             closed: Arc::new(AtomicBool::new(false)),
             waker: AtomicWaker::new(),
             metrics_collector: collector,
+            filter_configuration: self.filter_configuration.clone(),
         });
         let msg_handler = ConsumerMessageHandler(consumer.clone());
         client.set_handler(msg_handler).await;
+
+        let mut properties = HashMap::new();
+        if let Some(filter_input) = self.filter_configuration {
+            if !client.filtering_supported() {
+                return Err(ConsumerCreateError::FilteringNotSupport);
+            }
+            for (index, item) in filter_input.filter_values.iter().enumerate() {
+                let key = format!("filter.{}", index);
+                properties.insert(key, item.to_owned());
+            }
+
+            let match_unfiltered_key = "match-unfiltered".to_string();
+            properties.insert(
+                match_unfiltered_key,
+                filter_input.match_unfiltered.to_string(),
+            );
+        }
 
         let response = client
             .subscribe(
@@ -126,7 +173,7 @@ impl ConsumerBuilder {
                 stream,
                 self.offset_specification,
                 1,
-                HashMap::new(),
+                properties,
             )
             .await?;
 
@@ -151,6 +198,11 @@ impl ConsumerBuilder {
 
     pub fn name(mut self, consumer_name: &str) -> Self {
         self.consumer_name = Some(String::from(consumer_name));
+        self
+    }
+
+    pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
+        self.filter_configuration = filter_configuration;
         self
     }
 }
@@ -244,7 +296,25 @@ impl MessageHandler for ConsumerMessageHandler {
 
                     let len = delivery.messages.len();
                     trace!("Got delivery with messages {}", len);
-                    for message in delivery.messages {
+
+                    // // client filter
+                    let messages = match &self.0.filter_configuration {
+                        Some(filter_input) => {
+                            if let Some(f) = &filter_input.predicate {
+                                delivery
+                                    .messages
+                                    .into_iter()
+                                    .filter(|message| f(message))
+                                    .collect::<Vec<Message>>()
+                            } else {
+                                delivery.messages
+                            }
+                        }
+
+                        None => delivery.messages,
+                    };
+
+                    for message in messages {
                         if let OffsetSpecification::Offset(offset_) = self.0.offset_specification {
                             if offset_ > offset {
                                 offset += 1;
