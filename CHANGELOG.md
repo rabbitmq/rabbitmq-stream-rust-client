@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.4.4...rabbitmq-stream-client-v0.5.0) - 2024-08-23
+
+### Other
+- Change codecov upload ([#227](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/227))
+- Filtering supported ([#225](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/225))
+
 ## [0.4.4](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.4.3...rabbitmq-stream-client-v0.4.4) - 2024-08-11
 
 ### Fixed
