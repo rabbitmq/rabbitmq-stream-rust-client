@@ -34,6 +34,48 @@ impl StreamCreator {
         }
     }
 
+    pub async fn create_super_stream(
+        self,
+        super_stream: &str,
+        number_of_partitions: usize,
+        binding_keys: Option<Vec<String>>,
+    ) -> Result<(), StreamCreateError> {
+        let mut partitions_names = Vec::with_capacity(number_of_partitions);
+        let mut new_binding_keys: Vec<String> = Vec::with_capacity(number_of_partitions);
+
+        if binding_keys.is_none() {
+            for i in 0..number_of_partitions {
+                new_binding_keys.push(i.to_string());
+                partitions_names.push(super_stream.to_owned() + "-" + i.to_string().as_str())
+            }
+        } else {
+            new_binding_keys = binding_keys.unwrap();
+            for binding_key in new_binding_keys.iter() {
+                partitions_names.push(super_stream.to_owned() + "-" + binding_key)
+            }
+        }
+
+        let client = self.env.create_client().await?;
+        let response = client
+            .create_super_stream(
+                super_stream,
+                partitions_names,
+                new_binding_keys,
+                self.options,
+            )
+            .await?;
+        client.close().await?;
+
+        if response.is_ok() {
+            Ok(())
+        } else {
+            Err(StreamCreateError::Create {
+                stream: super_stream.to_owned(),
+                status: response.code().clone(),
+            })
+        }
+    }
+
     pub fn max_age(mut self, max_age: Duration) -> Self {
         self.options
             .insert("max-age".to_owned(), format!("{}s", max_age.as_secs()));

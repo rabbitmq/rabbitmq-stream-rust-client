@@ -41,6 +41,39 @@ async fn client_create_stream_error_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn client_create_and_delete_super_stream_test() {
+    let super_stream_name = "test-super-stream";
+
+    let client = Client::connect(ClientOptions::default()).await.unwrap();
+
+    let partitions: Vec<String> = [
+        "test-super-stream-0",
+        "test-super-stream-1",
+        "test-super-stream-2",
+    ]
+    .iter()
+    .map(|&x| x.into())
+    .collect();
+
+    let binding_keys: Vec<String> = ["0", "1", "2"].iter().map(|&x| x.into()).collect();
+
+    let response = client
+        .create_super_stream(&super_stream_name, partitions, binding_keys, HashMap::new())
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response = client
+        .delete_super_stream(&super_stream_name)
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let _ = client.close().await;
+}
+
 async fn client_delete_stream_test() {
     let test = TestClient::create().await;
 

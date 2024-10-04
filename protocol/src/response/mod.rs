@@ -139,6 +139,8 @@ impl Decoder for Response {
             | COMMAND_SUBSCRIBE
             | COMMAND_UNSUBSCRIBE
             | COMMAND_CREATE_STREAM
+            | COMMAND_CREATE_SUPER_STREAM
+            | COMMAND_DELETE_SUPER_STREAM
             | COMMAND_DELETE_STREAM => {
                 GenericResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Generic(kind)))?
             }

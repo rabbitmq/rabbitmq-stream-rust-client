@@ -1,3 +1,5 @@
+use crate::commands::create_super_stream::CreateSuperStreamCommand;
+use crate::commands::delete_super_stream::DeleteSuperStreamCommand;
 use crate::{
     commands::{
         close::CloseRequest, create_stream::CreateStreamCommand, credit::CreditCommand,
@@ -14,6 +16,7 @@ use crate::{
     types::Header,
     Request, RequestKind,
 };
+
 impl<T> From<T> for Request
 where
     T: Into<RequestKind> + Command,
@@ -133,5 +136,17 @@ impl From<UnSubscribeCommand> for RequestKind {
 impl From<ExchangeCommandVersionsRequest> for RequestKind {
     fn from(cmd: ExchangeCommandVersionsRequest) -> Self {
         RequestKind::ExchangeCommandVersions(cmd)
+    }
+}
+
+impl From<CreateSuperStreamCommand> for RequestKind {
+    fn from(cmd: CreateSuperStreamCommand) -> Self {
+        RequestKind::CreateSuperStream(cmd)
+    }
+}
+
+impl From<DeleteSuperStreamCommand> for RequestKind {
+    fn from(cmd: DeleteSuperStreamCommand) -> Self {
+        RequestKind::DeleteSuperStream(cmd)
     }
 }

@@ -30,6 +30,8 @@ pub mod commands {
     pub const COMMAND_CONSUMER_UPDATE: u16 = 26;
     pub const COMMAND_EXCHANGE_COMMAND_VERSIONS: u16 = 27;
     pub const COMMAND_STREAMS_STATS: u16 = 28;
+    pub const COMMAND_CREATE_SUPER_STREAM: u16 = 29;
+    pub const COMMAND_DELETE_SUPER_STREAM: u16 = 30;
 }
 
 // server responses
