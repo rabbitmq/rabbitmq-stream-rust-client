@@ -2,7 +2,6 @@ use std::io::Write;
 
 #[cfg(test)]
 use fake::Fake;
-
 use super::Command;
 use crate::{
     codec::{Decoder, Encoder},

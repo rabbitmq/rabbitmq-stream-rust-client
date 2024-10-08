@@ -222,7 +222,6 @@ impl Decoder for Request {
             COMMAND_ROUTE => {
                 SuperStreamRouteRequest::decode(input).map(|(i, kind)| (i, kind.into()))?
             }
-
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Request { header, kind: cmd }))
