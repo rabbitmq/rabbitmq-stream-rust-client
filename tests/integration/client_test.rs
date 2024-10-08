@@ -460,3 +460,89 @@ async fn client_exchange_command_versions() {
     let response = test.client.exchange_command_versions().await.unwrap();
     assert_eq!(&ResponseCode::Ok, response.code());
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_test_partitions_test() {
+    let super_stream_name = "test-super-stream-partitions";
+
+    let client = Client::connect(ClientOptions::default()).await.unwrap();
+
+    let partitions: Vec<String> = [
+        "test-super-stream-partitions-0",
+        "test-super-stream-partitions-1",
+        "test-super-stream-partitions-2",
+    ]
+        .iter()
+        .map(|&x| x.into())
+        .collect();
+
+    let binding_keys: Vec<String> = ["0", "1", "2"].iter().map(|&x| x.into()).collect();
+
+    let response = client
+        .create_super_stream(&super_stream_name, partitions, binding_keys, HashMap::new())
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response = client
+        .partitions(super_stream_name.to_string())
+        .await
+        .unwrap();
+
+    assert_eq!(response.streams.get(0).unwrap(), "test-super-stream-partitions-0");
+    assert_eq!(response.streams.get(1).unwrap(), "test-super-stream-partitions-1");
+    assert_eq!(response.streams.get(2).unwrap(), "test-super-stream-partitions-2");
+
+    let response = client
+        .delete_super_stream(&super_stream_name)
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let _ = client.close().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_test_route_test() {
+    let super_stream_name = "test-super-stream-route";
+
+    let client = Client::connect(ClientOptions::default()).await.unwrap();
+
+    let partitions: Vec<String> = [
+        "test-super-stream-route-0",
+        "test-super-stream-route-1",
+        "test-super-stream-route-2",
+    ]
+        .iter()
+        .map(|&x| x.into())
+        .collect();
+
+    let binding_keys: Vec<String> = ["0", "1", "2"].iter().map(|&x| x.into()).collect();
+
+    let response = client
+        .create_super_stream(&super_stream_name, partitions, binding_keys, HashMap::new())
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let response = client
+        .route("0".to_string(), super_stream_name.to_string())
+        .await
+        .unwrap();
+
+    assert_eq!(response.streams.len(), 1);
+    assert_eq!(response.streams.get(0).unwrap(), "test-super-stream-route-0");
+
+
+    let response = client
+        .delete_super_stream(&super_stream_name)
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::Ok, response.code());
+
+    let _ = client.close().await;
+}

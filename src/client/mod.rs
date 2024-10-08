@@ -61,7 +61,9 @@ use rabbitmq_stream_protocol::{
         store_offset::StoreOffset,
         subscribe::{OffsetSpecification, SubscribeCommand},
         tune::TunesCommand,
-        unsubscribe::UnSubscribeCommand,
+        unsubscribe::UnSubscribeCommand, superstream_partitions::SuperStreamPartitionsResponse,
+        superstream_partitions::SuperStreamPartitionsRequest, superstream_route::SuperStreamRouteRequest,
+        superstream_route::SuperStreamRouteResponse,
     },
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseCode, ResponseKind,
@@ -295,6 +297,20 @@ impl Client {
             UnSubscribeCommand::new(correlation_id, subscription_id)
         })
         .await
+    }
+
+    pub async fn partitions(&self, super_stream: String) -> RabbitMQStreamResult<SuperStreamPartitionsResponse> {
+        self.send_and_receive(|correlation_id| {
+            SuperStreamPartitionsRequest::new(correlation_id, super_stream)
+        })
+            .await
+    }
+
+    pub async fn route(&self, routing_key: String, super_stream: String) -> RabbitMQStreamResult<SuperStreamRouteResponse> {
+        self.send_and_receive(|correlation_id| {
+            SuperStreamRouteRequest::new(correlation_id, routing_key, super_stream)
+        })
+            .await
     }
 
     pub async fn create_stream(

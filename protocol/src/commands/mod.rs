@@ -25,6 +25,8 @@ pub mod sasl_authenticate;
 pub mod sasl_handshake;
 pub mod store_offset;
 pub mod subscribe;
+pub mod superstream_partitions;
+pub mod superstream_route;
 pub mod tune;
 pub mod unsubscribe;
 

@@ -12,7 +12,9 @@ use crate::{
         publish::PublishCommand, query_offset::QueryOffsetRequest,
         query_publisher_sequence::QueryPublisherRequest,
         sasl_authenticate::SaslAuthenticateCommand, sasl_handshake::SaslHandshakeCommand,
-        store_offset::StoreOffset, subscribe::SubscribeCommand, tune::TunesCommand,
+        store_offset::StoreOffset, subscribe::SubscribeCommand,
+        superstream_partitions::SuperStreamPartitionsRequest,
+        superstream_route::SuperStreamRouteRequest, tune::TunesCommand,
         unsubscribe::UnSubscribeCommand,
     },
     error::{DecodeError, EncodeError},
@@ -64,6 +66,8 @@ pub enum RequestKind {
     ExchangeCommandVersions(ExchangeCommandVersionsRequest),
     CreateSuperStream(CreateSuperStreamCommand),
     DeleteSuperStream(DeleteSuperStreamCommand),
+    SuperStreamPartitions(SuperStreamPartitionsRequest),
+    SuperStreamRoute(SuperStreamRouteRequest),
 }
 
 impl Encoder for RequestKind {
@@ -97,6 +101,10 @@ impl Encoder for RequestKind {
             RequestKind::DeleteSuperStream(delete_super_stream) => {
                 delete_super_stream.encoded_size()
             }
+            RequestKind::SuperStreamPartitions(super_stream_partitions) => {
+                super_stream_partitions.encoded_size()
+            }
+            RequestKind::SuperStreamRoute(super_stream_route) => super_stream_route.encoded_size(),
         }
     }
 
@@ -130,6 +138,10 @@ impl Encoder for RequestKind {
             RequestKind::DeleteSuperStream(delete_super_stream) => {
                 delete_super_stream.encode(writer)
             }
+            RequestKind::SuperStreamPartitions(super_stream_partition) => {
+                super_stream_partition.encode(writer)
+            }
+            RequestKind::SuperStreamRoute(super_stream_route) => super_stream_route.encode(writer),
         }
     }
 }
@@ -204,6 +216,12 @@ impl Decoder for Request {
             COMMAND_DELETE_SUPER_STREAM => {
                 DeleteSuperStreamCommand::decode(input).map(|(i, kind)| (i, kind.into()))?
             }
+            COMMAND_PARTITIONS => {
+                SuperStreamPartitionsRequest::decode(input).map(|(i, kind)| (i, kind.into()))?
+            }
+            COMMAND_ROUTE => {
+                SuperStreamRouteRequest::decode(input).map(|(i, kind)| (i, kind.into()))?
+            }
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Request { header, kind: cmd }))
@@ -226,7 +244,9 @@ mod tests {
             peer_properties::PeerPropertiesCommand, publish::PublishCommand,
             query_offset::QueryOffsetRequest, query_publisher_sequence::QueryPublisherRequest,
             sasl_authenticate::SaslAuthenticateCommand, sasl_handshake::SaslHandshakeCommand,
-            store_offset::StoreOffset, subscribe::SubscribeCommand, tune::TunesCommand,
+            store_offset::StoreOffset, subscribe::SubscribeCommand,
+            superstream_partitions::SuperStreamPartitionsRequest,
+            superstream_route::SuperStreamRouteRequest, tune::TunesCommand,
             unsubscribe::UnSubscribeCommand, Command,
         },
     };
@@ -356,5 +376,15 @@ mod tests {
     #[test]
     fn request_delete_super_stream_test() {
         request_encode_decode_test::<DeleteSuperStreamCommand>()
+    }
+
+    #[test]
+    fn request_partitions_command() {
+        request_encode_decode_test::<SuperStreamPartitionsRequest>()
+    }
+
+    #[test]
+    fn request_route_command() {
+        request_encode_decode_test::<SuperStreamRouteRequest>()
     }
 }

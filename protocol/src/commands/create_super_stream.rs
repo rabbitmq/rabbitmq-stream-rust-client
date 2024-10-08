@@ -88,7 +88,7 @@ impl Command for CreateSuperStreamCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::commands::create_stream::CreateStreamCommand;
+
     use crate::commands::tests::command_encode_decode_test;
 
     use super::CreateSuperStreamCommand;

@@ -10,7 +10,9 @@ use crate::{
         publish::PublishCommand, query_offset::QueryOffsetRequest,
         query_publisher_sequence::QueryPublisherRequest,
         sasl_authenticate::SaslAuthenticateCommand, sasl_handshake::SaslHandshakeCommand,
-        store_offset::StoreOffset, subscribe::SubscribeCommand, tune::TunesCommand,
+        store_offset::StoreOffset, subscribe::SubscribeCommand,
+        superstream_partitions::SuperStreamPartitionsRequest,
+        superstream_route::SuperStreamRouteRequest, tune::TunesCommand,
         unsubscribe::UnSubscribeCommand, Command,
     },
     types::Header,
@@ -148,5 +150,17 @@ impl From<CreateSuperStreamCommand> for RequestKind {
 impl From<DeleteSuperStreamCommand> for RequestKind {
     fn from(cmd: DeleteSuperStreamCommand) -> Self {
         RequestKind::DeleteSuperStream(cmd)
+    }
+}
+
+impl From<SuperStreamPartitionsRequest> for RequestKind {
+    fn from(cmd: SuperStreamPartitionsRequest) -> Self {
+        RequestKind::SuperStreamPartitions(cmd)
+    }
+}
+
+impl From<SuperStreamRouteRequest> for RequestKind {
+    fn from(cmd: SuperStreamRouteRequest) -> Self {
+        RequestKind::SuperStreamRoute(cmd)
     }
 }
