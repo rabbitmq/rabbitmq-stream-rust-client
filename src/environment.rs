@@ -77,6 +77,21 @@ impl Environment {
             })
         }
     }
+
+    pub async fn delete_super_stream(&self, super_stream: &str) -> Result<(), StreamDeleteError> {
+        let client = self.create_client().await?;
+        let response = client.delete_super_stream(super_stream).await?;
+        client.close().await?;
+
+        if response.is_ok() {
+            Ok(())
+        } else {
+            Err(StreamDeleteError::Delete {
+                stream: super_stream.to_owned(),
+                status: response.code().clone(),
+            })
+        }
+    }
 }
 
 /// Builder for [`Environment`]

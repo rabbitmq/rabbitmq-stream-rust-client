@@ -3,15 +3,18 @@ use std::io::Write;
 use crate::{
     codec::{decoder::read_u32, Decoder, Encoder},
     commands::{
-        close::CloseRequest, create_stream::CreateStreamCommand, credit::CreditCommand,
+        close::CloseRequest, create_stream::CreateStreamCommand,
+        create_super_stream::CreateSuperStreamCommand, credit::CreditCommand,
         declare_publisher::DeclarePublisherCommand, delete::Delete,
-        delete_publisher::DeletePublisherCommand,
+        delete_publisher::DeletePublisherCommand, delete_super_stream::DeleteSuperStreamCommand,
         exchange_command_versions::ExchangeCommandVersionsRequest, heart_beat::HeartBeatCommand,
         metadata::MetadataCommand, open::OpenCommand, peer_properties::PeerPropertiesCommand,
         publish::PublishCommand, query_offset::QueryOffsetRequest,
         query_publisher_sequence::QueryPublisherRequest,
         sasl_authenticate::SaslAuthenticateCommand, sasl_handshake::SaslHandshakeCommand,
-        store_offset::StoreOffset, subscribe::SubscribeCommand, tune::TunesCommand,
+        store_offset::StoreOffset, subscribe::SubscribeCommand,
+        superstream_partitions::SuperStreamPartitionsRequest,
+        superstream_route::SuperStreamRouteRequest, tune::TunesCommand,
         unsubscribe::UnSubscribeCommand,
     },
     error::{DecodeError, EncodeError},
@@ -20,6 +23,7 @@ use crate::{
 };
 
 use byteorder::{BigEndian, WriteBytesExt};
+
 mod shims;
 #[derive(Debug, PartialEq, Eq)]
 pub struct Request {
@@ -60,6 +64,10 @@ pub enum RequestKind {
     StoreOffset(StoreOffset),
     Unsubscribe(UnSubscribeCommand),
     ExchangeCommandVersions(ExchangeCommandVersionsRequest),
+    CreateSuperStream(CreateSuperStreamCommand),
+    DeleteSuperStream(DeleteSuperStreamCommand),
+    SuperStreamPartitions(SuperStreamPartitionsRequest),
+    SuperStreamRoute(SuperStreamRouteRequest),
 }
 
 impl Encoder for RequestKind {
@@ -87,6 +95,16 @@ impl Encoder for RequestKind {
             RequestKind::ExchangeCommandVersions(exchange_command_versions) => {
                 exchange_command_versions.encoded_size()
             }
+            RequestKind::CreateSuperStream(create_super_stream) => {
+                create_super_stream.encoded_size()
+            }
+            RequestKind::DeleteSuperStream(delete_super_stream) => {
+                delete_super_stream.encoded_size()
+            }
+            RequestKind::SuperStreamPartitions(super_stream_partitions) => {
+                super_stream_partitions.encoded_size()
+            }
+            RequestKind::SuperStreamRoute(super_stream_route) => super_stream_route.encoded_size(),
         }
     }
 
@@ -114,6 +132,16 @@ impl Encoder for RequestKind {
             RequestKind::ExchangeCommandVersions(exchange_command_versions) => {
                 exchange_command_versions.encode(writer)
             }
+            RequestKind::CreateSuperStream(create_super_stream) => {
+                create_super_stream.encode(writer)
+            }
+            RequestKind::DeleteSuperStream(delete_super_stream) => {
+                delete_super_stream.encode(writer)
+            }
+            RequestKind::SuperStreamPartitions(super_stream_partition) => {
+                super_stream_partition.encode(writer)
+            }
+            RequestKind::SuperStreamRoute(super_stream_route) => super_stream_route.encode(writer),
         }
     }
 }
@@ -182,6 +210,18 @@ impl Decoder for Request {
             COMMAND_EXCHANGE_COMMAND_VERSIONS => {
                 ExchangeCommandVersionsRequest::decode(input).map(|(i, kind)| (i, kind.into()))?
             }
+            COMMAND_CREATE_SUPER_STREAM => {
+                CreateSuperStreamCommand::decode(input).map(|(i, kind)| (i, kind.into()))?
+            }
+            COMMAND_DELETE_SUPER_STREAM => {
+                DeleteSuperStreamCommand::decode(input).map(|(i, kind)| (i, kind.into()))?
+            }
+            COMMAND_PARTITIONS => {
+                SuperStreamPartitionsRequest::decode(input).map(|(i, kind)| (i, kind.into()))?
+            }
+            COMMAND_ROUTE => {
+                SuperStreamRouteRequest::decode(input).map(|(i, kind)| (i, kind.into()))?
+            }
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Request { header, kind: cmd }))
@@ -194,24 +234,27 @@ mod tests {
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
-            close::CloseRequest, create_stream::CreateStreamCommand, credit::CreditCommand,
+            close::CloseRequest, create_stream::CreateStreamCommand,
+            create_super_stream::CreateSuperStreamCommand, credit::CreditCommand,
             declare_publisher::DeclarePublisherCommand, delete::Delete,
             delete_publisher::DeletePublisherCommand,
+            delete_super_stream::DeleteSuperStreamCommand,
             exchange_command_versions::ExchangeCommandVersionsRequest,
             heart_beat::HeartBeatCommand, metadata::MetadataCommand, open::OpenCommand,
             peer_properties::PeerPropertiesCommand, publish::PublishCommand,
             query_offset::QueryOffsetRequest, query_publisher_sequence::QueryPublisherRequest,
             sasl_authenticate::SaslAuthenticateCommand, sasl_handshake::SaslHandshakeCommand,
-            store_offset::StoreOffset, subscribe::SubscribeCommand, tune::TunesCommand,
+            store_offset::StoreOffset, subscribe::SubscribeCommand,
+            superstream_partitions::SuperStreamPartitionsRequest,
+            superstream_route::SuperStreamRouteRequest, tune::TunesCommand,
             unsubscribe::UnSubscribeCommand, Command,
         },
     };
 
     use std::fmt::Debug;
 
-    use fake::{Dummy, Fake, Faker};
-
     use super::Request;
+    use fake::{Dummy, Fake, Faker};
 
     #[test]
     fn request_open_test() {
@@ -323,5 +366,25 @@ mod tests {
     #[test]
     fn request_exchange_command_versions_test() {
         request_encode_decode_test::<ExchangeCommandVersionsRequest>()
+    }
+
+    #[test]
+    fn request_create_super_stream_test() {
+        request_encode_decode_test::<CreateSuperStreamCommand>()
+    }
+
+    #[test]
+    fn request_delete_super_stream_test() {
+        request_encode_decode_test::<DeleteSuperStreamCommand>()
+    }
+
+    #[test]
+    fn request_partitions_command() {
+        request_encode_decode_test::<SuperStreamPartitionsRequest>()
+    }
+
+    #[test]
+    fn request_route_command() {
+        request_encode_decode_test::<SuperStreamRouteRequest>()
     }
 }

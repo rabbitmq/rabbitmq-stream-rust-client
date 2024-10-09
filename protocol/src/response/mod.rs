@@ -13,12 +13,14 @@ use crate::{
         peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
         publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
         query_publisher_sequence::QueryPublisherResponse, sasl_handshake::SaslHandshakeResponse,
-        tune::TunesCommand,
+        superstream_partitions::SuperStreamPartitionsResponse,
+        superstream_route::SuperStreamRouteResponse, tune::TunesCommand,
     },
     error::DecodeError,
     protocol::commands::*,
     types::Header,
 };
+
 mod shims;
 
 #[cfg_attr(test, derive(fake::Dummy))]
@@ -68,6 +70,8 @@ pub enum ResponseKind {
     QueryPublisherSequence(QueryPublisherResponse),
     Credit(CreditResponse),
     ExchangeCommandVersions(ExchangeCommandVersionsResponse),
+    SuperStreamPartitions(SuperStreamPartitionsResponse),
+    SuperStreamRoute(SuperStreamRouteResponse),
 }
 
 impl Response {
@@ -96,6 +100,12 @@ impl Response {
             ResponseKind::Credit(_) => None,
             ResponseKind::ExchangeCommandVersions(exchange_command_versions) => {
                 Some(exchange_command_versions.correlation_id)
+            }
+            ResponseKind::SuperStreamPartitions(super_stream_partitions_command) => {
+                Some(super_stream_partitions_command.correlation_id)
+            }
+            ResponseKind::SuperStreamRoute(super_stream_route_command) => {
+                Some(super_stream_route_command.correlation_id)
             }
         }
     }
@@ -139,6 +149,8 @@ impl Decoder for Response {
             | COMMAND_SUBSCRIBE
             | COMMAND_UNSUBSCRIBE
             | COMMAND_CREATE_STREAM
+            | COMMAND_CREATE_SUPER_STREAM
+            | COMMAND_DELETE_SUPER_STREAM
             | COMMAND_DELETE_STREAM => {
                 GenericResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Generic(kind)))?
             }
@@ -172,6 +184,10 @@ impl Decoder for Response {
                 .map(|(remaining, kind)| {
                     (remaining, ResponseKind::ExchangeCommandVersions(kind))
                 })?,
+            COMMAND_PARTITIONS => SuperStreamPartitionsResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::SuperStreamPartitions(kind)))?,
+            COMMAND_ROUTE => SuperStreamRouteResponse::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::SuperStreamRoute(kind)))?,
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
@@ -199,6 +215,7 @@ mod tests {
 
     use byteorder::{BigEndian, WriteBytesExt};
 
+    use super::{Response, ResponseKind};
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
@@ -209,14 +226,16 @@ mod tests {
             peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
             publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
             query_publisher_sequence::QueryPublisherResponse,
-            sasl_handshake::SaslHandshakeResponse, tune::TunesCommand,
+            sasl_handshake::SaslHandshakeResponse,
+            superstream_partitions::SuperStreamPartitionsResponse,
+            superstream_route::SuperStreamRouteResponse, tune::TunesCommand,
         },
         protocol::{
             commands::{
                 COMMAND_CLOSE, COMMAND_DELIVER, COMMAND_HEARTBEAT, COMMAND_METADATA,
-                COMMAND_METADATA_UPDATE, COMMAND_OPEN, COMMAND_PEER_PROPERTIES,
+                COMMAND_METADATA_UPDATE, COMMAND_OPEN, COMMAND_PARTITIONS, COMMAND_PEER_PROPERTIES,
                 COMMAND_PUBLISH_CONFIRM, COMMAND_PUBLISH_ERROR, COMMAND_QUERY_OFFSET,
-                COMMAND_QUERY_PUBLISHER_SEQUENCE, COMMAND_SASL_AUTHENTICATE,
+                COMMAND_QUERY_PUBLISHER_SEQUENCE, COMMAND_ROUTE, COMMAND_SASL_AUTHENTICATE,
                 COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
             },
             version::PROTOCOL_VERSION,
@@ -225,8 +244,6 @@ mod tests {
         types::Header,
         ResponseCode,
     };
-
-    use super::{Response, ResponseKind};
     impl Encoder for ResponseKind {
         fn encoded_size(&self) -> u32 {
             match self {
@@ -249,6 +266,12 @@ mod tests {
                 ResponseKind::Credit(credit) => credit.encoded_size(),
                 ResponseKind::ExchangeCommandVersions(exchange_command_versions) => {
                     exchange_command_versions.encoded_size()
+                }
+                ResponseKind::SuperStreamPartitions(super_stream_response) => {
+                    super_stream_response.encoded_size()
+                }
+                ResponseKind::SuperStreamRoute(super_stream_response) => {
+                    super_stream_response.encoded_size()
                 }
             }
         }
@@ -277,6 +300,12 @@ mod tests {
                 ResponseKind::Credit(credit) => credit.encode(writer),
                 ResponseKind::ExchangeCommandVersions(exchange_command_versions) => {
                     exchange_command_versions.encode(writer)
+                }
+                ResponseKind::SuperStreamPartitions(super_stream_command_versions) => {
+                    super_stream_command_versions.encode(writer)
+                }
+                ResponseKind::SuperStreamRoute(super_stream_command_versions) => {
+                    super_stream_command_versions.encode(writer)
                 }
             }
         }
@@ -445,6 +474,24 @@ mod tests {
             ExchangeCommandVersionsResponse,
             ResponseKind::ExchangeCommandVersions,
             COMMAND_EXCHANGE_COMMAND_VERSIONS
+        );
+    }
+
+    #[test]
+    fn super_stream_partitions_response_test() {
+        response_test!(
+            SuperStreamPartitionsResponse,
+            ResponseKind::SuperStreamPartitions,
+            COMMAND_PARTITIONS
+        );
+    }
+
+    #[test]
+    fn super_stream_route_response_test() {
+        response_test!(
+            SuperStreamRouteResponse,
+            ResponseKind::SuperStreamRoute,
+            COMMAND_ROUTE
         );
     }
 }

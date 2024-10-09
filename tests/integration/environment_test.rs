@@ -14,6 +14,24 @@ async fn environment_create_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn environment_create_and_delete_super_stream_test() {
+    let super_stream = "super_stream_test";
+    let env = Environment::builder().build().await.unwrap();
+
+    let response = env
+        .stream_creator()
+        .max_length(ByteCapacity::GB(5))
+        .create_super_stream(super_stream, 3, None)
+        .await;
+
+    assert_eq!(response.is_ok(), true);
+
+    let response = env.delete_super_stream(super_stream).await;
+
+    assert_eq!(response.is_ok(), true);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn environment_fail_to_connect_wrong_config() {
     // test the wrong config
     // the client should fail to connect
