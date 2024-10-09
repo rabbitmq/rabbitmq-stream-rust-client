@@ -79,6 +79,7 @@ pub mod error;
 mod offset_specification;
 mod producer;
 mod stream_creator;
+mod superstream;
 
 pub type RabbitMQStreamResult<T> = Result<T, error::ClientError>;
 
