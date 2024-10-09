@@ -60,10 +60,12 @@ use rabbitmq_stream_protocol::{
         sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
         store_offset::StoreOffset,
         subscribe::{OffsetSpecification, SubscribeCommand},
-        tune::TunesCommand,
-        unsubscribe::UnSubscribeCommand, superstream_partitions::SuperStreamPartitionsResponse,
-        superstream_partitions::SuperStreamPartitionsRequest, superstream_route::SuperStreamRouteRequest,
+        superstream_partitions::SuperStreamPartitionsRequest,
+        superstream_partitions::SuperStreamPartitionsResponse,
+        superstream_route::SuperStreamRouteRequest,
         superstream_route::SuperStreamRouteResponse,
+        tune::TunesCommand,
+        unsubscribe::UnSubscribeCommand,
     },
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseCode, ResponseKind,
@@ -299,18 +301,25 @@ impl Client {
         .await
     }
 
-    pub async fn partitions(&self, super_stream: String) -> RabbitMQStreamResult<SuperStreamPartitionsResponse> {
+    pub async fn partitions(
+        &self,
+        super_stream: String,
+    ) -> RabbitMQStreamResult<SuperStreamPartitionsResponse> {
         self.send_and_receive(|correlation_id| {
             SuperStreamPartitionsRequest::new(correlation_id, super_stream)
         })
-            .await
+        .await
     }
 
-    pub async fn route(&self, routing_key: String, super_stream: String) -> RabbitMQStreamResult<SuperStreamRouteResponse> {
+    pub async fn route(
+        &self,
+        routing_key: String,
+        super_stream: String,
+    ) -> RabbitMQStreamResult<SuperStreamRouteResponse> {
         self.send_and_receive(|correlation_id| {
             SuperStreamRouteRequest::new(correlation_id, routing_key, super_stream)
         })
-            .await
+        .await
     }
 
     pub async fn create_stream(

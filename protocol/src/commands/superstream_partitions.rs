@@ -3,14 +3,13 @@ use std::io::Write;
 #[cfg(test)]
 use fake::Fake;
 
+use super::Command;
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
     protocol::commands::COMMAND_PARTITIONS,
     FromResponse, ResponseCode,
 };
-use crate::commands::exchange_command_versions::ExchangeCommandVersion;
-use super::Command;
 
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Eq, Debug)]
