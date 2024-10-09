@@ -36,6 +36,7 @@ thiserror = "1.0"
 async-trait = "0.1.51"
 rand = "0.8"
 dashmap = "5.3.4"
+murmur3 = "0.5.2"
 
 [dev-dependencies]
 tracing-subscriber = "0.3.1"
