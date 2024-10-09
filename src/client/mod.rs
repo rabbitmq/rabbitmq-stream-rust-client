@@ -308,7 +308,7 @@ impl Client {
         self.send_and_receive(|correlation_id| {
             SuperStreamPartitionsRequest::new(correlation_id, super_stream)
         })
-            .await
+        .await
     }
 
     pub async fn route(
@@ -319,7 +319,7 @@ impl Client {
         self.send_and_receive(|correlation_id| {
             SuperStreamRouteRequest::new(correlation_id, routing_key, super_stream)
         })
-            .await
+        .await
     }
 
     pub async fn create_stream(

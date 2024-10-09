@@ -2,6 +2,10 @@ use std::io::Write;
 
 #[cfg(test)]
 use fake::Fake;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 4a7cb45 (refactoring tests)
 use super::Command;
 use crate::{
     codec::{Decoder, Encoder},
