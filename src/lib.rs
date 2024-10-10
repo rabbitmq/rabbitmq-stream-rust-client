@@ -80,6 +80,7 @@ mod offset_specification;
 mod producer;
 mod stream_creator;
 mod superstream;
+mod superstream_producer;
 
 pub type RabbitMQStreamResult<T> = Result<T, error::ClientError>;
 

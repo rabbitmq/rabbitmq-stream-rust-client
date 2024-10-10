@@ -1,86 +1,74 @@
-use crate::{
-    client::Client,
-};
+use crate::client::Client;
 
 use murmur3::murmur3_32;
-use std::any::Any;
 use rabbitmq_stream_protocol::message::Message;
 use std::io::Cursor;
 
-trait Metadata   {
-
-    async fn partitions(&mut self) -> Vec<String>;
-    async fn routes(&mut self, routing_key: String) -> Vec<String>;
-
+pub enum RouteType {
+    Hash = 0,
+    Key = 1,
 }
 
-struct DefaultSuperStreamMetadata   {
+trait Metadata {
+    async fn partitions(&mut self) -> Vec<String>;
+    async fn routes(&mut self, routing_key: String) -> Vec<String>;
+}
+
+struct DefaultSuperStreamMetadata {
     super_stream: String,
     client: Client,
     partitions: Vec<String>,
     routes: Vec<String>,
 }
 
-impl Metadata for DefaultSuperStreamMetadata    {
-
-    async fn partitions(&mut self) -> Vec<String>   {
-
-        if self.partitions.len() == 0    {
-
+impl Metadata for DefaultSuperStreamMetadata {
+    async fn partitions(&mut self) -> Vec<String> {
+        if self.partitions.len() == 0 {
             let response = self.client.partitions(self.super_stream.clone()).await;
 
             self.partitions = response.unwrap().streams;
-
         }
 
-        return self.partitions.clone()
-
+        return self.partitions.clone();
     }
-    async fn routes(&mut self, routing_key: String) -> Vec<String>    {
-
-        if self.routes.len() == 0    {
-
-            let response = self.client.route(routing_key, self.super_stream.clone()).await;
+    async fn routes(&mut self, routing_key: String) -> Vec<String> {
+        if self.routes.len() == 0 {
+            let response = self
+                .client
+                .route(routing_key, self.super_stream.clone())
+                .await;
 
             self.routes = response.unwrap().streams;
-
         }
 
-        return self.routes.clone()
-
+        return self.routes.clone();
     }
-
 }
 
-trait RoutingStrategy   {
-    async fn routes(&self, message: Message, metadata: & mut impl Metadata) -> Vec<String>;
+pub trait RoutingStrategy {
+    async fn routes(&self, message: Message, metadata: &mut impl Metadata) -> Vec<String>;
 }
 
-struct RoutingKeyRoutingStrategy   {
+struct RoutingKeyRoutingStrategy {
     routing_extractor: &'static dyn Fn(Message) -> String,
 }
 
-impl RoutingStrategy for RoutingKeyRoutingStrategy    {
-
-    async fn routes(&self, message: Message, metadata: & mut impl Metadata) -> Vec<String>   {
-
+impl RoutingStrategy for RoutingKeyRoutingStrategy {
+    async fn routes(&self, message: Message, metadata: &mut impl Metadata) -> Vec<String> {
         let key = (self.routing_extractor)(message);
 
         let routes = metadata.routes(key).await;
 
         return routes;
-
     }
 }
 
-struct HashRoutingMurmurStrategy   {
+struct HashRoutingMurmurStrategy {
     routing_extractor: &'static dyn Fn(Message) -> String,
 }
 
 impl RoutingStrategy for HashRoutingMurmurStrategy {
-
-    async fn routes(&self, message: Message, metadata: & mut impl Metadata) -> Vec<String>   {
-
+    async fn routes(&self, message: Message, metadata: &mut impl Metadata) -> Vec<String> {
         let mut streams: Vec<String> = Vec::new();
 
         let key = (self.routing_extractor)(message);
@@ -92,7 +80,6 @@ impl RoutingStrategy for HashRoutingMurmurStrategy {
         let stream = partitions.into_iter().nth(route as usize).unwrap();
         streams.push(stream);
 
-        return streams
-
+        return streams;
     }
 }
