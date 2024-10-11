@@ -9,20 +9,16 @@ pub enum RouteType {
     Key = 1,
 }
 
-trait Metadata {
-    async fn partitions(&mut self) -> Vec<String>;
-    async fn routes(&mut self, routing_key: String) -> Vec<String>;
+#[derive(Clone)]
+pub struct DefaultSuperStreamMetadata {
+    pub super_stream: String,
+    pub client: Client,
+    pub partitions: Vec<String>,
+    pub routes: Vec<String>,
 }
 
-struct DefaultSuperStreamMetadata {
-    super_stream: String,
-    client: Client,
-    partitions: Vec<String>,
-    routes: Vec<String>,
-}
-
-impl Metadata for DefaultSuperStreamMetadata {
-    async fn partitions(&mut self) -> Vec<String> {
+impl DefaultSuperStreamMetadata {
+    pub async fn partitions(&mut self) -> Vec<String> {
         if self.partitions.len() == 0 {
             let response = self.client.partitions(self.super_stream.clone()).await;
 
@@ -31,7 +27,7 @@ impl Metadata for DefaultSuperStreamMetadata {
 
         return self.partitions.clone();
     }
-    async fn routes(&mut self, routing_key: String) -> Vec<String> {
+    pub async fn routes(&mut self, routing_key: String) -> Vec<String> {
         if self.routes.len() == 0 {
             let response = self
                 .client
@@ -45,16 +41,17 @@ impl Metadata for DefaultSuperStreamMetadata {
     }
 }
 
-pub trait RoutingStrategy {
-    async fn routes(&self, message: Message, metadata: &mut impl Metadata) -> Vec<String>;
-}
-
-struct RoutingKeyRoutingStrategy {
+#[derive(Clone)]
+pub struct RoutingKeyRoutingStrategy {
     routing_extractor: &'static dyn Fn(Message) -> String,
 }
 
-impl RoutingStrategy for RoutingKeyRoutingStrategy {
-    async fn routes(&self, message: Message, metadata: &mut impl Metadata) -> Vec<String> {
+impl RoutingKeyRoutingStrategy {
+    pub async fn routes(
+        &self,
+        message: Message,
+        metadata: &mut DefaultSuperStreamMetadata,
+    ) -> Vec<String> {
         let key = (self.routing_extractor)(message);
 
         let routes = metadata.routes(key).await;
@@ -63,12 +60,17 @@ impl RoutingStrategy for RoutingKeyRoutingStrategy {
     }
 }
 
-struct HashRoutingMurmurStrategy {
+#[derive(Clone)]
+pub struct HashRoutingMurmurStrategy {
     routing_extractor: &'static dyn Fn(Message) -> String,
 }
 
-impl RoutingStrategy for HashRoutingMurmurStrategy {
-    async fn routes(&self, message: Message, metadata: &mut impl Metadata) -> Vec<String> {
+impl HashRoutingMurmurStrategy {
+    pub async fn routes(
+        &self,
+        message: Message,
+        metadata: &mut DefaultSuperStreamMetadata,
+    ) -> Vec<String> {
         let mut streams: Vec<String> = Vec::new();
 
         let key = (self.routing_extractor)(message);
@@ -82,4 +84,10 @@ impl RoutingStrategy for HashRoutingMurmurStrategy {
 
         return streams;
     }
+}
+
+#[derive(Clone)]
+pub enum RoutingStrategy {
+    HashRoutingStrategy(HashRoutingMurmurStrategy),
+    RoutingKeyStrategy(RoutingKeyRoutingStrategy),
 }
