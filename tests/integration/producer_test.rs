@@ -12,6 +12,14 @@ use rabbitmq_stream_client::{
 
 use crate::common::{Countdown, TestEnvironment};
 
+use rabbitmq_stream_client::types::{
+    HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy,
+    RoutingStrategy,
+};
+
+use std::sync::atomic::{AtomicU32, Ordering};
+use tokio::sync::Notify;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_send_no_name_ok() {
     let env = TestEnvironment::create().await;
@@ -439,6 +447,94 @@ async fn producer_send_after_close_error() {
         ),
         true
     );
+}
+
+fn routing_key_strategy_value_extractor(message: Message) -> String {
+    return "0".to_string();
+}
+
+fn hash_strategy_value_extractor(message: Message) -> String {
+    let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
+
+    return s;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn key_super_steam_producer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+    let mut confirmed_messages = Arc::new(AtomicU32::new(0));
+    let notify_on_send = Arc::new(Notify::new());
+    let message_count = 100;
+
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::RoutingKeyStrategy(
+            RoutingKeyRoutingStrategy {
+                routing_extractor: &routing_key_strategy_value_extractor,
+            },
+        ))
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    for i in 0..message_count {
+        let counter = confirmed_messages.clone();
+        let notifier = notify_on_send.clone();
+        let msg = Message::builder().body(format!("message{}", i)).build();
+        super_stream_producer
+            .send(msg, move |_| {
+                let inner_counter = counter.clone();
+                let inner_notifier = notifier.clone();
+                async move {
+                    if inner_counter.fetch_add(1, Ordering::Relaxed) == message_count - 1 {
+                        inner_notifier.notify_one();
+                    }
+                }
+            })
+            .await
+            .unwrap();
+    }
+
+    notify_on_send.notified().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn hash_super_steam_producer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+    let mut confirmed_messages = Arc::new(AtomicU32::new(0));
+    let notify_on_send = Arc::new(Notify::new());
+    let message_count = 100;
+
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
+            HashRoutingMurmurStrategy {
+                routing_extractor: &hash_strategy_value_extractor,
+            },
+        ))
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    for i in 0..message_count {
+        let counter = confirmed_messages.clone();
+        let notifier = notify_on_send.clone();
+        let msg = Message::builder().body(format!("message{}", i)).build();
+        super_stream_producer
+            .send(msg, move |_| {
+                let inner_counter = counter.clone();
+                let inner_notifier = notifier.clone();
+                async move {
+                    if inner_counter.fetch_add(1, Ordering::Relaxed) == message_count - 1 {
+                        inner_notifier.notify_one();
+                    }
+                }
+            })
+            .await
+            .unwrap();
+    }
+
+    notify_on_send.notified().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

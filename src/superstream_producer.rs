@@ -2,7 +2,7 @@ use crate::{
     client::Client,
     environment::Environment,
     error::{ProducerCreateError, ProducerPublishError},
-    producer::{ConfirmationStatus, Producer, NoDedup},
+    producer::{ConfirmationStatus, NoDedup, Producer},
     superstream::{DefaultSuperStreamMetadata, RoutingStrategy},
 };
 use rabbitmq_stream_protocol::message::Message;
@@ -14,7 +14,11 @@ use std::sync::Arc;
 type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
 
 #[derive(Clone)]
-pub struct SuperStreamProducer<T>(Arc<SuperStreamProducerInternal<T>>, PhantomData<T>);
+pub struct SuperStreamProducer<T>(
+    Arc<SuperStreamProducerInternal>,
+    HashMap<String, Producer<T>>,
+    PhantomData<T>,
+);
 
 /// Builder for [`SuperStreamProducer`]
 pub struct SuperStreamProducerBuilder<T> {
@@ -25,12 +29,11 @@ pub struct SuperStreamProducerBuilder<T> {
     pub(crate) data: PhantomData<T>,
 }
 
-pub struct SuperStreamProducerInternal<T> {
+pub struct SuperStreamProducerInternal {
     pub(crate) environment: Environment,
     client: Client,
     super_stream: String,
     publish_version: u16,
-    producers: HashMap<String, Producer<T>>,
     filter_value_extractor: Option<FilterValueExtractor>,
     super_stream_metadata: DefaultSuperStreamMetadata,
     routing_strategy: RoutingStrategy,
@@ -38,10 +41,15 @@ pub struct SuperStreamProducerInternal<T> {
 
 impl SuperStreamProducer<NoDedup> {
     pub async fn send<Fut>(
-        &self,
+        &mut self,
         message: Message,
-        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static + Clone,
-    ) where
+        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut
+            + Send
+            + Sync
+            + 'static
+            + Clone,
+    ) -> Result<(), ProducerPublishError>
+    where
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
         let routes = match self.0.routing_strategy.clone() {
@@ -58,16 +66,22 @@ impl SuperStreamProducer<NoDedup> {
         };
 
         for route in routes.into_iter() {
-            if !self.0.producers.contains_key(route.as_str()) {
+            if !self.1.contains_key(route.as_str()) {
                 let producer = self.0.environment.producer().build(route.as_str()).await;
-                self.0.producers.clone().insert(route.clone(), producer.unwrap().clone());
+
+                self.1.insert(route.clone(), producer.unwrap());
             }
 
-            let producer = self.0.producers.get(route.as_str()).unwrap();
-            _ = producer
-                .send(message.clone(), cb.clone())
-                .await;
+            println!("sending message to super_stream {}", route.clone());
+
+            let producer = self.1.get(route.as_str()).unwrap();
+            let result = producer.send(message.clone(), cb.clone()).await;
+            match result {
+                Ok(()) => println!("Message correctly sent"),
+                Err(e) => println!("Error {}", e),
+            }
         }
+        Ok(())
     }
 }
 
@@ -75,7 +89,6 @@ impl<T> SuperStreamProducerBuilder<T> {
     pub async fn build(
         self,
         super_stream: &str,
-        route_type: RoutingStrategy,
     ) -> Result<SuperStreamProducer<T>, ProducerCreateError> {
         // Connect to the user specified node first, then look for the stream leader.
         // The leader is the recommended node for writing, because writing to a replica will redundantly pass these messages
@@ -100,18 +113,18 @@ impl<T> SuperStreamProducerBuilder<T> {
             client,
             publish_version,
             filter_value_extractor: self.filter_value_extractor,
-            routing_strategy: route_type,
+            routing_strategy: self.routing_strategy,
             super_stream_metadata: DefaultSuperStreamMetadata {
                 super_stream: super_stream.to_string(),
                 client: self.environment.create_client().await?,
                 partitions: Vec::new(),
                 routes: Vec::new(),
             },
-            producers,
         };
 
         let internal_producer = Arc::new(super_stream_producer);
-        let super_stream_producer = SuperStreamProducer(internal_producer.clone(), PhantomData);
+        let super_stream_producer =
+            SuperStreamProducer(internal_producer.clone(), producers, PhantomData);
 
         Ok(super_stream_producer)
     }
