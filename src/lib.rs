@@ -96,6 +96,9 @@ pub mod types {
     pub use crate::consumer::Delivery;
     pub use crate::offset_specification::OffsetSpecification;
     pub use crate::stream_creator::StreamCreator;
+    pub use crate::superstream::HashRoutingMurmurStrategy;
+    pub use crate::superstream::RoutingKeyRoutingStrategy;
+    pub use crate::superstream::RoutingStrategy;
     pub use rabbitmq_stream_protocol::message::Message;
     pub use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};
 

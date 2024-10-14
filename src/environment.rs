@@ -11,6 +11,8 @@ use crate::{
     error::StreamDeleteError,
     producer::ProducerBuilder,
     stream_creator::StreamCreator,
+    superstream::RoutingStrategy,
+    superstream_producer::SuperStreamProducerBuilder,
     RabbitMQStreamResult,
 };
 
@@ -46,6 +48,19 @@ impl Environment {
             batch_publishing_delay: Duration::from_millis(100),
             data: PhantomData,
             filter_value_extractor: None,
+        }
+    }
+
+    pub fn super_stream_producer(
+        &self,
+        routing_strategy: RoutingStrategy,
+    ) -> SuperStreamProducerBuilder<NoDedup> {
+        SuperStreamProducerBuilder {
+            environment: self.clone(),
+            name: None,
+            data: PhantomData,
+            filter_value_extractor: None,
+            routing_strategy: routing_strategy,
         }
     }
 

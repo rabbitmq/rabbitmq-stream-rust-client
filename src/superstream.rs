@@ -4,10 +4,12 @@ use murmur3::murmur3_32;
 use rabbitmq_stream_protocol::message::Message;
 use std::io::Cursor;
 
+/*
 pub enum RouteType {
     Hash = 0,
     Key = 1,
 }
+*/
 
 #[derive(Clone)]
 pub struct DefaultSuperStreamMetadata {
@@ -43,7 +45,7 @@ impl DefaultSuperStreamMetadata {
 
 #[derive(Clone)]
 pub struct RoutingKeyRoutingStrategy {
-    routing_extractor: &'static dyn Fn(Message) -> String,
+    pub routing_extractor: &'static dyn Fn(Message) -> String,
 }
 
 impl RoutingKeyRoutingStrategy {
@@ -62,7 +64,7 @@ impl RoutingKeyRoutingStrategy {
 
 #[derive(Clone)]
 pub struct HashRoutingMurmurStrategy {
-    routing_extractor: &'static dyn Fn(Message) -> String,
+    pub routing_extractor: &'static dyn Fn(Message) -> String,
 }
 
 impl HashRoutingMurmurStrategy {
