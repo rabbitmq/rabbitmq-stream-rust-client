@@ -449,11 +449,11 @@ async fn producer_send_after_close_error() {
     );
 }
 
-fn routing_key_strategy_value_extractor(message: Message) -> String {
+fn routing_key_strategy_value_extractor(message: &Message) -> String {
     return "0".to_string();
 }
 
-fn hash_strategy_value_extractor(message: Message) -> String {
+fn hash_strategy_value_extractor(message: &Message) -> String {
     let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
     return s;
 }

@@ -53,10 +53,10 @@ impl SuperStreamProducer<NoDedup> {
     {
         let routes = match self.0.routing_strategy.clone() {
             RoutingStrategy::HashRoutingStrategy(routing_strategy) => {
-                routing_strategy.routes(message.clone(), &mut self.2).await
+                routing_strategy.routes(&message, &mut self.2).await
             }
             RoutingStrategy::RoutingKeyStrategy(routing_strategy) => {
-                routing_strategy.routes(message.clone(), &mut self.2).await
+                routing_strategy.routes(&message, &mut self.2).await
             }
         };
 
@@ -67,7 +67,7 @@ impl SuperStreamProducer<NoDedup> {
             }
 
             let producer = self.1.get(route.as_str()).unwrap();
-            let result = producer.send(message.clone(), cb.clone()).await?;
+            let _ = producer.send(message.clone(), cb.clone()).await?;
         }
         Ok(())
     }
