@@ -45,13 +45,13 @@ impl DefaultSuperStreamMetadata {
 
 #[derive(Clone)]
 pub struct RoutingKeyRoutingStrategy {
-    pub routing_extractor: &'static dyn Fn(Message) -> String,
+    pub routing_extractor: &'static dyn Fn(&Message) -> String,
 }
 
 impl RoutingKeyRoutingStrategy {
     pub async fn routes(
         &self,
-        message: Message,
+        message: &Message,
         metadata: &mut DefaultSuperStreamMetadata,
     ) -> Vec<String> {
         let key = (self.routing_extractor)(message);
@@ -64,19 +64,19 @@ impl RoutingKeyRoutingStrategy {
 
 #[derive(Clone)]
 pub struct HashRoutingMurmurStrategy {
-    pub routing_extractor: &'static dyn Fn(Message) -> String,
+    pub routing_extractor: &'static dyn Fn(&Message) -> String,
 }
 
 impl HashRoutingMurmurStrategy {
     pub async fn routes(
         &self,
-        message: Message,
+        message: &Message,
         metadata: &mut DefaultSuperStreamMetadata,
     ) -> Vec<String> {
         println!("im in routes");
         let mut streams: Vec<String> = Vec::new();
 
-        let key = (self.routing_extractor)(message.clone());
+        let key = (self.routing_extractor)(message);
         let hash_result = murmur3_32(&mut Cursor::new(key), 104729);
 
         let number_of_partitions = metadata.partitions().await.len();
