@@ -57,9 +57,8 @@ impl Environment {
     ) -> SuperStreamProducerBuilder<NoDedup> {
         SuperStreamProducerBuilder {
             environment: self.clone(),
-            name: None,
             data: PhantomData,
-            filter_value_extractor: None,
+            //filter_value_extractor: None,
             routing_strategy: routing_strategy,
         }
     }
