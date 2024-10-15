@@ -9,12 +9,9 @@ use rabbitmq_stream_client::types::{
 };
 
 use crate::common::TestEnvironment;
-use rabbitmq_stream_protocol::message::Value;
-use rabbitmq_stream_protocol::utils::TupleMapperSecond;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::Notify;
-use tokio::time::{sleep, Duration};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_send_no_name_ok() {
@@ -400,7 +397,6 @@ fn routing_key_strategy_value_extractor(message: Message) -> String {
 
 fn hash_strategy_value_extractor(message: Message) -> String {
     let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
-
     return s;
 }
 
@@ -441,6 +437,7 @@ async fn key_super_steam_producer_test() {
     }
 
     notify_on_send.notified().await;
+    _ = super_stream_producer.close();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -462,6 +459,7 @@ async fn hash_super_steam_producer_test() {
         .unwrap();
 
     for i in 0..message_count {
+        println!("sending message {}", i);
         let counter = confirmed_messages.clone();
         let notifier = notify_on_send.clone();
         let msg = Message::builder().body(format!("message{}", i)).build();
@@ -480,6 +478,7 @@ async fn hash_super_steam_producer_test() {
     }
 
     notify_on_send.notified().await;
+    _ = super_stream_producer.close();
 }
 
 #[tokio::test(flavor = "multi_thread")]

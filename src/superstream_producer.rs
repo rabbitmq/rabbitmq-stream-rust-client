@@ -1,3 +1,4 @@
+use crate::error::ProducerCloseError;
 use crate::{
     client::Client,
     environment::Environment,
@@ -17,14 +18,14 @@ type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sy
 pub struct SuperStreamProducer<T>(
     Arc<SuperStreamProducerInternal>,
     HashMap<String, Producer<T>>,
+    DefaultSuperStreamMetadata,
     PhantomData<T>,
 );
 
 /// Builder for [`SuperStreamProducer`]
 pub struct SuperStreamProducerBuilder<T> {
     pub(crate) environment: Environment,
-    pub(crate) name: Option<String>,
-    pub filter_value_extractor: Option<FilterValueExtractor>,
+    //pub filter_value_extractor: Option<FilterValueExtractor>,
     pub routing_strategy: RoutingStrategy,
     pub(crate) data: PhantomData<T>,
 }
@@ -32,10 +33,8 @@ pub struct SuperStreamProducerBuilder<T> {
 pub struct SuperStreamProducerInternal {
     pub(crate) environment: Environment,
     client: Client,
-    super_stream: String,
-    publish_version: u16,
-    filter_value_extractor: Option<FilterValueExtractor>,
-    super_stream_metadata: DefaultSuperStreamMetadata,
+    // TODO: implement filtering for superstream
+    //filter_value_extractor: Option<FilterValueExtractor>,
     routing_strategy: RoutingStrategy,
 }
 
@@ -54,34 +53,47 @@ impl SuperStreamProducer<NoDedup> {
     {
         let routes = match self.0.routing_strategy.clone() {
             RoutingStrategy::HashRoutingStrategy(routing_strategy) => {
-                routing_strategy
-                    .routes(message.clone(), &mut self.0.super_stream_metadata.clone())
-                    .await
+                routing_strategy.routes(message.clone(), &mut self.2).await
             }
             RoutingStrategy::RoutingKeyStrategy(routing_strategy) => {
-                routing_strategy
-                    .routes(message.clone(), &mut self.0.super_stream_metadata.clone())
-                    .await
+                routing_strategy.routes(message.clone(), &mut self.2).await
             }
         };
 
         for route in routes.into_iter() {
             if !self.1.contains_key(route.as_str()) {
-                let producer = self.0.environment.producer().build(route.as_str()).await;
-
-                self.1.insert(route.clone(), producer.unwrap());
+                    let producer = self.0.environment.producer().build(route.as_str()).await;
+                    self.1.insert(route.clone(), producer.unwrap());
             }
-
-            println!("sending message to super_stream {}", route.clone());
 
             let producer = self.1.get(route.as_str()).unwrap();
-            let result = producer.send(message.clone(), cb.clone()).await;
-            match result {
-                Ok(()) => println!("Message correctly sent"),
-                Err(e) => println!("Error {}", e),
-            }
+            let result = producer.send(message.clone(), cb.clone()).await?;
         }
         Ok(())
+    }
+
+
+    pub async fn close(self) -> Result<(), ProducerCloseError> {
+        self.0.client.close().await?;
+
+        let mut err: Option<ProducerCloseError> = None;
+        let mut is_error = false;
+        for (_, producer) in self.1.into_iter() {
+            let close = producer.close().await;
+            match close {
+                Err(e) => {
+                    is_error = true;
+                    err = Some(e);
+                }
+                _ => (),
+            }
+        }
+
+        if is_error == false {
+            return Ok(());
+        } else {
+            return Err(err.unwrap());
+        }
     }
 }
 
@@ -95,36 +107,29 @@ impl<T> SuperStreamProducerBuilder<T> {
         // to the leader anyway - it is the only one capable of writing.
         let client = self.environment.create_client().await?;
 
-        let mut publish_version = 1;
-
-        if self.filter_value_extractor.is_some() {
-            if client.filtering_supported() {
-                publish_version = 2
-            } else {
-                return Err(ProducerCreateError::FilteringNotSupport);
-            }
-        }
-
         let producers = HashMap::new();
+
+        let super_stream_metadata = DefaultSuperStreamMetadata {
+            super_stream: super_stream.to_string(),
+            client: self.environment.create_client().await?,
+            partitions: Vec::new(),
+            routes: Vec::new(),
+        };
 
         let super_stream_producer = SuperStreamProducerInternal {
             environment: self.environment.clone(),
-            super_stream: super_stream.to_string(),
             client,
-            publish_version,
-            filter_value_extractor: self.filter_value_extractor,
+            //filter_value_extractor: self.filter_value_extractor,
             routing_strategy: self.routing_strategy,
-            super_stream_metadata: DefaultSuperStreamMetadata {
-                super_stream: super_stream.to_string(),
-                client: self.environment.create_client().await?,
-                partitions: Vec::new(),
-                routes: Vec::new(),
-            },
         };
 
         let internal_producer = Arc::new(super_stream_producer);
-        let super_stream_producer =
-            SuperStreamProducer(internal_producer.clone(), producers, PhantomData);
+        let super_stream_producer = SuperStreamProducer(
+            internal_producer.clone(),
+            producers,
+            super_stream_metadata,
+            PhantomData,
+        );
 
         Ok(super_stream_producer)
     }
