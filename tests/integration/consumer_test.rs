@@ -3,17 +3,20 @@ use std::time::Duration;
 use crate::common::TestEnvironment;
 use fake::{Fake, Faker};
 use futures::StreamExt;
+use tokio::task;
 use rabbitmq_stream_client::{
     error::{
         ClientError, ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError,
         ProducerCloseError,
     },
-    types::{Delivery, Message, OffsetSpecification},
+    types::{Delivery, Message, OffsetSpecification, SuperStreamConsumer},
     Consumer, FilterConfiguration, NoDedup, Producer,
 };
 
 use rabbitmq_stream_protocol::ResponseCode;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use rabbitmq_stream_client::types::{HashRoutingMurmurStrategy, RoutingStrategy};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
@@ -52,6 +55,69 @@ async fn consumer_test() {
 
     consumer.handle().close().await.unwrap();
     producer.close().await.unwrap();
+}
+
+fn hash_strategy_value_extractor(message: &Message) -> String {
+    let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
+    return s;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn super_stream_consumer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+    let reference: String = Faker.fake();
+
+    let message_count = 10;
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
+            HashRoutingMurmurStrategy {
+                routing_extractor: &hash_strategy_value_extractor,
+            },
+        ))
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    static super_stream_consumer: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    for n in 0..message_count {
+        let msg = Message::builder().body(format!("message{}", n)).build();
+        let _ = super_stream_producer
+            .send(msg, |confirmation_status| async move {
+                println!("Message confirmed with status {:?}", confirmation_status);
+            })
+            .await
+            .unwrap();
+    }
+
+
+    let received_messages = Arc::new(AtomicU32::new(0));
+    let consumers =  super_stream_consumer.get_consumers().await;
+
+    let mut tasks = Vec::new();
+        for mut consumer in consumers.into_iter() {
+            let received_messages_outer = received_messages.clone();
+            tasks.push(task::spawn(async move {
+                let inner_received_messages = received_messages_outer.clone();
+                let delivery = consumer.next().await.unwrap();
+                let _ = String::from_utf8(delivery.unwrap().message().data().unwrap().to_vec()).unwrap();
+                inner_received_messages.fetch_add(1, Ordering::Relaxed);
+
+            }));
+        }
+
+    futures::future::join_all(tasks).await;
+
+    assert!(received_messages.fetch_add(1, Ordering::Relaxed) == message_count);
+    //consumer.handle().close().await.unwrap();
+    super_stream_producer.close().await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]

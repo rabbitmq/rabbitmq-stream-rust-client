@@ -80,6 +80,7 @@ mod offset_specification;
 mod producer;
 mod stream_creator;
 mod superstream;
+mod superstream_consumer;
 mod superstream_producer;
 
 pub type RabbitMQStreamResult<T> = Result<T, error::ClientError>;
@@ -98,6 +99,7 @@ pub mod types {
     pub use crate::stream_creator::StreamCreator;
     pub use crate::superstream::HashRoutingMurmurStrategy;
     pub use crate::superstream::RoutingKeyRoutingStrategy;
+    pub use crate::superstream_consumer::SuperStreamConsumer;
     pub use crate::superstream::RoutingStrategy;
     pub use rabbitmq_stream_protocol::message::Message;
     pub use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};

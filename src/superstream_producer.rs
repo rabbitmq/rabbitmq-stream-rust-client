@@ -12,7 +12,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
+//type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
 
 #[derive(Clone)]
 pub struct SuperStreamProducer<T>(
@@ -62,8 +62,8 @@ impl SuperStreamProducer<NoDedup> {
 
         for route in routes.into_iter() {
             if !self.1.contains_key(route.as_str()) {
-                    let producer = self.0.environment.producer().build(route.as_str()).await;
-                    self.1.insert(route.clone(), producer.unwrap());
+                let producer = self.0.environment.producer().build(route.as_str()).await;
+                self.1.insert(route.clone(), producer.unwrap());
             }
 
             let producer = self.1.get(route.as_str()).unwrap();
@@ -71,7 +71,6 @@ impl SuperStreamProducer<NoDedup> {
         }
         Ok(())
     }
-
 
     pub async fn close(self) -> Result<(), ProducerCloseError> {
         self.0.client.close().await?;
