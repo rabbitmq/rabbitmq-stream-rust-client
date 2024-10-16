@@ -461,7 +461,7 @@ fn hash_strategy_value_extractor(message: &Message) -> String {
 #[tokio::test(flavor = "multi_thread")]
 async fn key_super_steam_producer_test() {
     let env = TestEnvironment::create_super_stream().await;
-    let mut confirmed_messages = Arc::new(AtomicU32::new(0));
+    let confirmed_messages = Arc::new(AtomicU32::new(0));
     let notify_on_send = Arc::new(Notify::new());
     let message_count = 100;
 
@@ -501,7 +501,7 @@ async fn key_super_steam_producer_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn hash_super_steam_producer_test() {
     let env = TestEnvironment::create_super_stream().await;
-    let mut confirmed_messages = Arc::new(AtomicU32::new(0));
+    let confirmed_messages = Arc::new(AtomicU32::new(0));
     let notify_on_send = Arc::new(Notify::new());
     let message_count = 100;
 

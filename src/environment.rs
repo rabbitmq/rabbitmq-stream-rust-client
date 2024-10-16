@@ -13,6 +13,7 @@ use crate::{
     stream_creator::StreamCreator,
     superstream::RoutingStrategy,
     superstream_producer::SuperStreamProducerBuilder,
+    superstream_consumer::SuperStreamConsumerBuilder,
     RabbitMQStreamResult,
 };
 
@@ -72,6 +73,14 @@ impl Environment {
             filter_configuration: None,
         }
     }
+
+    pub fn super_stream_consumer(&self) -> SuperStreamConsumerBuilder {
+        SuperStreamConsumerBuilder {
+            environment: self.clone(),
+            offset_specification: OffsetSpecification::Next,
+        }
+    }
+
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {
         Client::connect(self.options.client_options.clone()).await
     }

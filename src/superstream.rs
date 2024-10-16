@@ -4,13 +4,6 @@ use murmur3::murmur3_32;
 use rabbitmq_stream_protocol::message::Message;
 use std::io::Cursor;
 
-/*
-pub enum RouteType {
-    Hash = 0,
-    Key = 1,
-}
-*/
-
 #[derive(Clone)]
 pub struct DefaultSuperStreamMetadata {
     pub super_stream: String,
