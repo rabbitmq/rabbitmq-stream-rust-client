@@ -291,14 +291,14 @@ impl Client {
                 properties,
             )
         })
-            .await
+        .await
     }
 
     pub async fn unsubscribe(&self, subscription_id: u8) -> RabbitMQStreamResult<GenericResponse> {
         self.send_and_receive(|correlation_id| {
             UnSubscribeCommand::new(correlation_id, subscription_id)
         })
-            .await
+        .await
     }
 
     pub async fn partitions(
@@ -330,7 +330,7 @@ impl Client {
         self.send_and_receive(|correlation_id| {
             CreateStreamCommand::new(correlation_id, stream.to_owned(), options)
         })
-            .await
+        .await
     }
 
     pub async fn create_super_stream(
@@ -349,7 +349,7 @@ impl Client {
                 options,
             )
         })
-            .await
+        .await
     }
 
     pub async fn delete_stream(&self, stream: &str) -> RabbitMQStreamResult<GenericResponse> {
@@ -364,7 +364,7 @@ impl Client {
         self.send_and_receive(|correlation_id| {
             DeleteSuperStreamCommand::new(correlation_id, super_stream.to_owned())
         })
-            .await
+        .await
     }
 
     pub async fn credit(&self, subscription_id: u8, credit: u16) -> RabbitMQStreamResult<()> {
@@ -391,7 +391,7 @@ impl Client {
             stream.to_owned(),
             offset,
         ))
-            .await
+        .await
     }
 
     pub async fn query_offset(&self, reference: String, stream: &str) -> Result<u64, ClientError> {
@@ -422,7 +422,7 @@ impl Client {
                 stream.to_owned(),
             )
         })
-            .await
+        .await
     }
 
     pub async fn delete_publisher(
@@ -432,7 +432,7 @@ impl Client {
         self.send_and_receive(|correlation_id| {
             DeletePublisherCommand::new(correlation_id, publisher_id)
         })
-            .await
+        .await
     }
 
     pub async fn publish<T: BaseMessage>(
@@ -475,8 +475,8 @@ impl Client {
         self.send_and_receive::<QueryPublisherResponse, _, _>(|correlation_id| {
             QueryPublisherRequest::new(correlation_id, reference.to_owned(), stream.to_owned())
         })
-            .await
-            .map(|sequence| sequence.from_response())
+        .await
+        .map(|sequence| sequence.from_response())
     }
 
     pub async fn exchange_command_versions(
@@ -485,7 +485,7 @@ impl Client {
         self.send_and_receive::<ExchangeCommandVersionsResponse, _, _>(|correlation_id| {
             ExchangeCommandVersionsRequest::new(correlation_id, vec![])
         })
-            .await
+        .await
     }
 
     pub fn filtering_supported(&self) -> bool {
@@ -509,13 +509,13 @@ impl Client {
                 let roots = Self::build_root_store(Some(Path::new(
                     &broker.tls.get_root_certificates_path(),
                 )))
-                    .await?;
+                .await?;
                 config = Self::build_tls_client_configuration(
                     broker.tls.get_client_certificates_path(),
                     &roots,
                     broker,
                 )
-                    .await?;
+                .await?;
             } else {
                 config = Self::build_tls_client_configuration_untrusted().await?;
             }
@@ -547,7 +547,7 @@ impl Client {
         self.with_state_lock(self.peer_properties(), move |state, server_properties| {
             state.server_properties = server_properties;
         })
-            .await?;
+        .await?;
         self.authenticate().await?;
 
         self.wait_for_tune_data().await?;
@@ -555,7 +555,7 @@ impl Client {
         self.with_state_lock(self.open(), |state, connection_properties| {
             state.connection_properties = connection_properties;
         })
-            .await?;
+        .await?;
 
         // Start heartbeat task after connection is established
         self.start_hearbeat_task(self.state.write().await.deref_mut());
@@ -619,8 +619,8 @@ impl Client {
         self.send_and_receive::<SaslHandshakeResponse, _, _>(|correlation_id| {
             SaslHandshakeCommand::new(correlation_id)
         })
-            .await
-            .map(|handshake| handshake.mechanisms)
+        .await
+        .map(|handshake| handshake.mechanisms)
     }
 
     async fn send_and_receive<T, R, M>(&self, msg_factory: M) -> Result<T, ClientError>
@@ -664,22 +664,22 @@ impl Client {
         self.send_and_receive::<OpenResponse, _, _>(|correlation_id| {
             OpenCommand::new(correlation_id, self.opts.v_host.clone())
         })
-            .await
-            .and_then(|open| {
-                if open.is_ok() {
-                    Ok(open.connection_properties)
-                } else {
-                    Err(ClientError::RequestError(open.code().clone()))
-                }
-            })
+        .await
+        .and_then(|open| {
+            if open.is_ok() {
+                Ok(open.connection_properties)
+            } else {
+                Err(ClientError::RequestError(open.code().clone()))
+            }
+        })
     }
 
     async fn peer_properties(&self) -> Result<HashMap<String, String>, ClientError> {
         self.send_and_receive::<PeerPropertiesResponse, _, _>(|correlation_id| {
             PeerPropertiesCommand::new(correlation_id, HashMap::new())
         })
-            .await
-            .map(|peer_properties| peer_properties.server_properties)
+        .await
+        .map(|peer_properties| peer_properties.server_properties)
     }
 
     async fn handle_tune_command(&self, tunes: &TunesCommand) {
@@ -723,7 +723,7 @@ impl Client {
                 tokio::time::sleep(Duration::from_secs(heartbeat_interval.into())).await;
             }
         })
-            .into();
+        .into();
         state.heartbeat_task = Some(heartbeat_task);
     }
 
@@ -781,7 +781,7 @@ impl Client {
             let client_certs = Self::build_client_certificates(Path::new(
                 &broker.tls.get_client_certificates_path(),
             ))
-                .await?;
+            .await?;
             let client_keys =
                 Self::build_client_private_keys(Path::new(&broker.tls.get_client_keys_path()))
                     .await?;
