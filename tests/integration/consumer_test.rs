@@ -3,7 +3,6 @@ use std::time::Duration;
 use crate::common::TestEnvironment;
 use fake::{Fake, Faker};
 use futures::StreamExt;
-use tokio::task;
 use rabbitmq_stream_client::{
     error::{
         ClientError, ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError,
@@ -12,11 +11,12 @@ use rabbitmq_stream_client::{
     types::{Delivery, Message, OffsetSpecification, SuperStreamConsumer},
     Consumer, FilterConfiguration, NoDedup, Producer,
 };
+use tokio::task;
 
-use rabbitmq_stream_protocol::ResponseCode;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
 use rabbitmq_stream_client::types::{HashRoutingMurmurStrategy, RoutingStrategy};
+use rabbitmq_stream_protocol::ResponseCode;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
@@ -79,13 +79,14 @@ async fn super_stream_consumer_test() {
         .await
         .unwrap();
 
-    static super_stream_consumer: SuperStreamConsumer = env
-        .env
-        .super_stream_consumer()
-        .offset(OffsetSpecification::Next)
-        .build(&env.stream)
-        .await
-        .unwrap();
+    let super_stream_consumer: Arc<SuperStreamConsumer> = Arc::new(
+        env.env
+            .super_stream_consumer()
+            //.offset(OffsetSpecification::Next)
+            .build(&env.stream)
+            .await
+            .unwrap(),
+    );
 
     for n in 0..message_count {
         let msg = Message::builder().body(format!("message{}", n)).build();
@@ -97,22 +98,19 @@ async fn super_stream_consumer_test() {
             .unwrap();
     }
 
-
     let received_messages = Arc::new(AtomicU32::new(0));
-    let consumers =  super_stream_consumer.get_consumers().await;
 
     let mut tasks = Vec::new();
-        for mut consumer in consumers.into_iter() {
-            let received_messages_outer = received_messages.clone();
-            tasks.push(task::spawn(async move {
-                let inner_received_messages = received_messages_outer.clone();
-                let delivery = consumer.next().await.unwrap();
-                let _ = String::from_utf8(delivery.unwrap().message().data().unwrap().to_vec()).unwrap();
-                inner_received_messages.fetch_add(1, Ordering::Relaxed);
-
-            }));
-        }
-
+    for mut consumer in super_stream_consumer.get_consumers().await.into_iter() {
+        let received_messages_outer = received_messages.clone();
+        tasks.push(task::spawn(async move {
+            let inner_received_messages = received_messages_outer.clone();
+            let delivery = consumer.next().await.unwrap();
+            let _ =
+                String::from_utf8(delivery.unwrap().message().data().unwrap().to_vec()).unwrap();
+            inner_received_messages.fetch_add(1, Ordering::Relaxed);
+        }));
+    }
     futures::future::join_all(tasks).await;
 
     assert!(received_messages.fetch_add(1, Ordering::Relaxed) == message_count);
@@ -398,7 +396,7 @@ async fn consumer_test_with_store_offset() {
         // Store an offset
         if i == offset_to_store {
             //Store the 5th element produced
-            let _result = consumer_store
+            let _ = consumer_store
                 .store_offset(delivery.unwrap().offset())
                 .await;
         }

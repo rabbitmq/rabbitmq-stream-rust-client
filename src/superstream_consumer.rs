@@ -1,23 +1,23 @@
 use std::sync::Arc;
 
-use rabbitmq_stream_protocol::{commands::subscribe::OffsetSpecification, message::Message};
+use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
 
 use crate::superstream::DefaultSuperStreamMetadata;
 use crate::{error::ConsumerCreateError, Client, Consumer, Environment};
 
-type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
+//type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
 
 /// API for consuming RabbitMQ stream messages
 #[derive(Clone)]
 pub struct SuperStreamConsumer {
-    pub internal: Arc<SuperStreamConsumerInternal>,
+    internal: Arc<SuperStreamConsumerInternal>,
 }
 
 struct SuperStreamConsumerInternal {
     client: Client,
     super_stream: String,
     offset_specification: OffsetSpecification,
-    pub consumers: Vec<Consumer>,
+    consumers: Vec<Consumer>,
 }
 
 /// Builder for [`Consumer`]
@@ -68,15 +68,14 @@ impl SuperStreamConsumerBuilder {
         })
     }
 
-    pub fn offset(mut self, offset_specification: OffsetSpecification) -> Self {
+    pub async fn offset(mut self, offset_specification: OffsetSpecification) -> Self {
         self.offset_specification = offset_specification;
         self
     }
 }
 
-impl SuperStreamConsumer   {
-
-    pub async fn get_consumers(&self) -> &Vec<Consumer>   {
-        return &self.internal.consumers
+impl SuperStreamConsumer {
+    pub async fn get_consumers(&self) -> &Vec<Consumer> {
+        return &self.internal.consumers;
     }
 }

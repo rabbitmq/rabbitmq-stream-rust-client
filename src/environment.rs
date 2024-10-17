@@ -12,8 +12,8 @@ use crate::{
     producer::ProducerBuilder,
     stream_creator::StreamCreator,
     superstream::RoutingStrategy,
-    superstream_producer::SuperStreamProducerBuilder,
     superstream_consumer::SuperStreamConsumerBuilder,
+    superstream_producer::SuperStreamProducerBuilder,
     RabbitMQStreamResult,
 };
 
