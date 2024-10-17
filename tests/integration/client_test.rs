@@ -41,6 +41,28 @@ async fn client_create_stream_error_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn client_create_and_delete_super_stream_test() {
+    let test = TestClient::create_super_stream().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_create_super_stream_error_test() {
+    let test = TestClient::create_super_stream().await;
+    let binding_keys: Vec<String> = ["0", "1", "2"].iter().map(|&x| x.into()).collect();
+
+    let response = test
+        .client
+        .create_super_stream(
+            &test.super_stream,
+            test.partitions.clone(),
+            binding_keys,
+            HashMap::new(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(&ResponseCode::StreamAlreadyExists, response.code());
+}
 async fn client_delete_stream_test() {
     let test = TestClient::create().await;
 
@@ -384,4 +406,44 @@ async fn client_exchange_command_versions() {
 
     let response = test.client.exchange_command_versions().await.unwrap();
     assert_eq!(&ResponseCode::Ok, response.code());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_test_partitions_test() {
+    let test = TestClient::create_super_stream().await;
+
+    let response = test
+        .client
+        .partitions(test.super_stream.to_string())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response.streams.get(0).unwrap(),
+        test.partitions.get(0).unwrap()
+    );
+    assert_eq!(
+        response.streams.get(1).unwrap(),
+        test.partitions.get(1).unwrap()
+    );
+    assert_eq!(
+        response.streams.get(2).unwrap(),
+        test.partitions.get(2).unwrap()
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_test_route_test() {
+    let test = TestClient::create_super_stream().await;
+    let response = test
+        .client
+        .route("0".to_string(), test.super_stream.to_string())
+        .await
+        .unwrap();
+
+    assert_eq!(response.streams.len(), 1);
+    assert_eq!(
+        response.streams.get(0).unwrap(),
+        test.partitions.get(0).unwrap()
+    );
 }

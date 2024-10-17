@@ -2,10 +2,12 @@ use crate::protocol::version::PROTOCOL_VERSION;
 
 pub mod close;
 pub mod create_stream;
+pub mod create_super_stream;
 pub mod credit;
 pub mod declare_publisher;
 pub mod delete;
 pub mod delete_publisher;
+pub mod delete_super_stream;
 pub mod deliver;
 pub mod exchange_command_versions;
 pub mod generic;
@@ -23,6 +25,8 @@ pub mod sasl_authenticate;
 pub mod sasl_handshake;
 pub mod store_offset;
 pub mod subscribe;
+pub mod superstream_partitions;
+pub mod superstream_route;
 pub mod tune;
 pub mod unsubscribe;
 

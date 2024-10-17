@@ -42,10 +42,12 @@ use rabbitmq_stream_protocol::{
     commands::{
         close::{CloseRequest, CloseResponse},
         create_stream::CreateStreamCommand,
+        create_super_stream::CreateSuperStreamCommand,
         credit::CreditCommand,
         declare_publisher::DeclarePublisherCommand,
         delete::Delete,
         delete_publisher::DeletePublisherCommand,
+        delete_super_stream::DeleteSuperStreamCommand,
         generic::GenericResponse,
         heart_beat::HeartBeatCommand,
         metadata::MetadataCommand,
@@ -58,6 +60,10 @@ use rabbitmq_stream_protocol::{
         sasl_handshake::{SaslHandshakeCommand, SaslHandshakeResponse},
         store_offset::StoreOffset,
         subscribe::{OffsetSpecification, SubscribeCommand},
+        superstream_partitions::SuperStreamPartitionsRequest,
+        superstream_partitions::SuperStreamPartitionsResponse,
+        superstream_route::SuperStreamRouteRequest,
+        superstream_route::SuperStreamRouteResponse,
         tune::TunesCommand,
         unsubscribe::UnSubscribeCommand,
     },
@@ -295,6 +301,27 @@ impl Client {
         .await
     }
 
+    pub async fn partitions(
+        &self,
+        super_stream: String,
+    ) -> RabbitMQStreamResult<SuperStreamPartitionsResponse> {
+        self.send_and_receive(|correlation_id| {
+            SuperStreamPartitionsRequest::new(correlation_id, super_stream)
+        })
+        .await
+    }
+
+    pub async fn route(
+        &self,
+        routing_key: String,
+        super_stream: String,
+    ) -> RabbitMQStreamResult<SuperStreamRouteResponse> {
+        self.send_and_receive(|correlation_id| {
+            SuperStreamRouteRequest::new(correlation_id, routing_key, super_stream)
+        })
+        .await
+    }
+
     pub async fn create_stream(
         &self,
         stream: &str,
@@ -306,9 +333,38 @@ impl Client {
         .await
     }
 
+    pub async fn create_super_stream(
+        &self,
+        super_stream: &str,
+        partitions: Vec<String>,
+        binding_keys: Vec<String>,
+        options: HashMap<String, String>,
+    ) -> RabbitMQStreamResult<GenericResponse> {
+        self.send_and_receive(|correlation_id| {
+            CreateSuperStreamCommand::new(
+                correlation_id,
+                super_stream.to_owned(),
+                partitions,
+                binding_keys,
+                options,
+            )
+        })
+        .await
+    }
+
     pub async fn delete_stream(&self, stream: &str) -> RabbitMQStreamResult<GenericResponse> {
         self.send_and_receive(|correlation_id| Delete::new(correlation_id, stream.to_owned()))
             .await
+    }
+
+    pub async fn delete_super_stream(
+        &self,
+        super_stream: &str,
+    ) -> RabbitMQStreamResult<GenericResponse> {
+        self.send_and_receive(|correlation_id| {
+            DeleteSuperStreamCommand::new(correlation_id, super_stream.to_owned())
+        })
+        .await
     }
 
     pub async fn credit(&self, subscription_id: u8, credit: u16) -> RabbitMQStreamResult<()> {
@@ -574,6 +630,7 @@ impl Client {
         M: FnOnce(u32) -> R,
     {
         let Some((correlation_id, mut receiver)) = self.dispatcher.response_channel() else {
+            trace!("Connection si closed here");
             return Err(ClientError::ConnectionClosed);
         };
 
