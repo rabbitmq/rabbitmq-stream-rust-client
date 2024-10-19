@@ -1,10 +1,14 @@
-use std::sync::Arc;
-
+use futures::Stream;
 use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::task::{Context, Poll};
 
+use crate::consumer::Delivery;
+use crate::error::ConsumerDeliveryError;
 use crate::superstream::DefaultSuperStreamMetadata;
 use crate::{error::ConsumerCreateError, Client, Consumer, Environment};
-
 //type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
 
 /// API for consuming RabbitMQ stream messages
@@ -75,7 +79,11 @@ impl SuperStreamConsumerBuilder {
 }
 
 impl SuperStreamConsumer {
-    pub async fn get_consumers(&self) -> &Vec<Consumer> {
-        return &self.internal.consumers;
+    pub async fn get_consumer(&self, i: usize) -> &Consumer {
+        return self.internal.consumers.get(i).unwrap();
+    }
+
+    pub async fn get_consumers(&mut self) -> Vec<Consumer> {
+        self.internal.consumers.clone()
     }
 }
