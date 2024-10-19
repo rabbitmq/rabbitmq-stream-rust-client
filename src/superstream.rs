@@ -14,16 +14,16 @@ pub struct DefaultSuperStreamMetadata {
 
 impl DefaultSuperStreamMetadata {
     pub async fn partitions(&mut self) -> Vec<String> {
-        if self.partitions.len() == 0 {
+        if self.partitions.is_empty() {
             println!("partition len is 0");
             let response = self.client.partitions(self.super_stream.clone()).await;
 
             self.partitions = response.unwrap().streams;
         }
-        return self.partitions.clone();
+        self.partitions.clone()
     }
     pub async fn routes(&mut self, routing_key: String) -> Vec<String> {
-        if self.routes.len() == 0 {
+        if self.routes.is_empty() {
             let response = self
                 .client
                 .route(routing_key, self.super_stream.clone())
@@ -32,7 +32,7 @@ impl DefaultSuperStreamMetadata {
             self.routes = response.unwrap().streams;
         }
 
-        return self.routes.clone();
+        self.routes.clone()
     }
 }
 
@@ -49,9 +49,7 @@ impl RoutingKeyRoutingStrategy {
     ) -> Vec<String> {
         let key = (self.routing_extractor)(message);
 
-        let routes = metadata.routes(key).await;
-
-        return routes;
+        metadata.routes(key).await
     }
 }
 
@@ -78,7 +76,7 @@ impl HashRoutingMurmurStrategy {
         let stream = partitions.into_iter().nth(route as usize).unwrap();
         streams.push(stream);
 
-        return streams;
+        streams
     }
 }
 

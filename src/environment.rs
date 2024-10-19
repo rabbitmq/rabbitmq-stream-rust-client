@@ -60,7 +60,7 @@ impl Environment {
             environment: self.clone(),
             data: PhantomData,
             //filter_value_extractor: None,
-            routing_strategy: routing_strategy,
+            route_strategy: routing_strategy,
         }
     }
 

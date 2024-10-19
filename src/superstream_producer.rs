@@ -26,7 +26,7 @@ pub struct SuperStreamProducer<T>(
 pub struct SuperStreamProducerBuilder<T> {
     pub(crate) environment: Environment,
     //pub filter_value_extractor: Option<FilterValueExtractor>,
-    pub routing_strategy: RoutingStrategy,
+    pub route_strategy: RoutingStrategy,
     pub(crate) data: PhantomData<T>,
 }
 
@@ -67,7 +67,7 @@ impl SuperStreamProducer<NoDedup> {
             }
 
             let producer = self.1.get(route.as_str()).unwrap();
-            let _ = producer.send(message.clone(), cb.clone()).await?;
+            producer.send(message.clone(), cb.clone()).await?;
         }
         Ok(())
     }
@@ -79,19 +79,16 @@ impl SuperStreamProducer<NoDedup> {
         let mut is_error = false;
         for (_, producer) in self.1.into_iter() {
             let close = producer.close().await;
-            match close {
-                Err(e) => {
-                    is_error = true;
-                    err = Some(e);
-                }
-                _ => (),
+            if let Err(e) = close {
+                is_error = true;
+                err = Some(e);
             }
         }
 
-        if is_error == false {
-            return Ok(());
+        if !is_error {
+            Ok(())
         } else {
-            return Err(err.unwrap());
+            Err(err.unwrap())
         }
     }
 }
@@ -119,7 +116,7 @@ impl<T> SuperStreamProducerBuilder<T> {
             environment: self.environment.clone(),
             client,
             //filter_value_extractor: self.filter_value_extractor,
-            routing_strategy: self.routing_strategy,
+            routing_strategy: self.route_strategy,
         };
 
         let internal_producer = Arc::new(super_stream_producer);

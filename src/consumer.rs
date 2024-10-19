@@ -252,7 +252,7 @@ impl Consumer {
 impl Stream for Consumer {
     type Item = Result<Delivery, ConsumerDeliveryError>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.internal.waker.register(cx.waker());
         let poll = Pin::new(&mut self.receiver.lock().unwrap()).poll_recv(cx);
         match (self.is_closed(), poll.is_ready()) {
