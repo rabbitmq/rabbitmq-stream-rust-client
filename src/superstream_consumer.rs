@@ -1,14 +1,7 @@
-use futures::Stream;
-use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::task::{Context, Poll};
-
-use crate::consumer::Delivery;
-use crate::error::ConsumerDeliveryError;
 use crate::superstream::DefaultSuperStreamMetadata;
 use crate::{error::ConsumerCreateError, Client, Consumer, Environment};
+use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
+use std::sync::Arc;
 //type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
 
 /// API for consuming RabbitMQ stream messages
