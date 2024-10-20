@@ -104,7 +104,7 @@ async fn super_stream_consumer_test() {
 
         task::spawn(async move {
             let mut inner_received_messages = received_messages_outer.clone();
-            while let d = consumer.next().await.unwrap() {
+            while let _ = consumer.next().await.unwrap() {
                 let value = inner_received_messages.fetch_add(1, Ordering::Relaxed);
                 if value == message_count {
                     let handle = consumer.handle();

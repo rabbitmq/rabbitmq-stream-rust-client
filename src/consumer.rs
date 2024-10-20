@@ -332,6 +332,7 @@ impl MessageHandler for ConsumerMessageHandler {
                             .0
                             .sender
                             .send(Ok(Delivery {
+                                stream: self.0.stream.clone(),
                                 subscription_id: self.0.subscription_id,
                                 message,
                                 offset,
@@ -360,6 +361,7 @@ impl MessageHandler for ConsumerMessageHandler {
 /// Envelope from incoming message
 #[derive(Debug, Clone)]
 pub struct Delivery {
+    stream: String,
     subscription_id: u8,
     message: Message,
     offset: u64,
@@ -369,6 +371,11 @@ impl Delivery {
     /// Get a reference to the delivery's subscription id.
     pub fn subscription_id(&self) -> u8 {
         self.subscription_id
+    }
+
+    /// Get a reference to the delivery's stream name.
+    pub fn stream(&self) -> &String {
+        &self.stream
     }
 
     /// Get a reference to the delivery's message.
