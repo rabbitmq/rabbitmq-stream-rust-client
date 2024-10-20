@@ -1,5 +1,5 @@
 use crate::superstream::DefaultSuperStreamMetadata;
-use crate::{error::ConsumerCreateError, Client, Consumer, Environment};
+use crate::{error::ConsumerCreateError, Consumer, Environment};
 use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
 use std::sync::Arc;
 //type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
@@ -11,8 +11,6 @@ pub struct SuperStreamConsumer {
 }
 
 struct SuperStreamConsumerInternal {
-    client: Client,
-    super_stream: String,
     offset_specification: OffsetSpecification,
     consumers: Vec<Consumer>,
 }
@@ -54,8 +52,6 @@ impl SuperStreamConsumerBuilder {
         }
 
         let super_stream_consumer_internal = Arc::new(SuperStreamConsumerInternal {
-            super_stream: super_stream.to_string(),
-            client: client.clone(),
             offset_specification: self.offset_specification.clone(),
             consumers,
         });
@@ -65,7 +61,7 @@ impl SuperStreamConsumerBuilder {
         })
     }
 
-    pub async fn offset(mut self, offset_specification: OffsetSpecification) -> Self {
+    pub fn offset(mut self, offset_specification: OffsetSpecification) -> Self {
         self.offset_specification = offset_specification;
         self
     }
