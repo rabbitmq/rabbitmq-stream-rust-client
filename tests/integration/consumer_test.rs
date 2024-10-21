@@ -8,12 +8,16 @@ use rabbitmq_stream_client::{
         ClientError, ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError,
         ProducerCloseError,
     },
-    types::{Delivery, Message, OffsetSpecification},
+    types::{Delivery, Message, OffsetSpecification, SuperStreamConsumer},
     Consumer, FilterConfiguration, NoDedup, Producer,
 };
+use tokio::task;
+use tokio::time::sleep;
 
+use rabbitmq_stream_client::types::{HashRoutingMurmurStrategy, RoutingStrategy};
 use rabbitmq_stream_protocol::ResponseCode;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use {std::sync::Arc, std::sync::Mutex};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
@@ -52,6 +56,70 @@ async fn consumer_test() {
 
     consumer.handle().close().await.unwrap();
     producer.close().await.unwrap();
+}
+
+fn hash_strategy_value_extractor(message: &Message) -> String {
+    let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
+    return s;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn super_stream_consumer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+
+    let message_count = 10;
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
+            HashRoutingMurmurStrategy {
+                routing_extractor: &hash_strategy_value_extractor,
+            },
+        ))
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let mut super_stream_consumer: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        //.offset(OffsetSpecification::Next)
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    for n in 0..message_count {
+        let msg = Message::builder().body(format!("message{}", n)).build();
+        let _ = super_stream_producer
+            .send(msg, |confirmation_status| async move {
+                println!("Message confirmed with status {:?}", confirmation_status);
+            })
+            .await
+            .unwrap();
+    }
+
+    let received_messages = Arc::new(AtomicU32::new(0));
+
+    for mut consumer in super_stream_consumer.get_consumers().await.into_iter() {
+        let received_messages_outer = received_messages.clone();
+
+        task::spawn(async move {
+            let mut inner_received_messages = received_messages_outer.clone();
+            while let _ = consumer.next().await.unwrap() {
+                let value = inner_received_messages.fetch_add(1, Ordering::Relaxed);
+                if value == message_count {
+                    let handle = consumer.handle();
+                    _ = handle.close().await;
+                    break;
+                }
+            }
+        });
+    }
+
+    sleep(Duration::from_millis(1000)).await;
+
+    assert!(received_messages.fetch_add(1, Ordering::Relaxed) == message_count);
+
+    super_stream_producer.close().await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -332,7 +400,7 @@ async fn consumer_test_with_store_offset() {
         // Store an offset
         if i == offset_to_store {
             //Store the 5th element produced
-            let result = consumer_store
+            let _ = consumer_store
                 .store_offset(delivery.unwrap().offset())
                 .await;
         }
