@@ -11,7 +11,6 @@ pub struct SuperStreamConsumer {
 }
 
 struct SuperStreamConsumerInternal {
-    offset_specification: OffsetSpecification,
     consumers: Vec<Consumer>,
 }
 
@@ -51,10 +50,7 @@ impl SuperStreamConsumerBuilder {
             consumers.push(consumer);
         }
 
-        let super_stream_consumer_internal = Arc::new(SuperStreamConsumerInternal {
-            offset_specification: self.offset_specification.clone(),
-            consumers,
-        });
+        let super_stream_consumer_internal = Arc::new(SuperStreamConsumerInternal { consumers });
 
         Ok(SuperStreamConsumer {
             internal: super_stream_consumer_internal,
