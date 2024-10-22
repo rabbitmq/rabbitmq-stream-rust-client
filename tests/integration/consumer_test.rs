@@ -82,7 +82,7 @@ async fn super_stream_consumer_test() {
     let mut super_stream_consumer: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
-        //.offset(OffsetSpecification::Next)
+        .offset(OffsetSpecification::First)
         .build(&env.super_stream)
         .await
         .unwrap();
@@ -97,27 +97,28 @@ async fn super_stream_consumer_test() {
             .unwrap();
     }
 
-    let received_messages = Arc::new(AtomicU32::new(0));
+    let mut received_messages = 0;
 
-    for mut consumer in super_stream_consumer.get_consumers().await.into_iter() {
-        let received_messages_outer = received_messages.clone();
+    println!("before looping");
+    while let delivery = super_stream_consumer.next().await.unwrap() {
+        println!("inside while delivery loop");
+        let d = delivery.unwrap();
+        println!(
+            "Got message: {:#?} from stream: {} with offset: {}",
+            d.message()
+                .data()
+                .map(|data| String::from_utf8(data.to_vec()).unwrap()),
+            d.stream(),
+            d.offset()
+        );
 
-        task::spawn(async move {
-            let mut inner_received_messages = received_messages_outer.clone();
-            while let _ = consumer.next().await.unwrap() {
-                let value = inner_received_messages.fetch_add(1, Ordering::Relaxed);
-                if value == message_count {
-                    let handle = consumer.handle();
-                    _ = handle.close().await;
-                    break;
-                }
-            }
-        });
+        received_messages = received_messages + 1;
+        if received_messages == 10 {
+            break;
+        }
     }
 
-    sleep(Duration::from_millis(1000)).await;
-
-    assert!(received_messages.fetch_add(1, Ordering::Relaxed) == message_count);
+    assert!(received_messages == message_count);
 
     super_stream_producer.close().await.unwrap();
 }

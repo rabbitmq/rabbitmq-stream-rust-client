@@ -6,7 +6,7 @@ use std::{
             AtomicBool,
             Ordering::{Relaxed, SeqCst},
         },
-        Arc, Mutex,
+        Arc,
     },
     task::{Context, Poll},
 };
@@ -32,11 +32,10 @@ use rand::{seq::SliceRandom, SeedableRng};
 type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
 
 /// API for consuming RabbitMQ stream messages
-#[derive(Clone)]
 pub struct Consumer {
     // Mandatory in case of manual offset tracking
     name: Option<String>,
-    receiver: Arc<Mutex<Receiver<Result<Delivery, ConsumerDeliveryError>>>>,
+    receiver: Receiver<Result<Delivery, ConsumerDeliveryError>>,
     internal: Arc<ConsumerInternal>,
 }
 
@@ -182,7 +181,7 @@ impl ConsumerBuilder {
         if response.is_ok() {
             Ok(Consumer {
                 name: self.consumer_name,
-                receiver: Arc::new(Mutex::new(rx)),
+                receiver: rx,
                 internal: consumer,
             })
         } else {
@@ -252,9 +251,9 @@ impl Consumer {
 impl Stream for Consumer {
     type Item = Result<Delivery, ConsumerDeliveryError>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.internal.waker.register(cx.waker());
-        let poll = Pin::new(&mut self.receiver.lock().unwrap()).poll_recv(cx);
+        let poll = Pin::new(&mut self.receiver).poll_recv(cx);
         match (self.is_closed(), poll.is_ready()) {
             (true, false) => Poll::Ready(None),
             _ => poll,
