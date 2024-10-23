@@ -14,7 +14,9 @@ use rabbitmq_stream_client::{
 use tokio::task;
 use tokio::time::sleep;
 
-use rabbitmq_stream_client::types::{HashRoutingMurmurStrategy, RoutingStrategy};
+use rabbitmq_stream_client::types::{
+    HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
+};
 use rabbitmq_stream_protocol::ResponseCode;
 use std::sync::atomic::{AtomicU32, Ordering};
 use {std::sync::Arc, std::sync::Mutex};

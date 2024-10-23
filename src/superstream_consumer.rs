@@ -1,7 +1,7 @@
 use crate::consumer::Delivery;
 use crate::error::{ConsumerCloseError, ConsumerDeliveryError};
 use crate::superstream::DefaultSuperStreamMetadata;
-use crate::{error::ConsumerCreateError, ConsumerHandle, Environment};
+use crate::{error::ConsumerCreateError, ConsumerHandle, Environment, FilterConfiguration};
 use futures::task::AtomicWaker;
 use futures::{Stream, StreamExt};
 use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
@@ -13,8 +13,6 @@ use std::task::{Context, Poll};
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio::task;
 
-//type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
-
 /// API for consuming RabbitMQ stream messages
 pub struct SuperStreamConsumer {
     internal: Arc<SuperStreamConsumerInternal>,
@@ -25,12 +23,14 @@ struct SuperStreamConsumerInternal {
     closed: Arc<AtomicBool>,
     handlers: Vec<ConsumerHandle>,
     waker: AtomicWaker,
+    //filter_configuration: Option<FilterConfiguration>,
 }
 
 /// Builder for [`Consumer`]
 pub struct SuperStreamConsumerBuilder {
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
+    pub(crate) filter_configuration: Option<FilterConfiguration>,
 }
 
 impl SuperStreamConsumerBuilder {
@@ -58,6 +58,7 @@ impl SuperStreamConsumerBuilder {
                 .environment
                 .consumer()
                 .offset(self.offset_specification.clone())
+                .filter_input(self.filter_configuration.clone())
                 .build(partition.as_str())
                 .await
                 .unwrap();
@@ -75,6 +76,7 @@ impl SuperStreamConsumerBuilder {
             closed: Arc::new(AtomicBool::new(false)),
             handlers,
             waker: AtomicWaker::new(),
+            //filter_configuration: self.filter_configuration.clone(),
         };
 
         Ok(SuperStreamConsumer {
@@ -85,6 +87,11 @@ impl SuperStreamConsumerBuilder {
 
     pub fn offset(mut self, offset_specification: OffsetSpecification) -> Self {
         self.offset_specification = offset_specification;
+        self
+    }
+
+    pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
+        self.filter_configuration = filter_configuration;
         self
     }
 }
