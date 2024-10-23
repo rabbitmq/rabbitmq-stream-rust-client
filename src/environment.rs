@@ -59,7 +59,7 @@ impl Environment {
         SuperStreamProducerBuilder {
             environment: self.clone(),
             data: PhantomData,
-            //filter_value_extractor: None,
+            filter_value_extractor: None,
             route_strategy: routing_strategy,
         }
     }
@@ -78,6 +78,7 @@ impl Environment {
         SuperStreamConsumerBuilder {
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
+            filter_configuration: None,
         }
     }
 

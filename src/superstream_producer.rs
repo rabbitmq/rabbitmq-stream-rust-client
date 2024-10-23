@@ -12,7 +12,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-//type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
+type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
 
 #[derive(Clone)]
 pub struct SuperStreamProducer<T>(
@@ -20,12 +20,13 @@ pub struct SuperStreamProducer<T>(
     HashMap<String, Producer<T>>,
     DefaultSuperStreamMetadata,
     PhantomData<T>,
+    RoutingStrategy,
 );
 
 /// Builder for [`SuperStreamProducer`]
 pub struct SuperStreamProducerBuilder<T> {
     pub(crate) environment: Environment,
-    //pub filter_value_extractor: Option<FilterValueExtractor>,
+    pub filter_value_extractor: Option<FilterValueExtractor>,
     pub route_strategy: RoutingStrategy,
     pub(crate) data: PhantomData<T>,
 }
@@ -34,8 +35,8 @@ pub struct SuperStreamProducerInternal {
     pub(crate) environment: Environment,
     client: Client,
     // TODO: implement filtering for superstream
-    //filter_value_extractor: Option<FilterValueExtractor>,
-    routing_strategy: RoutingStrategy,
+    filter_value_extractor: Option<FilterValueExtractor>,
+    //routing_strategy: RoutingStrategy,
 }
 
 impl SuperStreamProducer<NoDedup> {
@@ -51,7 +52,7 @@ impl SuperStreamProducer<NoDedup> {
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
-        let routes = match self.0.routing_strategy.clone() {
+        let routes = match &self.4 {
             RoutingStrategy::HashRoutingStrategy(routing_strategy) => {
                 routing_strategy.routes(&message, &mut self.2).await
             }
@@ -62,7 +63,13 @@ impl SuperStreamProducer<NoDedup> {
 
         for route in routes.into_iter() {
             if !self.1.contains_key(route.as_str()) {
-                let producer = self.0.environment.producer().build(route.as_str()).await;
+                let producer = self
+                    .0
+                    .environment
+                    .producer()
+                    .filter_value_extractor_arc(self.0.filter_value_extractor.clone())
+                    .build(route.as_str())
+                    .await;
                 self.1.insert(route.clone(), producer.unwrap());
             }
 
@@ -115,8 +122,7 @@ impl<T> SuperStreamProducerBuilder<T> {
         let super_stream_producer = SuperStreamProducerInternal {
             environment: self.environment.clone(),
             client,
-            //filter_value_extractor: self.filter_value_extractor,
-            routing_strategy: self.route_strategy,
+            filter_value_extractor: self.filter_value_extractor,
         };
 
         let internal_producer = Arc::new(super_stream_producer);
@@ -125,8 +131,18 @@ impl<T> SuperStreamProducerBuilder<T> {
             producers,
             super_stream_metadata,
             PhantomData,
+            self.route_strategy,
         );
 
         Ok(super_stream_producer)
+    }
+
+    pub fn filter_value_extractor(
+        mut self,
+        filter_value_extractor: impl Fn(&Message) -> String + Send + Sync + 'static,
+    ) -> Self {
+        let f = Arc::new(filter_value_extractor);
+        self.filter_value_extractor = Some(f);
+        self
     }
 }

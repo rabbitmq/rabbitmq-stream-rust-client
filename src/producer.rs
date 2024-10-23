@@ -245,6 +245,14 @@ impl<T> ProducerBuilder<T> {
         self.filter_value_extractor = Some(f);
         self
     }
+
+    pub fn filter_value_extractor_arc(
+        mut self,
+        filter_value_extractor: Option<FilterValueExtractor>,
+    ) -> Self {
+        self.filter_value_extractor = filter_value_extractor;
+        self
+    }
 }
 
 pub struct MessageAccumulator {

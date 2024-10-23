@@ -449,7 +449,7 @@ async fn producer_send_after_close_error() {
     );
 }
 
-fn routing_key_strategy_value_extractor(message: &Message) -> String {
+pub fn routing_key_strategy_value_extractor(message: &Message) -> String {
     return "0".to_string();
 }
 
@@ -517,7 +517,6 @@ async fn hash_super_steam_producer_test() {
         .unwrap();
 
     for i in 0..message_count {
-        println!("sending message {}", i);
         let counter = confirmed_messages.clone();
         let notifier = notify_on_send.clone();
         let msg = Message::builder().body(format!("message{}", i)).build();
