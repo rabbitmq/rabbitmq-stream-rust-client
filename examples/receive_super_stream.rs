@@ -3,11 +3,6 @@ use rabbitmq_stream_client::error::StreamCreateError;
 use rabbitmq_stream_client::types::{
     ByteCapacity, OffsetSpecification, ResponseCode, SuperStreamConsumer,
 };
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::task;
-use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -41,34 +36,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap();
 
-    let received_messages = Arc::new(AtomicU32::new(0));
+    let mut received_messages = 0;
 
-    for mut consumer in super_stream_consumer.get_consumers().await.into_iter() {
-        let received_messages_outer = received_messages.clone();
+    while let delivery = super_stream_consumer.next().await.unwrap() {
+        println!("inside while delivery loop");
+        let d = delivery.unwrap();
+        println!(
+            "Got message: {:#?} from stream: {} with offset: {}",
+            d.message()
+                .data()
+                .map(|data| String::from_utf8(data.to_vec()).unwrap()),
+            d.stream(),
+            d.offset()
+        );
 
-        task::spawn(async move {
-            let mut inner_received_messages = received_messages_outer.clone();
-            while let Some(delivery) = consumer.next().await {
-                let d = delivery.unwrap();
-                println!(
-                    "Got message: {:#?} from stream: {} with offset: {}",
-                    d.message()
-                        .data()
-                        .map(|data| String::from_utf8(data.to_vec()).unwrap()),
-                    d.stream(),
-                    d.offset(),
-                );
-                let value = inner_received_messages.fetch_add(1, Ordering::Relaxed);
-                if value == message_count {
-                    let handle = consumer.handle();
-                    _ = handle.close().await;
-                    break;
-                }
-            }
-        });
+        received_messages = received_messages + 1;
+        if received_messages == 10 {
+            break;
+        }
     }
-
-    sleep(Duration::from_millis(20000)).await;
 
     Ok(())
 }
