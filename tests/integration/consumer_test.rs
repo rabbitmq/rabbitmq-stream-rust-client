@@ -98,6 +98,7 @@ async fn super_stream_consumer_test() {
     }
 
     let mut received_messages = 0;
+    let handle = super_stream_consumer.handle();
 
     println!("before looping");
     while let delivery = super_stream_consumer.next().await.unwrap() {
@@ -121,6 +122,7 @@ async fn super_stream_consumer_test() {
     assert!(received_messages == message_count);
 
     super_stream_producer.close().await.unwrap();
+    _ = handle.close().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

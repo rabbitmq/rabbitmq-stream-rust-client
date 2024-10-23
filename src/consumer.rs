@@ -214,10 +214,6 @@ impl Consumer {
         ConsumerHandle(self.internal.clone())
     }
 
-    pub fn get_name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
     /// Check if the consumer is closed
     pub fn is_closed(&self) -> bool {
         self.internal.is_closed()
@@ -267,6 +263,10 @@ pub struct ConsumerHandle(Arc<ConsumerInternal>);
 impl ConsumerHandle {
     /// Close the [`Consumer`] associated to this handle
     pub async fn close(self) -> Result<(), ConsumerCloseError> {
+        self.internal_close().await
+    }
+
+    pub(crate) async fn internal_close(&self) -> Result<(), ConsumerCloseError> {
         match self.0.closed.compare_exchange(false, true, SeqCst, SeqCst) {
             Ok(false) => {
                 let response = self.0.client.unsubscribe(self.0.subscription_id).await?;
@@ -358,7 +358,7 @@ impl MessageHandler for ConsumerMessageHandler {
     }
 }
 /// Envelope from incoming message
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Delivery {
     stream: String,
     subscription_id: u8,
