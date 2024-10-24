@@ -332,7 +332,7 @@ async fn consumer_test_with_store_offset() {
         // Store an offset
         if i == offset_to_store {
             //Store the 5th element produced
-            let result = consumer_store
+            let _result = consumer_store
                 .store_offset(delivery.unwrap().offset())
                 .await;
         }

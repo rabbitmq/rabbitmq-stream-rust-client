@@ -1,14 +1,37 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future, sync::Arc};
 
 use fake::{Fake, Faker};
 use rabbitmq_stream_client::{Client, ClientOptions, Environment};
 use rabbitmq_stream_protocol::ResponseCode;
+use tokio::sync::Semaphore;
 
 pub struct TestClient {
     pub client: Client,
     pub stream: String,
     pub super_stream: String,
     pub partitions: Vec<String>,
+}
+
+#[derive(Clone)]
+pub struct Countdown(Arc<Semaphore>);
+
+impl Drop for Countdown {
+    fn drop(&mut self) {
+        self.0.add_permits(1);
+    }
+}
+
+impl Countdown {
+    pub fn new(n: u32) -> (Self, impl Future + Send) {
+        let sem = Arc::new(Semaphore::new(0));
+        let latch = Self(sem.clone());
+
+        let wait = async move {
+            let _ = sem.acquire_many(n).await;
+        };
+
+        (latch, wait)
+    }
 }
 
 pub struct TestEnvironment {

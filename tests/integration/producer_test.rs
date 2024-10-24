@@ -1,11 +1,16 @@
+use std::{collections::HashSet, sync::Arc};
+
 use chrono::Utc;
 use fake::{Fake, Faker};
-use futures::StreamExt;
+use futures::{lock::Mutex, StreamExt};
 use tokio::sync::mpsc::channel;
 
-use rabbitmq_stream_client::types::{Message, OffsetSpecification, SimpleValue};
+use rabbitmq_stream_client::{
+    types::{Message, OffsetSpecification, SimpleValue},
+    Environment,
+};
 
-use crate::common::TestEnvironment;
+use crate::common::{Countdown, TestEnvironment};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_send_no_name_ok() {
@@ -33,6 +38,57 @@ async fn producer_send_no_name_ok() {
     assert_eq!(Some(b"message".as_ref()), delivery.message().data());
 
     consumer.handle().close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_send_name_deduplication_unique_ids() {
+    let env = TestEnvironment::create().await;
+
+    type Ids = Arc<Mutex<HashSet<u64>>>;
+
+    let ids = Ids::default();
+
+    let run = move |times, env: Environment, stream: String, ids: Ids| async move {
+        let (countdown, wait) = Countdown::new(times);
+        let mut producer = env
+            .producer()
+            .name("my_producer")
+            .build(&stream)
+            .await
+            .unwrap();
+
+        for _ in 0..times {
+            let cloned_ids = ids.clone();
+            let countdown = countdown.clone();
+            let _ = producer
+                .send(
+                    Message::builder().body(b"message".to_vec()).build(),
+                    move |result| {
+                        let value = cloned_ids.clone();
+
+                        let countdown = countdown.clone();
+                        async move {
+                            let _countdown = countdown;
+                            let id = result.unwrap().publishing_id();
+                            let mut guard = value.lock().await;
+                            guard.insert(id);
+                        }
+                    },
+                )
+                .await
+                .unwrap();
+        }
+
+        wait.await;
+
+        producer.close().await.unwrap();
+    };
+
+    run(10, env.env.clone(), env.stream.to_string(), ids.clone()).await;
+
+    run(10, env.env.clone(), env.stream.to_string(), ids.clone()).await;
+
+    assert_eq!(20, ids.lock().await.len());
 }
 
 #[tokio::test(flavor = "multi_thread")]
