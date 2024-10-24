@@ -181,7 +181,10 @@ impl<T> ProducerBuilder<T> {
 
         let publish_sequence = if let Some(name) = self.name {
             let sequence = client.query_publisher_sequence(&name, stream).await?;
-            Arc::new(AtomicU64::new(sequence))
+
+            let first_sequence = if sequence == 0 { 0 } else { sequence + 1 };
+
+            Arc::new(AtomicU64::new(first_sequence))
         } else {
             Arc::new(AtomicU64::new(0))
         };
