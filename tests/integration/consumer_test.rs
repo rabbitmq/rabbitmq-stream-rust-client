@@ -14,6 +14,7 @@ use rabbitmq_stream_client::{
 use tokio::task;
 use tokio::time::sleep;
 
+use crate::producer_test::routing_key_strategy_value_extractor;
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
@@ -503,6 +504,88 @@ async fn consumer_test_with_filtering() {
 
     assert!(repsonse_length == filtering_response_length);
     producer.close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn super_stream_consumer_test_with_filtering() {
+    let env = TestEnvironment::create_super_stream().await;
+    let reference: String = Faker.fake();
+
+    let message_count = 10;
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::RoutingKeyStrategy(
+            RoutingKeyRoutingStrategy {
+                routing_extractor: &routing_key_strategy_value_extractor,
+            },
+        ))
+        .filter_value_extractor(|_| "filtering".to_string())
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let filter_configuration = FilterConfiguration::new(vec!["filtering".to_string()], false)
+        .post_filter(|message| {
+            String::from_utf8(message.data().unwrap().to_vec()).unwrap_or("".to_string())
+                == "filtering".to_string()
+        });
+
+    let mut super_stream_consumer = env
+        .env
+        .super_stream_consumer()
+        .offset(OffsetSpecification::First)
+        .filter_input(Some(filter_configuration))
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    for _ in 0..message_count {
+        let _ = super_stream_producer
+            .send(
+                Message::builder().body("filtering").build(),
+                |_| async move {},
+            )
+            .await;
+
+        let _ = super_stream_producer
+            .send(
+                Message::builder().body("filtering").build(),
+                |_| async move {},
+            )
+            .await;
+    }
+
+    let response = Arc::new(tokio::sync::Mutex::new(vec![]));
+    let response_clone = Arc::clone(&response);
+
+    let task = tokio::task::spawn(async move {
+        loop {
+            let delivery = super_stream_consumer.next().await.unwrap();
+
+            let d = delivery.unwrap();
+            let data = d
+                .message()
+                .data()
+                .map(|data| String::from_utf8(data.to_vec()).unwrap())
+                .unwrap();
+
+            let mut r = response_clone.lock().await;
+            r.push(data);
+        }
+    });
+
+    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(3), task).await;
+    let repsonse_length = response.lock().await.len();
+    let filtering_response_length = response
+        .lock()
+        .await
+        .iter()
+        .filter(|item| item == &&"filtering")
+        .collect::<Vec<_>>()
+        .len();
+
+    assert!(repsonse_length == filtering_response_length);
+    super_stream_producer.close().await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]

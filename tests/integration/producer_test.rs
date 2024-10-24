@@ -581,3 +581,47 @@ async fn producer_send_filtering_message() {
         true
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn super_stream_producer_send_filtering_message() {
+    let env = TestEnvironment::create_super_stream().await;
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
+            HashRoutingMurmurStrategy {
+                routing_extractor: &hash_strategy_value_extractor,
+            },
+        ))
+        .filter_value_extractor(|message| {
+            let app_properties = message.application_properties();
+            match app_properties {
+                Some(properties) => {
+                    let value = properties.get("region").and_then(|item| match item {
+                        SimpleValue::String(s) => Some(s.clone()),
+                        _ => None,
+                    });
+                    value.unwrap_or(String::from(""))
+                }
+                None => String::from(""),
+            }
+        })
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let message_builder = Message::builder();
+    let mut application_properties = message_builder.application_properties();
+    application_properties = application_properties.insert("region", "emea");
+
+    let message = application_properties
+        .message_builder()
+        .body(b"message".to_vec())
+        .build();
+
+    let closed = super_stream_producer.send(message, |_| async move {}).await;
+
+    match closed {
+        Ok(_) => assert!(true),
+        Err(_) => assert!(false),
+    }
+}
