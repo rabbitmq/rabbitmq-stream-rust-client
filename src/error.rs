@@ -110,6 +110,26 @@ pub enum ProducerPublishError {
     #[error(transparent)]
     Client(#[from] ClientError),
 }
+
+#[derive(Error, Debug)]
+pub enum SuperStreamProducerPublishError {
+    #[error("Failed to send message to stream")]
+    ProducerPublishError(),
+    #[error("Failed to create a producer")]
+    ProducerCreateError(),
+}
+
+impl From<ProducerPublishError> for SuperStreamProducerPublishError {
+    fn from(_err: ProducerPublishError) -> Self {
+        SuperStreamProducerPublishError::ProducerPublishError()
+    }
+}
+impl From<ProducerCreateError> for SuperStreamProducerPublishError {
+    fn from(_err: ProducerCreateError) -> Self {
+        SuperStreamProducerPublishError::ProducerCreateError()
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ProducerCloseError {
     #[error("Failed to close producer for stream {stream} status {status:?}")]

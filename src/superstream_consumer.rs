@@ -23,7 +23,6 @@ struct SuperStreamConsumerInternal {
     closed: Arc<AtomicBool>,
     handlers: Vec<ConsumerHandle>,
     waker: AtomicWaker,
-    //filter_configuration: Option<FilterConfiguration>,
 }
 
 /// Builder for [`Consumer`]
@@ -76,7 +75,6 @@ impl SuperStreamConsumerBuilder {
             closed: Arc::new(AtomicBool::new(false)),
             handlers,
             waker: AtomicWaker::new(),
-            //filter_configuration: self.filter_configuration.clone(),
         };
 
         Ok(SuperStreamConsumer {

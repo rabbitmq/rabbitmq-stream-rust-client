@@ -499,6 +499,38 @@ async fn key_super_steam_producer_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn key_super_steam_non_existing_producer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::RoutingKeyStrategy(
+            RoutingKeyRoutingStrategy {
+                routing_extractor: &routing_key_strategy_value_extractor,
+            },
+        ))
+        .build("non-existing-stream")
+        .await
+        .unwrap();
+
+    let msg = Message::builder().body(format!("message{}", 0)).build();
+    let result = super_stream_producer
+        .send(msg, |_| async move {})
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        matches!(
+            result,
+            rabbitmq_stream_client::error::SuperStreamProducerPublishError::ProducerCreateError()
+        ),
+        true
+    );
+
+    _ = super_stream_producer.close();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn hash_super_steam_producer_test() {
     let env = TestEnvironment::create_super_stream().await;
     let confirmed_messages = Arc::new(AtomicU32::new(0));

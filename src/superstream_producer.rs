@@ -2,7 +2,7 @@ use crate::error::ProducerCloseError;
 use crate::{
     client::Client,
     environment::Environment,
-    error::{ProducerCreateError, ProducerPublishError},
+    error::{ProducerCreateError, ProducerPublishError, SuperStreamProducerPublishError},
     producer::{ConfirmationStatus, NoDedup, Producer},
     superstream::{DefaultSuperStreamMetadata, RoutingStrategy},
 };
@@ -48,7 +48,7 @@ impl SuperStreamProducer<NoDedup> {
             + Sync
             + 'static
             + Clone,
-    ) -> Result<(), ProducerPublishError>
+    ) -> Result<(), SuperStreamProducerPublishError>
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
@@ -61,6 +61,10 @@ impl SuperStreamProducer<NoDedup> {
             }
         };
 
+        if routes.is_empty() {
+            return Err(crate::error::SuperStreamProducerPublishError::ProducerCreateError());
+        }
+
         for route in routes.into_iter() {
             if !self.1.contains_key(route.as_str()) {
                 let producer = self
@@ -69,8 +73,8 @@ impl SuperStreamProducer<NoDedup> {
                     .producer()
                     .filter_value_extractor_arc(self.0.filter_value_extractor.clone())
                     .build(route.as_str())
-                    .await;
-                self.1.insert(route.clone(), producer.unwrap());
+                    .await?;
+                self.1.insert(route.clone(), producer);
             }
 
             let producer = self.1.get(route.as_str()).unwrap();
