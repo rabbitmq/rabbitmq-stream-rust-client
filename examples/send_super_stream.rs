@@ -2,19 +2,27 @@ use rabbitmq_stream_client::error::StreamCreateError;
 use rabbitmq_stream_client::types::{
     ByteCapacity, HashRoutingMurmurStrategy, Message, ResponseCode, RoutingStrategy,
 };
+use std::convert::TryInto;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::Notify;
 
 fn hash_strategy_value_extractor(message: &Message) -> String {
-    String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8")
+    message
+        .application_properties()
+        .unwrap()
+        .get("id")
+        .unwrap()
+        .clone()
+        .try_into()
+        .unwrap()
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     use rabbitmq_stream_client::Environment;
     let environment = Environment::builder().build().await?;
-    let message_count = 100;
+    let message_count = 1000000;
     let stream = "hello-rust-stream";
     let confirmed_messages = Arc::new(AtomicU32::new(0));
     let notify_on_send = Arc::new(Notify::new());
@@ -54,10 +62,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     for i in 0..message_count {
-        println!("sending message {}", i);
         let counter = confirmed_messages.clone();
         let notifier = notify_on_send.clone();
-        let msg = Message::builder().body(format!("message{}", i)).build();
+        let msg = Message::builder()
+            .body(format!("message{}", i))
+            .application_properties()
+            .insert("id", i.to_string())
+            .message_builder()
+            .build();
         super_stream_producer
             .send(msg, move |_| {
                 let inner_counter = counter.clone();

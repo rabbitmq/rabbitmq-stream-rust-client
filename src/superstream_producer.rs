@@ -36,7 +36,6 @@ pub struct SuperStreamProducerInternal {
     client: Client,
     // TODO: implement filtering for superstream
     filter_value_extractor: Option<FilterValueExtractor>,
-    //routing_strategy: RoutingStrategy,
 }
 
 impl SuperStreamProducer<NoDedup> {
