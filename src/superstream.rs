@@ -68,9 +68,10 @@ impl HashRoutingMurmurStrategy {
         let key = (self.routing_extractor)(message);
         let hash_result = murmur3_32(&mut Cursor::new(key), 104729);
 
-        let number_of_partitions = metadata.partitions().await.len();
-        let route = hash_result.unwrap() % number_of_partitions as u32;
         let partitions = metadata.partitions().await;
+        let number_of_partitions = partitions.len();
+        let route = hash_result.unwrap() % number_of_partitions as u32;
+
         let stream = partitions.into_iter().nth(route as usize).unwrap();
         streams.push(stream);
 
