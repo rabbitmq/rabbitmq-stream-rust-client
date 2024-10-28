@@ -8,8 +8,8 @@ use rabbitmq_stream_client::types::{
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     use rabbitmq_stream_client::Environment;
     let environment = Environment::builder().build().await?;
-    let message_count = 10;
-    let super_stream = "hello-rust-stream";
+    let message_count = 100_000;
+    let super_stream = "hello-rust-super-stream";
 
     let create_response = environment
         .stream_creator()
@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-
+    println!("Super stream consumer example, consuming messages from the super stream {}", super_stream);
     let mut super_stream_consumer: SuperStreamConsumer = environment
         .super_stream_consumer()
         .offset(OffsetSpecification::First)
@@ -36,25 +36,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap();
 
-    let mut received_messages = 0;
-
-    while let delivery = super_stream_consumer.next().await.unwrap() {
-        println!("inside while delivery loop");
-        let d = delivery.unwrap();
-        println!(
-            "Got message: {:#?} from stream: {} with offset: {}",
-            d.message()
-                .data()
-                .map(|data| String::from_utf8(data.to_vec()).unwrap()),
-            d.stream(),
-            d.offset()
-        );
-
-        received_messages = received_messages + 1;
-        if received_messages == 10 {
-            break;
+    for _ in 0..message_count {
+        let delivery = super_stream_consumer.next().await.unwrap();
+        {
+            let delivery = delivery.unwrap();
+            println!(
+                "Got message: {:#?} from stream: {} with offset: {}",
+                delivery.message()
+                    .data()
+                    .map(|data| String::from_utf8(data.to_vec()).unwrap()).unwrap(),
+                delivery.stream(),
+                delivery.offset()
+            );
         }
     }
 
+    println!("Consumer stopped consuming.");
+    // let _ = super_stream_consumer.close().await;
     Ok(())
 }
