@@ -56,7 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("Consumer stopped consuming.");
-    // let _ = super_stream_consumer.close().await;
+    println!("Stopping super stream consumer...");
+    let _ = super_stream_consumer.handle().close().await;
+    println!("Super stream consumer stopped");
     Ok(())
 }
