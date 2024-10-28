@@ -28,7 +28,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    println!("Super stream consumer example, consuming messages from the super stream {}", super_stream);
+    println!(
+        "Super stream consumer example, consuming messages from the super stream {}",
+        super_stream
+    );
     let mut super_stream_consumer: SuperStreamConsumer = environment
         .super_stream_consumer()
         .offset(OffsetSpecification::First)
@@ -42,9 +45,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let delivery = delivery.unwrap();
             println!(
                 "Got message: {:#?} from stream: {} with offset: {}",
-                delivery.message()
+                delivery
+                    .message()
                     .data()
-                    .map(|data| String::from_utf8(data.to_vec()).unwrap()).unwrap(),
+                    .map(|data| String::from_utf8(data.to_vec()).unwrap())
+                    .unwrap(),
                 delivery.stream(),
                 delivery.offset()
             );

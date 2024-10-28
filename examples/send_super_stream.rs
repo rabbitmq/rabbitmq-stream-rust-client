@@ -1,4 +1,4 @@
-use rabbitmq_stream_client::error::{StreamCreateError};
+use rabbitmq_stream_client::error::StreamCreateError;
 use rabbitmq_stream_client::types::{
     ByteCapacity, HashRoutingMurmurStrategy, Message, ResponseCode, RoutingStrategy,
 };
@@ -35,8 +35,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let delete_stream = environment.delete_super_stream(super_stream).await;
 
     match delete_stream {
-        Ok(_) => { println!("Successfully deleted super stream {}", super_stream); }
-        Err(err) => { println!("Failed to delete super stream {}. error {}", super_stream, err); }
+        Ok(_) => {
+            println!("Successfully deleted super stream {}", super_stream);
+        }
+        Err(err) => {
+            println!(
+                "Failed to delete super stream {}. error {}",
+                super_stream, err
+            );
+        }
     }
 
     let create_response = environment
@@ -56,7 +63,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    println!("Super stream example. Sending {} messages to the super stream: {}", message_count, super_stream);
+    println!(
+        "Super stream example. Sending {} messages to the super stream: {}",
+        message_count, super_stream
+    );
     let mut super_stream_producer = environment
         .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
             HashRoutingMurmurStrategy {
@@ -91,7 +101,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     notify_on_send.notified().await;
-    println!("Successfully sent {} messages to the super stream {}", message_count, super_stream);
+    println!(
+        "Successfully sent {} messages to the super stream {}",
+        message_count, super_stream
+    );
     let _ = super_stream_producer.close().await;
     Ok(())
 }
