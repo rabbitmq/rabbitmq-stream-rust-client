@@ -344,7 +344,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_reject_requests_after_closing() {
-        let mock_source = MockIO::push();
+        let _mock_source = MockIO::push();
 
         let dispatcher = Dispatcher::with_handler(|_| async { Ok(()) });
 
