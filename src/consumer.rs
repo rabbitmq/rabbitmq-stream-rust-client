@@ -120,6 +120,7 @@ impl ConsumerBuilder {
                         }
                     }
                 } else {
+                    client.close().await?;
                     client = Client::connect(ClientOptions {
                         host: replica.host.clone(),
                         port: replica.port as u16,
@@ -267,6 +268,7 @@ impl ConsumerHandle {
                 let response = self.0.client.unsubscribe(self.0.subscription_id).await?;
                 if response.is_ok() {
                     self.0.waker.wake();
+                    self.0.client.close().await?;
                     Ok(())
                 } else {
                     Err(ConsumerCloseError::Close {
