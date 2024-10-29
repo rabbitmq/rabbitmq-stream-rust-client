@@ -1,3 +1,4 @@
+use crate::client::Client;
 use crate::consumer::Delivery;
 use crate::error::{ConsumerCloseError, ConsumerDeliveryError};
 use crate::superstream::DefaultSuperStreamMetadata;
@@ -23,6 +24,7 @@ struct SuperStreamConsumerInternal {
     closed: Arc<AtomicBool>,
     handlers: Vec<ConsumerHandle>,
     waker: AtomicWaker,
+    client: Client,
 }
 
 /// Builder for [`Consumer`]
@@ -75,6 +77,7 @@ impl SuperStreamConsumerBuilder {
             closed: Arc::new(AtomicBool::new(false)),
             handlers,
             waker: AtomicWaker::new(),
+            client,
         };
 
         Ok(SuperStreamConsumer {
@@ -135,6 +138,7 @@ impl SuperStreamConsumerHandle {
                 for handle in &self.0.handlers {
                     handle.internal_close().await.unwrap();
                 }
+                self.0.client.close().await?;
                 Ok(())
             }
             _ => Err(ConsumerCloseError::AlreadyClosed),

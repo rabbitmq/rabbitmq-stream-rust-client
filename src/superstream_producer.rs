@@ -117,7 +117,7 @@ impl<T> SuperStreamProducerBuilder<T> {
 
         let super_stream_metadata = DefaultSuperStreamMetadata {
             super_stream: super_stream.to_string(),
-            client: self.environment.create_client().await?,
+            client: client.clone(),
             partitions: Vec::new(),
             routes: Vec::new(),
         };
