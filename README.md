@@ -148,9 +148,9 @@ You can use SuperStreamProducer and SuperStreamConsumer classes which internally
 
 Have a look to the examples to see on how to work with super streams.
 
-See the [Super Stream Producer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/examples/send_super_stream.rs)
+See the [Super Stream Producer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/send_super_stream.rs)
 
-See the [Super Stream Consumer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/examples/receive_super_stream.rs)
+See the [Super Stream Consumer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/receive_super_stream.rs)
 
 ### Development
 
