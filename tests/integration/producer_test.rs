@@ -13,8 +13,7 @@ use rabbitmq_stream_client::{
 use crate::common::{Countdown, TestEnvironment};
 
 use rabbitmq_stream_client::types::{
-    HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy,
-    RoutingStrategy,
+    HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
 
 use std::sync::atomic::{AtomicU32, Ordering};

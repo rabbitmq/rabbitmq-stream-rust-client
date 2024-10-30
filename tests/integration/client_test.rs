@@ -42,7 +42,7 @@ async fn client_create_stream_error_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn client_create_and_delete_super_stream_test() {
-    let _ = TestClient::create_super_stream().await;
+    let _test = TestClient::create_super_stream().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

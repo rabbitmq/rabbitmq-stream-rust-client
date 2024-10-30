@@ -93,9 +93,7 @@ async fn super_stream_consumer_test() {
     for n in 0..message_count {
         let msg = Message::builder().body(format!("message{}", n)).build();
         let _ = super_stream_producer
-            .send(msg, |confirmation_status| async move {
-                println!("Message confirmed with status {:?}", confirmation_status);
-            })
+            .send(msg, |confirmation_status| async move {})
             .await
             .unwrap();
     }
@@ -103,19 +101,7 @@ async fn super_stream_consumer_test() {
     let mut received_messages = 0;
     let handle = super_stream_consumer.handle();
 
-    println!("before looping");
-    while let delivery = super_stream_consumer.next().await.unwrap() {
-        println!("inside while delivery loop");
-        let d = delivery.unwrap();
-        println!(
-            "Got message: {:#?} from stream: {} with offset: {}",
-            d.message()
-                .data()
-                .map(|data| String::from_utf8(data.to_vec()).unwrap()),
-            d.stream(),
-            d.offset()
-        );
-
+    while let _ = super_stream_consumer.next().await.unwrap() {
         received_messages = received_messages + 1;
         if received_messages == 10 {
             break;
@@ -406,7 +392,7 @@ async fn consumer_test_with_store_offset() {
         // Store an offset
         if i == offset_to_store {
             //Store the 5th element produced
-            let _ = consumer_store
+            let _result = consumer_store
                 .store_offset(delivery.unwrap().offset())
                 .await;
         }
