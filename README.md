@@ -136,6 +136,22 @@ sleep(Duration::from_secs(10)).await;
 handle.close().await?;
 ```
 
+### Superstreams
+
+The client supports the superstream functionality.
+
+A super stream is a logical stream made of individual, regular streams. It is a way to scale out publishing and consuming with RabbitMQ Streams: a large logical stream is divided into partition streams, splitting up the storage and the traffic on several cluster nodes.
+
+See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-super-streams/) for more info.
+
+You can use SuperStreamProducer and SuperStreamConsumer classes which internally uses producers and consumers to operate on the componsing streams.
+
+Have a look to the examples to see on how to work with super streams.
+
+See the [Super Stream Producer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/examples/send_super_stream.rs)
+
+See the [Super Stream Consumer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/examples/receive_super_stream.rs)
+
 ### Development
 
 #### Compiling
