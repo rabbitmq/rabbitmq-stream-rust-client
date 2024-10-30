@@ -200,6 +200,7 @@ pub struct Client {
     tune_notifier: Arc<Notify>,
     publish_sequence: Arc<AtomicU64>,
     filtering_supported: bool,
+    client_properties: HashMap<String, String>,
 }
 
 impl Client {
@@ -227,7 +228,28 @@ impl Client {
             tune_notifier: Arc::new(Notify::new()),
             publish_sequence: Arc::new(AtomicU64::new(1)),
             filtering_supported: false,
+            client_properties: HashMap::new(),
         };
+
+        client
+            .client_properties
+            .insert(String::from("product"), String::from("RabbitMQ"));
+        client
+            .client_properties
+            .insert(String::from("platform"), String::from("Rust"));
+        client.client_properties.insert(
+            String::from("copyright"),
+            String::from("Copyright (c) 2017-2023 Broadcom. All Rights Reserved. The term Broadcom refers to Broadcom Inc. and/or its subsidiaries."));
+        client.client_properties.insert(
+            String::from("information"),
+            String::from(
+                "Licensed under the Apache 2.0 and MPL 2.0 licenses. See https://www.rabbitmq.com/",
+            ),
+        );
+        client.client_properties.insert(
+            String::from("connection_name"),
+            client.opts.client_provided_name.clone(),
+        );
 
         client.initialize(receiver).await?;
 
@@ -676,7 +698,7 @@ impl Client {
 
     async fn peer_properties(&self) -> Result<HashMap<String, String>, ClientError> {
         self.send_and_receive::<PeerPropertiesResponse, _, _>(|correlation_id| {
-            PeerPropertiesCommand::new(correlation_id, HashMap::new())
+            PeerPropertiesCommand::new(correlation_id, self.client_properties.clone())
         })
         .await
         .map(|peer_properties| peer_properties.server_properties)
