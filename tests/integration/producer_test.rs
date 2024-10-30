@@ -12,6 +12,13 @@ use rabbitmq_stream_client::{
 
 use crate::common::{Countdown, TestEnvironment};
 
+use rabbitmq_stream_client::types::{
+    HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
+};
+
+use std::sync::atomic::{AtomicU32, Ordering};
+use tokio::sync::Notify;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_send_no_name_ok() {
     let env = TestEnvironment::create().await;
@@ -441,6 +448,127 @@ async fn producer_send_after_close_error() {
     );
 }
 
+pub fn routing_key_strategy_value_extractor(message: &Message) -> String {
+    return "0".to_string();
+}
+
+fn hash_strategy_value_extractor(message: &Message) -> String {
+    let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
+    return s;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn key_super_steam_producer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+    let confirmed_messages = Arc::new(AtomicU32::new(0));
+    let notify_on_send = Arc::new(Notify::new());
+    let message_count = 100;
+
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::RoutingKeyStrategy(
+            RoutingKeyRoutingStrategy {
+                routing_extractor: &routing_key_strategy_value_extractor,
+            },
+        ))
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    for i in 0..message_count {
+        let counter = confirmed_messages.clone();
+        let notifier = notify_on_send.clone();
+        let msg = Message::builder().body(format!("message{}", i)).build();
+        super_stream_producer
+            .send(msg, move |_| {
+                let inner_counter = counter.clone();
+                let inner_notifier = notifier.clone();
+                async move {
+                    if inner_counter.fetch_add(1, Ordering::Relaxed) == message_count - 1 {
+                        inner_notifier.notify_one();
+                    }
+                }
+            })
+            .await
+            .unwrap();
+    }
+
+    notify_on_send.notified().await;
+    _ = super_stream_producer.close();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn key_super_steam_non_existing_producer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::RoutingKeyStrategy(
+            RoutingKeyRoutingStrategy {
+                routing_extractor: &routing_key_strategy_value_extractor,
+            },
+        ))
+        .build("non-existing-stream")
+        .await
+        .unwrap();
+
+    let msg = Message::builder().body(format!("message{}", 0)).build();
+    let result = super_stream_producer
+        .send(msg, |_| async move {})
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        matches!(
+            result,
+            rabbitmq_stream_client::error::SuperStreamProducerPublishError::ProducerCreateError()
+        ),
+        true
+    );
+
+    _ = super_stream_producer.close();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn hash_super_steam_producer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+    let confirmed_messages = Arc::new(AtomicU32::new(0));
+    let notify_on_send = Arc::new(Notify::new());
+    let message_count = 100;
+
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
+            HashRoutingMurmurStrategy {
+                routing_extractor: &hash_strategy_value_extractor,
+            },
+        ))
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    for i in 0..message_count {
+        let counter = confirmed_messages.clone();
+        let notifier = notify_on_send.clone();
+        let msg = Message::builder().body(format!("message{}", i)).build();
+        super_stream_producer
+            .send(msg, move |_| {
+                let inner_counter = counter.clone();
+                let inner_notifier = notifier.clone();
+                async move {
+                    if inner_counter.fetch_add(1, Ordering::Relaxed) == message_count - 1 {
+                        inner_notifier.notify_one();
+                    }
+                }
+            })
+            .await
+            .unwrap();
+    }
+
+    notify_on_send.notified().await;
+    _ = super_stream_producer.close();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_send_filtering_message() {
     let env = TestEnvironment::create().await;
@@ -483,4 +611,48 @@ async fn producer_send_filtering_message() {
         ),
         true
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn super_stream_producer_send_filtering_message() {
+    let env = TestEnvironment::create_super_stream().await;
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
+            HashRoutingMurmurStrategy {
+                routing_extractor: &hash_strategy_value_extractor,
+            },
+        ))
+        .filter_value_extractor(|message| {
+            let app_properties = message.application_properties();
+            match app_properties {
+                Some(properties) => {
+                    let value = properties.get("region").and_then(|item| match item {
+                        SimpleValue::String(s) => Some(s.clone()),
+                        _ => None,
+                    });
+                    value.unwrap_or(String::from(""))
+                }
+                None => String::from(""),
+            }
+        })
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let message_builder = Message::builder();
+    let mut application_properties = message_builder.application_properties();
+    application_properties = application_properties.insert("region", "emea");
+
+    let message = application_properties
+        .message_builder()
+        .body(b"message".to_vec())
+        .build();
+
+    let closed = super_stream_producer.send(message, |_| async move {}).await;
+
+    match closed {
+        Ok(_) => assert!(true),
+        Err(_) => assert!(false),
+    }
 }
