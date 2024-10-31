@@ -145,10 +145,12 @@ impl<T> ProducerBuilder<T> {
                     let mapping = temp_client.connection_properties().await;
                     if let Some(advertised_host) = mapping.get("advertised_host") {
                         if *advertised_host == metadata.leader.host.clone() {
+                            client.close().await?;
                             client = temp_client;
                             break;
                         }
                     }
+                    temp_client.close().await?;
                 }
             } else {
                 client.close().await?;
