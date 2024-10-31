@@ -1,6 +1,6 @@
 [package]
 name = "rabbitmq-stream-client"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["wolf4ood <enrico.risa@gmail.com>", "korsmakolnikov <korsmakolnikov@gmail.com>", "gsantomaggio <g.santomaggio@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0 OR MPL-2.0"
@@ -23,7 +23,7 @@ members = [
 [dependencies]
 tokio-rustls = {version="0.24.1", features=["dangerous_configuration"]}
 rustls-pemfile = "1.0.3"
-rabbitmq-stream-protocol = { version = "0.5", path = "protocol" }
+rabbitmq-stream-protocol = { version = "0.6", path = "protocol" }
 tokio = { version = "1.29.1", features = ["full"] }
 tokio-util = { version = "0.7.3", features = ["codec"] }
 bytes = "1.0.0"

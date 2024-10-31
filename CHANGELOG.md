@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.5.0...rabbitmq-stream-client-v0.5.1) - 2024-10-31
+
+### Fixed
+
+- fixes [#233](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/233) by incrementing the publisher sequence ([#234](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/234))
+
+### Other
+
+- cleanup unused connections when load balancing mode is active ([#239](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/239))
+- Update README.md ([#238](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/238))
+- Implement super_stream  ([#232](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/232))
+- close client connection in client consumer ([#235](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/235))
+- Create/Delete superstream and Partition and route commands ([#230](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/230))
+
 ## [0.5.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.4.4...rabbitmq-stream-client-v0.5.0) - 2024-08-23
 
 ### Other
