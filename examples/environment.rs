@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut producer = environment
         .producer()
-        .name("test_producer")
+        .client_provided_name("my producer")
         .build("test")
         .await?;
 
@@ -42,6 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut consumer = environment
         .consumer()
+        .client_provided_name("my consumer")
         .offset(OffsetSpecification::First)
         .build("test")
         .await

@@ -231,9 +231,14 @@ impl Client {
             client_properties: HashMap::new(),
         };
 
+        const VERSION: &str = env!("CARGO_PKG_VERSION");
+
         client
             .client_properties
             .insert(String::from("product"), String::from("RabbitMQ"));
+        client
+            .client_properties
+            .insert(String::from("version"), String::from(VERSION));
         client
             .client_properties
             .insert(String::from("platform"), String::from("Rust"));
@@ -259,6 +264,7 @@ impl Client {
             client.filtering_supported = true
         }
 
+        println!("Connect {}", client.opts.client_provided_name.clone());
         Ok(client)
     }
 

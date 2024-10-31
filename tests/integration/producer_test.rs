@@ -53,6 +53,7 @@ async fn producer_send_name_deduplication_unique_ids() {
         let mut producer = env
             .producer()
             .name("my_producer")
+            .client_provided_name("my producer")
             .build(&stream)
             .await
             .unwrap();

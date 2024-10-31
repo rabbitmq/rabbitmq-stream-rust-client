@@ -32,6 +32,7 @@ async fn consumer_test() {
     let mut consumer = env
         .env
         .consumer()
+        .client_provided_name("my consumer")
         .offset(OffsetSpecification::Next)
         .build(&env.stream)
         .await

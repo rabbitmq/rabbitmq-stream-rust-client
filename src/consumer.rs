@@ -88,13 +88,21 @@ pub struct ConsumerBuilder {
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
+    pub(crate) client_provided_name: String,
 }
 
 impl ConsumerBuilder {
     pub async fn build(self, stream: &str) -> Result<Consumer, ConsumerCreateError> {
         // Connect to the user specified node first, then look for a random replica to connect to instead.
-        // This is recommended for load balancing purposes.
-        let mut client = self.environment.create_client().await?;
+        // This is recommended for load balancing purposes
+
+        let mut opt_with_client_provided_name = self.environment.options.client_options.clone();
+        opt_with_client_provided_name.client_provided_name = self.client_provided_name.clone();
+
+        let mut client = self
+            .environment
+            .create_client_with_options(opt_with_client_provided_name)
+            .await?;
         let collector = self.environment.options.client_options.collector.clone();
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
@@ -194,6 +202,11 @@ impl ConsumerBuilder {
 
     pub fn offset(mut self, offset_specification: OffsetSpecification) -> Self {
         self.offset_specification = offset_specification;
+        self
+    }
+
+    pub fn client_provided_name(mut self, name: &str) -> Self {
+        self.client_provided_name = String::from(name);
         self
     }
 

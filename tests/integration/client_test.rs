@@ -17,7 +17,15 @@ use crate::common::TestClient;
 #[tokio::test]
 async fn client_connection_test() {
     let client = Client::connect(ClientOptions::default()).await.unwrap();
+    assert_ne!(client.server_properties().await.len(), 0);
+    assert_ne!(client.connection_properties().await.len(), 0);
+}
 
+#[tokio::test]
+async fn client_connection_with_properties_test() {
+    let mut opts = ClientOptions::default();
+    opts.set_client_provided_name("my_connection_name");
+    let client = Client::connect(opts).await.unwrap();
     assert_ne!(client.server_properties().await.len(), 0);
     assert_ne!(client.connection_properties().await.len(), 0);
 }

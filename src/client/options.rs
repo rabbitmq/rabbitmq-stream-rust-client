@@ -72,6 +72,10 @@ impl ClientOptions {
     pub fn set_port(&mut self, port: u16) {
         self.port = port;
     }
+
+    pub fn set_client_provided_name(&mut self, name: &str) {
+        self.client_provided_name = name.to_owned();
+    }
 }
 
 pub struct ClientOptionsBuilder(ClientOptions);

@@ -46,6 +46,7 @@ impl Environment {
             batch_publishing_delay: Duration::from_millis(100),
             data: PhantomData,
             filter_value_extractor: None,
+            client_provided_name: String::from("rust-stream-producer"),
         }
     }
 
@@ -56,10 +57,17 @@ impl Environment {
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
             filter_configuration: None,
+            client_provided_name: String::from("rust-stream-consumer"),
         }
     }
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {
         Client::connect(self.options.client_options.clone()).await
+    }
+    pub(crate) async fn create_client_with_options(
+        &self,
+        opts: impl Into<ClientOptions>,
+    ) -> RabbitMQStreamResult<Client> {
+        Client::connect(opts).await
     }
 
     /// Delete a stream
@@ -146,6 +154,11 @@ impl EnvironmentBuilder {
 
     pub fn load_balancer_mode(mut self, load_balancer_mode: bool) -> EnvironmentBuilder {
         self.0.client_options.load_balancer_mode = load_balancer_mode;
+        self
+    }
+
+    pub fn client_provided_name(mut self, name: &str) -> EnvironmentBuilder {
+        self.0.client_options.client_provided_name = name.to_owned();
         self
     }
 }

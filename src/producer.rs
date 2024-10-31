@@ -105,6 +105,7 @@ pub struct ProducerBuilder<T> {
     pub batch_publishing_delay: Duration,
     pub(crate) data: PhantomData<T>,
     pub filter_value_extractor: Option<FilterValueExtractor>,
+    pub(crate) client_provided_name: String,
 }
 
 #[derive(Clone)]
@@ -117,7 +118,14 @@ impl<T> ProducerBuilder<T> {
         // Connect to the user specified node first, then look for the stream leader.
         // The leader is the recommended node for writing, because writing to a replica will redundantly pass these messages
         // to the leader anyway - it is the only one capable of writing.
-        let mut client = self.environment.create_client().await?;
+
+        let mut opt_with_client_provided_name = self.environment.options.client_options.clone();
+        opt_with_client_provided_name.client_provided_name = self.client_provided_name.clone();
+
+        let mut client = self
+            .environment
+            .create_client_with_options(opt_with_client_provided_name.clone())
+            .await?;
 
         let mut publish_version = 1;
 
@@ -155,7 +163,7 @@ impl<T> ProducerBuilder<T> {
                 client = Client::connect(ClientOptions {
                     host: metadata.leader.host.clone(),
                     port: metadata.leader.port as u16,
-                    ..self.environment.options.client_options
+                    ..opt_with_client_provided_name.clone()
                 })
                 .await?
             };
@@ -225,6 +233,12 @@ impl<T> ProducerBuilder<T> {
         self.batch_publishing_delay = delay;
         self
     }
+
+    pub fn client_provided_name(mut self, name: &str) -> Self {
+        self.client_provided_name = String::from(name);
+        self
+    }
+
     pub fn name(mut self, name: &str) -> ProducerBuilder<Dedup> {
         self.name = Some(name.to_owned());
         ProducerBuilder {
@@ -234,6 +248,7 @@ impl<T> ProducerBuilder<T> {
             batch_publishing_delay: self.batch_publishing_delay,
             data: PhantomData,
             filter_value_extractor: None,
+            client_provided_name: String::from("rust-stream-producer"),
         }
     }
 
