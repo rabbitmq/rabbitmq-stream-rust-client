@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.5.0...rabbitmq-stream-protocol-v0.6.0) - 2024-10-31
+
+### Other
+
+- Create/Delete superstream and Partition and route commands ([#230](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/230))
+
 ## [0.5.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.4.3...rabbitmq-stream-protocol-v0.5.0) - 2024-08-23
 
 ### Other
