@@ -6,6 +6,7 @@ use crate::{error::ConsumerCreateError, ConsumerHandle, Environment, FilterConfi
 use futures::task::AtomicWaker;
 use futures::{Stream, StreamExt};
 use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
@@ -49,7 +50,7 @@ impl SuperStreamConsumerBuilder {
             super_stream: super_stream.to_string(),
             client: client.clone(),
             partitions: Vec::new(),
-            routes: Vec::new(),
+            routes: HashMap::new(),
         };
         let partitions = super_stream_metadata.partitions().await;
 

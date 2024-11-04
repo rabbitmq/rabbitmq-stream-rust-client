@@ -2,6 +2,7 @@ use crate::client::Client;
 
 use murmur3::murmur3_32;
 use rabbitmq_stream_protocol::message::Message;
+use std::collections::HashMap;
 use std::io::Cursor;
 
 #[derive(Clone)]
@@ -9,7 +10,7 @@ pub struct DefaultSuperStreamMetadata {
     pub super_stream: String,
     pub client: Client,
     pub partitions: Vec<String>,
-    pub routes: Vec<String>,
+    pub routes: HashMap<String, Vec<String>>,
 }
 
 impl DefaultSuperStreamMetadata {
@@ -22,16 +23,17 @@ impl DefaultSuperStreamMetadata {
         self.partitions.clone()
     }
     pub async fn routes(&mut self, routing_key: String) -> Vec<String> {
-        if self.routes.is_empty() {
+        if !self.routes.contains_key(&routing_key) {
             let response = self
                 .client
-                .route(routing_key, self.super_stream.clone())
+                .route(routing_key.clone(), self.super_stream.clone())
                 .await;
 
-            self.routes = response.unwrap().streams;
+            self.routes
+                .insert(routing_key.clone(), response.unwrap().streams);
         }
 
-        self.routes.clone()
+        self.routes.clone().remove(routing_key.as_str()).unwrap()
     }
 }
 
