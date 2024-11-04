@@ -82,6 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..message_count {
         let counter = confirmed_messages.clone();
         let notifier = notify_on_send.clone();
+        // Region names are the same as the binding_keys we specified during superstream creation
         let mut region = "";
         if i % 3 == 0   {
             region = "EMEA"
