@@ -33,7 +33,7 @@ impl DefaultSuperStreamMetadata {
                 .insert(routing_key.clone(), response.unwrap().streams);
         }
 
-        self.routes.clone().remove(routing_key.as_str()).unwrap()
+        self.routes.get(routing_key.as_str()).unwrap().clone()
     }
 }
 
