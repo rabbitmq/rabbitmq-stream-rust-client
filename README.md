@@ -45,6 +45,7 @@ Welcome to the documentation for the RabbitMQ Stream Rust Client. This guide pro
     - [Publishing Messages](#publishing-messages)
     - [Consuming Messages](#consuming-messages)
     - [Super Stream](#super-stream)
+    - [Filtering](#filtering)
 5. [Examples](#examples)
 6. [Development](#development)
     - [Compiling](#Compiling)
@@ -121,11 +122,11 @@ let environment = Environment::builder()
 You can publish messages with three different methods:
 
 * `send`: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires. On confirmation a callback is triggered. See the [example](./examples/send_async.rs)
-* `batch_send`: synchronous, the user buffers the messages and sends them. This is the fastest publishing method. On confirmation a callback is triggered. See the [example](./examples/batch_send.rs)
+* `batch_send`: asynchronous, the user buffers the messages and sends them. This is the fastest publishing method. On confirmation a callback is triggered. See the [example](./examples/batch_send.rs)
 * `send_with_confirm`: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method. See the [example](./examples/send_with_confirm.rs)
 
 
-### Consuming messages
+## Consuming messages
 
 ```rust,no_run
 use rabbitmq_stream_client::{Environment};
@@ -149,7 +150,7 @@ handle.close().await?;
 ```
 
 
-### Super Stream
+## Super Stream
 
 The client supports the super-stream functionality.
 
@@ -161,9 +162,25 @@ You can use SuperStreamProducer and SuperStreamConsumer classes which internally
 
 Have a look to the examples to see on how to work with super streams.
 
-See the [Super Stream Producer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/send_super_stream.rs)
+See the [Super Stream Producer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/superstreams/send_super_stream.rs)
 
-See the [Super Stream Consumer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/receive_super_stream.rs)
+See the [Super Stream Consumer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/superstreams/receive_super_stream.rs)
+
+
+## Filtering
+
+Filtering is a new streaming feature enabled from RabbitMQ 3.13 based on Bloom filter. RabbitMQ Stream provides a server-side filtering feature that avoids reading all the messages of a stream and filtering only on the client side. This helps to save network bandwidth when a consuming application needs only a subset of messages.
+
+See the Java documentation for more details (Same concepts apply here):
+
+[Filtering - Java Doc](https://rabbitmq.github.io/rabbitmq-stream-java-client/stable/htmlsingle/#filtering)
+
+See Rust filtering examples:
+
+See the [Producer with filtering Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/filtering/send_with_filtering.rs)
+
+See the [Consumer with filtering Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/filtering/receive_with_filtering.rs)
+
 
 ### Examples
 
