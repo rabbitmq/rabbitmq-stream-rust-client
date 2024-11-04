@@ -97,23 +97,20 @@ let environment = Environment::builder()
     .build()
 ```
 
+### Publishing messages
 
+You can publish messages with three different methods:
 
-##### Publishing messages
+* `send`: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires. On confirmation a callback is triggered.
+* `batch_send`: synchronous, the user buffers the messages and sends them. This is the fastest publishing method. On confirmation a callback is triggered.
+* `send_with_confirm`: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method.
 
-```rust,no_run
-use rabbitmq_stream_client::{Environment, types::Message};
-let environment = Environment::builder().build().await?;
-let producer = environment.producer().name("myproducer").build("mystream").await?;
-for i in 0..10 {
-    producer
-      .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
-      .await?;
-}
-producer.close().await?;
-```
+On the [examples](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/) directory you can find diffent way to send the messages:
+- [producer using send](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/send_async.rs)
+- [producer using send_with_confirm](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/send_with_confirm.py)
+- [producer using batch_send](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/batch_send.py)
 
-##### Consuming messages
+### Consuming messages
 
 ```rust,no_run
 use rabbitmq_stream_client::{Environment};
