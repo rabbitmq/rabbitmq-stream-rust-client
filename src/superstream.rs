@@ -33,6 +33,23 @@ impl DefaultSuperStreamMetadata {
 
         self.routes.clone()
     }
+
+    pub async fn get_number_of_partitions(&mut self) -> usize   {
+        if self.partitions.is_empty() {
+            let response = self.client.partitions(self.super_stream.clone()).await;
+            self.partitions = response.unwrap().streams;
+        }
+
+        self.partitions.len()
+    }
+
+    pub async fn get_partition_at(&mut self, pos: usize) -> Option<&String>   {
+        if self.partitions.is_empty() {
+            let response = self.client.partitions(self.super_stream.clone()).await;
+            self.partitions = response.unwrap().streams;
+        }
+        self.partitions.get(pos)
+    }
 }
 
 #[derive(Clone)]
@@ -68,12 +85,12 @@ impl HashRoutingMurmurStrategy {
         let key = (self.routing_extractor)(message);
         let hash_result = murmur3_32(&mut Cursor::new(key), 104729);
 
-        let partitions = metadata.partitions().await;
-        let number_of_partitions = partitions.len();
+        //let partitions = metadata.partitions().await;
+        let number_of_partitions = metadata.get_number_of_partitions().await;
         let route = hash_result.unwrap() % number_of_partitions as u32;
 
-        let stream = partitions.into_iter().nth(route as usize).unwrap();
-        streams.push(stream);
+        let stream = metadata.get_partition_at(route as usize).await.unwrap();
+        streams.push(String::from(stream));
 
         streams
     }
