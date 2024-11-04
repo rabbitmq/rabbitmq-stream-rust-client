@@ -62,6 +62,7 @@ impl Environment {
             data: PhantomData,
             filter_value_extractor: None,
             route_strategy: routing_strategy,
+            client_provided_name: String::from("rust-super-stream-producer"),
         }
     }
 
@@ -81,6 +82,7 @@ impl Environment {
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
             filter_configuration: None,
+            client_provided_name: String::from("rust-super-stream-consumer"),
         }
     }
 

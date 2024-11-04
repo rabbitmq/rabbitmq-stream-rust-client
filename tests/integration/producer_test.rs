@@ -544,6 +544,7 @@ async fn hash_super_steam_producer_test() {
                 routing_extractor: &hash_strategy_value_extractor,
             },
         ))
+        .client_provided_name("test super stream producer ")
         .build(&env.super_stream)
         .await
         .unwrap();

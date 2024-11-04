@@ -263,8 +263,6 @@ impl Client {
         if max_version >= 2 {
             client.filtering_supported = true
         }
-
-        println!("Connect {}", client.opts.client_provided_name.clone());
         Ok(client)
     }
 

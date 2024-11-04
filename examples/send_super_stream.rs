@@ -73,6 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 routing_extractor: &hash_strategy_value_extractor,
             },
         ))
+        .client_provided_name("my super stream producer for hello rust")
         .build(super_stream)
         .await
         .unwrap();

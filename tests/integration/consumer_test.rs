@@ -79,6 +79,7 @@ async fn super_stream_consumer_test() {
                 routing_extractor: &hash_strategy_value_extractor,
             },
         ))
+        .client_provided_name("test super stream consumer ")
         .build(&env.super_stream)
         .await
         .unwrap();
