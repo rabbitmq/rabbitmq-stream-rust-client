@@ -122,10 +122,12 @@ impl ConsumerBuilder {
                         let mapping = temp_client.connection_properties().await;
                         if let Some(advertised_host) = mapping.get("advertised_host") {
                             if *advertised_host == replica.host.clone() {
+                                client.close().await?;
                                 client = temp_client;
                                 break;
                             }
                         }
+                        temp_client.close().await?;
                     }
                 } else {
                     client.close().await?;
@@ -276,6 +278,10 @@ pub struct ConsumerHandle(Arc<ConsumerInternal>);
 impl ConsumerHandle {
     /// Close the [`Consumer`] associated to this handle
     pub async fn close(self) -> Result<(), ConsumerCloseError> {
+        self.internal_close().await
+    }
+
+    pub(crate) async fn internal_close(&self) -> Result<(), ConsumerCloseError> {
         match self.0.closed.compare_exchange(false, true, SeqCst, SeqCst) {
             Ok(false) => {
                 let response = self.0.client.unsubscribe(self.0.subscription_id).await?;
@@ -340,6 +346,7 @@ impl MessageHandler for ConsumerMessageHandler {
                             .0
                             .sender
                             .send(Ok(Delivery {
+                                stream: self.0.stream.clone(),
                                 subscription_id: self.0.subscription_id,
                                 message,
                                 offset,
@@ -368,6 +375,7 @@ impl MessageHandler for ConsumerMessageHandler {
 /// Envelope from incoming message
 #[derive(Debug)]
 pub struct Delivery {
+    stream: String,
     subscription_id: u8,
     message: Message,
     offset: u64,
@@ -377,6 +385,11 @@ impl Delivery {
     /// Get a reference to the delivery's subscription id.
     pub fn subscription_id(&self) -> u8 {
         self.subscription_id
+    }
+
+    /// Get a reference to the delivery's stream name.
+    pub fn stream(&self) -> &String {
+        &self.stream
     }
 
     /// Get a reference to the delivery's message.

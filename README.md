@@ -2,7 +2,7 @@
 <br/>
 <div align="center">
  <strong>
-   A work-in-progress Rust client for RabbitMQ Streams
+   A Rust client for RabbitMQ Streams
  </strong>
 </div>
 
@@ -14,7 +14,7 @@
     <img src="https://github.com/rabbitmq/rabbitmq-stream-rust-client/workflows/Tests/badge.svg"
     alt="Tests status" />
   </a>
-  
+
   <a href="https://crates.io/crates/rabbitmq-stream-client">
     <img src="https://img.shields.io/crates/d/rabbitmq-stream-client.svg?style=flat-square"
       alt="Download" />
@@ -32,39 +32,53 @@
   <a href="https://codecov.io/gh/rabbitmq/rabbitmq-stream-rust-client">
     <img src="https://codecov.io/gh/rabbitmq/rabbitmq-stream-rust-client/branch/main/graph/badge.svg?token=2DHIQ20BDE" alt="codecov"/>
   </a>
-
-
-
 </div>
 
 
-# RabbitMQ Stream Client
+Welcome to the documentation for the RabbitMQ Stream Rust Client. This guide provides comprehensive information on installation, usage, and examples.
 
-This is a Rust client library for working with [RabbitMQ Streams](https://www.rabbitmq.com/docs/streams).
+## Table of Contents
+1. [Introduction](#introduction)
+2. [Installation](#installation)
+3. [Getting Started](#getting-started)
+4. [Usage](#usage)
+    - [Publishing Messages](#publishing-messages)
+    - [Consuming Messages](#consuming-messages)
+    - [Super Stream](#super-stream)
+5. [Examples](#examples)
+6. [Development](#development)
+    - [Compiling](#Compiling)
+    - [Running Tests](#running-tests)
+    - [Running Benchmarks](#running-benchmarks)
+    - [Contributing](#contributing)
+    - [License](#license)
 
-### Installation
+## Introduction
 
-Install from [crates.io](https://crates.io/)
+The RabbitMQ Stream Rust Client is a library designed for integrating Rust applications with RabbitMQ streams efficiently. It supports high throughput and low latency message streaming.
+
+## Installation
+
+Install from [crates.io](https://crates.io/crates/rabbitmq-stream-client)
 
 ```toml
 [dependencies]
 rabbitmq-stream-client = "*"
 ```
 
-### Quick Start
+Then run `cargo build `to include it in your project.
 
+## Getting Started
+This section covers the initial setup and necessary steps to incorporate the RabbitMQ Stream client into your Rust application.
+
+Ensure RabbitMQ server with stream support is installed.
 The main access point is `Environment`, which is used to connect to a node.
-
-#### Example
-
-##### Building the environment
 
 ```rust,no_run
 use rabbitmq_stream_client::Environment;
 let environment = Environment::builder().build().await?;
 ```
-
-##### Building the environment with TLS
+### Environment with TLS
 
 ```rust,no_run
 use rabbitmq_stream_client::Environment;
@@ -86,7 +100,10 @@ let environment = Environment::builder()
     .build()
 ```
 
-##### Building the environment with a load balancer
+### Environment with a load balancer
+
+
+See the [documentation](https://www.rabbitmq.com/blog/2021/07/23/connecting-to-streams#with-a-load-balancer) about the stream and load-balancer.
 
 ```rust,no_run
 use rabbitmq_stream_client::Environment;
@@ -99,21 +116,16 @@ let environment = Environment::builder()
 
 
 
-##### Publishing messages
+## Publishing messages
 
-```rust,no_run
-use rabbitmq_stream_client::{Environment, types::Message};
-let environment = Environment::builder().build().await?;
-let producer = environment.producer().name("myproducer").build("mystream").await?;
-for i in 0..10 {
-    producer
-      .send_with_confirm(Message::builder().body(format!("message{}", i)).build())
-      .await?;
-}
-producer.close().await?;
-```
+You can publish messages with three different methods:
 
-##### Consuming messages
+* `send`: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires. On confirmation a callback is triggered. See the [example](./examples/send_async.rs)
+* `batch_send`: synchronous, the user buffers the messages and sends them. This is the fastest publishing method. On confirmation a callback is triggered. See the [example](./examples/batch_send.rs)
+* `send_with_confirm`: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method. See the [example](./examples/send_with_confirm.rs)
+
+
+### Consuming messages
 
 ```rust,no_run
 use rabbitmq_stream_client::{Environment};
@@ -136,16 +148,38 @@ sleep(Duration::from_secs(10)).await;
 handle.close().await?;
 ```
 
-### Development
 
-#### Compiling
+### Super Stream
+
+The client supports the super-stream functionality.
+
+A super stream is a logical stream made of individual, regular streams. It is a way to scale out publishing and consuming with RabbitMQ Streams: a large logical stream is divided into partition streams, splitting up the storage and the traffic on several cluster nodes.
+
+See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-super-streams/) for more info.
+
+You can use SuperStreamProducer and SuperStreamConsumer classes which internally uses producers and consumers to operate on the componsing streams.
+
+Have a look to the examples to see on how to work with super streams.
+
+See the [Super Stream Producer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/send_super_stream.rs)
+
+See the [Super Stream Consumer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/receive_super_stream.rs)
+
+### Examples
+
+Refer to the [examples](./examples) directory for detailed code samples illustrating various use cases 
+like error handling, batch processing, super streams and different ways to send messages.
+
+## Development
+
+### Compiling
 
 ```bash
 git clone https://github.com/rabbitmq/rabbitmq-stream-rust-client .
 make build
 ```
 
-#### Running Tests
+### Running Tests
 
 To run tests you need to have a running RabbitMQ Stream node with a TLS configuration.
 It is mandatory to use `make rabbitmq-server` to create a TLS configuration compatible with the tests.
@@ -156,9 +190,15 @@ make rabbitmq-server
 make test
 ```
 
-#### Running Benchmarks
+### Running Benchmarks
 
 ```bash
 make rabbitmq-server
 make run-benchmark
 ```
+
+## Contributing
+Contributions are welcome! Please read our contributing guide to understand how to submit issues, enhancements, or patches.
+
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.

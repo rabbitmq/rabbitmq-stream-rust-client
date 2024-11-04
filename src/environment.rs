@@ -11,6 +11,9 @@ use crate::{
     error::StreamDeleteError,
     producer::ProducerBuilder,
     stream_creator::StreamCreator,
+    superstream::RoutingStrategy,
+    superstream_consumer::SuperStreamConsumerBuilder,
+    superstream_producer::SuperStreamProducerBuilder,
     RabbitMQStreamResult,
 };
 
@@ -50,6 +53,18 @@ impl Environment {
         }
     }
 
+    pub fn super_stream_producer(
+        &self,
+        routing_strategy: RoutingStrategy,
+    ) -> SuperStreamProducerBuilder<NoDedup> {
+        SuperStreamProducerBuilder {
+            environment: self.clone(),
+            data: PhantomData,
+            filter_value_extractor: None,
+            route_strategy: routing_strategy,
+        }
+    }
+
     /// Returns a builder for creating a consumer
     pub fn consumer(&self) -> ConsumerBuilder {
         ConsumerBuilder {
@@ -60,6 +75,15 @@ impl Environment {
             client_provided_name: String::from("rust-stream-consumer"),
         }
     }
+
+    pub fn super_stream_consumer(&self) -> SuperStreamConsumerBuilder {
+        SuperStreamConsumerBuilder {
+            environment: self.clone(),
+            offset_specification: OffsetSpecification::Next,
+            filter_configuration: None,
+        }
+    }
+
     pub(crate) async fn create_client(&self) -> RabbitMQStreamResult<Client> {
         Client::connect(self.options.client_options.clone()).await
     }

@@ -2,6 +2,7 @@ use std::{collections::HashMap, future::Future, sync::Arc};
 
 use fake::{Fake, Faker};
 use rabbitmq_stream_client::{Client, ClientOptions, Environment};
+use rabbitmq_stream_protocol::commands::generic::GenericResponse;
 use rabbitmq_stream_protocol::ResponseCode;
 use tokio::sync::Semaphore;
 
@@ -37,6 +38,8 @@ impl Countdown {
 pub struct TestEnvironment {
     pub env: Environment,
     pub stream: String,
+    pub super_stream: String,
+    pub partitions: Vec<String>,
 }
 
 impl TestClient {
@@ -59,26 +62,7 @@ impl TestClient {
         let super_stream: String = Faker.fake();
         let client = Client::connect(ClientOptions::default()).await.unwrap();
 
-        let partitions: Vec<String> = [
-            super_stream.to_string() + "-0",
-            super_stream.to_string() + "-1",
-            super_stream.to_string() + "-2",
-        ]
-        .iter()
-        .map(|x| x.into())
-        .collect();
-
-        let binding_keys: Vec<String> = ["0", "1", "2"].iter().map(|&x| x.into()).collect();
-
-        let response = client
-            .create_super_stream(
-                &super_stream,
-                partitions.clone(),
-                binding_keys,
-                HashMap::new(),
-            )
-            .await
-            .unwrap();
+        let (response, partitions) = create_generic_super_stream(&super_stream, &client).await;
 
         assert_eq!(&ResponseCode::Ok, response.code());
         TestClient {
@@ -117,15 +101,76 @@ impl TestEnvironment {
         let env = Environment::builder().build().await.unwrap();
         env.stream_creator().create(&stream).await.unwrap();
 
-        TestEnvironment { env, stream }
+        TestEnvironment {
+            env,
+            stream,
+            super_stream: String::new(),
+            partitions: Vec::new(),
+        }
+    }
+
+    pub async fn create_super_stream() -> TestEnvironment {
+        let super_stream: String = Faker.fake();
+        let client = Client::connect(ClientOptions::default()).await.unwrap();
+        let env = Environment::builder().build().await.unwrap();
+
+        let (response, partitions) = create_generic_super_stream(&super_stream, &client).await;
+
+        assert_eq!(&ResponseCode::Ok, response.code());
+        TestEnvironment {
+            env,
+            stream: String::new(),
+            super_stream,
+            partitions,
+        }
     }
 }
 
 impl Drop for TestEnvironment {
     fn drop(&mut self) {
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current()
-                .block_on(async { self.env.delete_stream(&self.stream).await.unwrap() })
-        });
+        if self.stream != "" {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async { self.env.delete_stream(&self.stream).await.unwrap() })
+            });
+        }
+        if self.super_stream != "" {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    self.env
+                        .delete_super_stream(&self.super_stream)
+                        .await
+                        .unwrap()
+                })
+            });
+        }
     }
+}
+
+pub async fn create_generic_super_stream(
+    super_stream: &String,
+    client: &Client,
+) -> (GenericResponse, Vec<String>) {
+    let partitions: Vec<String> = [
+        super_stream.to_string() + "-0",
+        super_stream.to_string() + "-1",
+        super_stream.to_string() + "-2",
+    ]
+    .iter()
+    .map(|x| x.into())
+    .collect();
+
+    let binding_keys: Vec<String> = ["0", "1", "2"].iter().map(|&x| x.into()).collect();
+
+    let response = client
+        .create_super_stream(
+            &super_stream,
+            partitions.clone(),
+            binding_keys,
+            HashMap::new(),
+        )
+        .await
+        .unwrap();
+
+    return (response, partitions);
 }
