@@ -79,7 +79,7 @@ impl SuperStreamProducer<NoDedup> {
                 self.1.insert(route.clone(), producer);
             }
 
-            let producer = self.1.get(route.as_str()).unwrap();
+            let producer = self.1.get(&route).unwrap();
             producer.send(message.clone(), cb.clone()).await?;
         }
         Ok(())
@@ -122,7 +122,7 @@ impl<T> SuperStreamProducerBuilder<T> {
             super_stream: super_stream.to_string(),
             client: client.clone(),
             partitions: Vec::new(),
-            routes: Vec::new(),
+            routes: HashMap::new(),
         };
 
         let super_stream_producer = SuperStreamProducerInternal {

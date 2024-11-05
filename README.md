@@ -146,6 +146,7 @@ See also a simple example here on how to consume from a stream:
 
 [Consuming messages from a stream example](./examples/simple-consumer.rs)
 
+
 ## Super Stream
 
 The client supports the super-stream functionality.
@@ -156,9 +157,17 @@ See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-featur
 
 You can use SuperStreamProducer and SuperStreamConsumer classes which internally uses producers and consumers to operate on the componsing streams.
 
+SuperstreamProducers can act in Hashing and Routing Key mode.
+
+See the Java documentation for more details (Same concepts apply here):
+
+[Super Stream Producer - Java doc](https://rabbitmq.github.io/rabbitmq-stream-java-client/stable/htmlsingle/#super-stream-producer)
+
 Have a look to the examples to see on how to work with super streams.
 
-See the [Super Stream Producer Example](./examples/superstreams/send_super_stream.rs)
+See the [Super Stream Producer Example using Hashing mmh3 mode](./examples/superstreams/send_super_stream_hash.rs)
+
+See the [Super Stream Producer Example using Routing key mode](./examples/superstreams/send_super_stream_routing_key.rs)
 
 See the [Super Stream Consumer Example](./examples/superstreams/receive_super_stream.rs)
 
