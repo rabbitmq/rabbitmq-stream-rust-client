@@ -128,27 +128,23 @@ You can publish messages with three different methods:
 
 ## Consuming messages
 
-```rust,no_run
-use rabbitmq_stream_client::{Environment};
-use futures::StreamExt;
-use tokio::task;
-use tokio::time::{sleep, Duration};
-let environment = Environment::builder().build().await?;
-let mut consumer = environment.consumer().build("mystream").await?;
-let handle = consumer.handle();
-task::spawn(async move {
-        while let Some(delivery) = consumer.next().await {
-            let d = delivery.unwrap();
-            println!("Got message: {:#?} with offset: {}",
-                     d.message().data().map(|data| String::from_utf8(data.to_vec()).unwrap()),
-                     d.offset(),);
-        }
-    });
-// wait 10 second and then close the consumer
-sleep(Duration::from_secs(10)).await;
-handle.close().await?;
-```
+As streams never delete any messages, any consumer can start reading/consuming from any point in the log
 
+See the Consuming section part of the streaming doc for further info (Most of the examples refer to Java but applies for ths library too):
+
+[Consuming messages from a stream](https://www.rabbitmq.com/docs/streams#consuming)
+
+See also the Rust streaming tutorial-2 on how consume messages starting from different positions and how to enable Server-Side Offset Tracking too:
+
+[RabbitMQ Streams - Rust tutorial 2](https://www.rabbitmq.com/tutorials/tutorial-two-rust-stream)
+
+and the relative examples from the tutorials:
+
+[Rust tutorials examples](https://github.com/rabbitmq/rabbitmq-tutorials/tree/main/rust-stream)
+
+See also a simple example here on how to consume from a stream:
+
+[Consuming messages from a stream example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/simple-consume.rs)
 
 ## Super Stream
 
@@ -162,9 +158,9 @@ You can use SuperStreamProducer and SuperStreamConsumer classes which internally
 
 Have a look to the examples to see on how to work with super streams.
 
-See the [Super Stream Producer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/superstreams/send_super_stream.rs)
+See the [Super Stream Producer Example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/superstreams/send_super_stream.rs)
 
-See the [Super Stream Consumer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/superstreams/receive_super_stream.rs)
+See the [Super Stream Consumer Example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/superstreams/receive_super_stream.rs)
 
 
 ## Filtering
@@ -177,9 +173,9 @@ See the Java documentation for more details (Same concepts apply here):
 
 See Rust filtering examples:
 
-See the [Producer with filtering Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/filtering/send_with_filtering.rs)
+See the [Producer with filtering Example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/filtering/send_with_filtering.rs)
 
-See the [Consumer with filtering Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/filtering/receive_with_filtering.rs)
+See the [Consumer with filtering Example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/filtering/receive_with_filtering.rs)
 
 
 ### Examples
