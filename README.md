@@ -146,6 +146,7 @@ See also a simple example here on how to consume from a stream:
 
 [Consuming messages from a stream example](./examples/simple-consumer.rs)
 
+
 ## Super Stream
 
 The client supports the super-stream functionality.
