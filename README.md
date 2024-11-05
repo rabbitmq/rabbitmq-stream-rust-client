@@ -45,6 +45,7 @@ Welcome to the documentation for the RabbitMQ Stream Rust Client. This guide pro
     - [Publishing Messages](#publishing-messages)
     - [Consuming Messages](#consuming-messages)
     - [Super Stream](#super-stream)
+    - [Filtering](#filtering)
 5. [Examples](#examples)
 6. [Development](#development)
     - [Compiling](#Compiling)
@@ -121,35 +122,31 @@ let environment = Environment::builder()
 You can publish messages with three different methods:
 
 * `send`: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires. On confirmation a callback is triggered. See the [example](./examples/send_async.rs)
-* `batch_send`: synchronous, the user buffers the messages and sends them. This is the fastest publishing method. On confirmation a callback is triggered. See the [example](./examples/batch_send.rs)
+* `batch_send`: asynchronous, the user buffers the messages and sends them. This is the fastest publishing method. On confirmation a callback is triggered. See the [example](./examples/batch_send.rs)
 * `send_with_confirm`: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method. See the [example](./examples/send_with_confirm.rs)
 
 
-### Consuming messages
+## Consuming messages
 
-```rust,no_run
-use rabbitmq_stream_client::{Environment};
-use futures::StreamExt;
-use tokio::task;
-use tokio::time::{sleep, Duration};
-let environment = Environment::builder().build().await?;
-let mut consumer = environment.consumer().build("mystream").await?;
-let handle = consumer.handle();
-task::spawn(async move {
-        while let Some(delivery) = consumer.next().await {
-            let d = delivery.unwrap();
-            println!("Got message: {:#?} with offset: {}",
-                     d.message().data().map(|data| String::from_utf8(data.to_vec()).unwrap()),
-                     d.offset(),);
-        }
-    });
-// wait 10 second and then close the consumer
-sleep(Duration::from_secs(10)).await;
-handle.close().await?;
-```
+As streams never delete any messages, any consumer can start reading/consuming from any point in the log
 
+See the Consuming section part of the streaming doc for further info (Most of the examples refer to Java but applies for ths library too):
 
-### Super Stream
+[Consuming messages from a stream](https://www.rabbitmq.com/docs/streams#consuming)
+
+See also the Rust streaming tutorial-2 on how consume messages starting from different positions and how to enable Server-Side Offset Tracking too:
+
+[RabbitMQ Streams - Rust tutorial 2](https://www.rabbitmq.com/tutorials/tutorial-two-rust-stream)
+
+and the relative examples from the tutorials:
+
+[Rust tutorials examples](https://github.com/rabbitmq/rabbitmq-tutorials/tree/main/rust-stream)
+
+See also a simple example here on how to consume from a stream:
+
+[Consuming messages from a stream example](./examples/simple-consume.rs)
+
+## Super Stream
 
 The client supports the super-stream functionality.
 
@@ -161,9 +158,25 @@ You can use SuperStreamProducer and SuperStreamConsumer classes which internally
 
 Have a look to the examples to see on how to work with super streams.
 
-See the [Super Stream Producer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/send_super_stream.rs)
+See the [Super Stream Producer Example](./examples/superstreams/send_super_stream.rs)
 
-See the [Super Stream Consumer Example:](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/receive_super_stream.rs)
+See the [Super Stream Consumer Example](./examples/superstreams/receive_super_stream.rs)
+
+
+## Filtering
+
+Filtering is a new streaming feature enabled from RabbitMQ 3.13 based on Bloom filter. RabbitMQ Stream provides a server-side filtering feature that avoids reading all the messages of a stream and filtering only on the client side. This helps to save network bandwidth when a consuming application needs only a subset of messages.
+
+See the Java documentation for more details (Same concepts apply here):
+
+[Filtering - Java Doc](https://rabbitmq.github.io/rabbitmq-stream-java-client/stable/htmlsingle/#filtering)
+
+See Rust filtering examples:
+
+See the [Producer with filtering Example](./examples/filtering/send_with_filtering.rs)
+
+See the [Consumer with filtering Example](./examples/filtering/receive_with_filtering.rs)
+
 
 ### Examples
 
