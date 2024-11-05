@@ -144,7 +144,7 @@ and the relative examples from the tutorials:
 
 See also a simple example here on how to consume from a stream:
 
-[Consuming messages from a stream example](./examples/simple-consume.rs)
+[Consuming messages from a stream example](./examples/simple-consumer.rs)
 
 ## Super Stream
 
