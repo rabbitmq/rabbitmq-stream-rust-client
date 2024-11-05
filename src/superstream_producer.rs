@@ -29,6 +29,7 @@ pub struct SuperStreamProducerBuilder<T> {
     pub filter_value_extractor: Option<FilterValueExtractor>,
     pub route_strategy: RoutingStrategy,
     pub(crate) data: PhantomData<T>,
+    pub(crate) client_provided_name: String,
 }
 
 pub struct SuperStreamProducerInternal {
@@ -36,6 +37,7 @@ pub struct SuperStreamProducerInternal {
     client: Client,
     // TODO: implement filtering for superstream
     filter_value_extractor: Option<FilterValueExtractor>,
+    client_provided_name: String,
 }
 
 impl SuperStreamProducer<NoDedup> {
@@ -70,6 +72,7 @@ impl SuperStreamProducer<NoDedup> {
                     .0
                     .environment
                     .producer()
+                    .client_provided_name(self.0.client_provided_name.as_str())
                     .filter_value_extractor_arc(self.0.filter_value_extractor.clone())
                     .build(route.as_str())
                     .await?;
@@ -126,6 +129,7 @@ impl<T> SuperStreamProducerBuilder<T> {
             environment: self.environment.clone(),
             client,
             filter_value_extractor: self.filter_value_extractor,
+            client_provided_name: self.client_provided_name,
         };
 
         let internal_producer = Arc::new(super_stream_producer);
@@ -146,6 +150,11 @@ impl<T> SuperStreamProducerBuilder<T> {
     ) -> Self {
         let f = Arc::new(filter_value_extractor);
         self.filter_value_extractor = Some(f);
+        self
+    }
+
+    pub fn client_provided_name(mut self, name: &str) -> Self {
+        self.client_provided_name = String::from(name);
         self
     }
 }

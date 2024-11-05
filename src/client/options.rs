@@ -15,6 +15,7 @@ pub struct ClientOptions {
     pub(crate) load_balancer_mode: bool,
     pub(crate) tls: TlsConfiguration,
     pub(crate) collector: Arc<dyn MetricsCollector>,
+    pub(crate) client_provided_name: String,
 }
 
 impl Debug for ClientOptions {
@@ -27,6 +28,7 @@ impl Debug for ClientOptions {
             .field("v_host", &self.v_host)
             .field("heartbeat", &self.heartbeat)
             .field("max_frame_size", &self.max_frame_size)
+            .field("client_provided_name", &self.client_provided_name)
             .finish()
     }
 }
@@ -49,6 +51,7 @@ impl Default for ClientOptions {
                 client_certificates_path: String::from(""),
                 client_keys_path: String::from(""),
             },
+            client_provided_name: String::from("rust-stream"),
         }
     }
 }
@@ -68,6 +71,10 @@ impl ClientOptions {
 
     pub fn set_port(&mut self, port: u16) {
         self.port = port;
+    }
+
+    pub fn set_client_provided_name(&mut self, name: &str) {
+        self.client_provided_name = name.to_owned();
     }
 }
 

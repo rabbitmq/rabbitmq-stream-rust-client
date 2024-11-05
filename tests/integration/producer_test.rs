@@ -60,6 +60,7 @@ async fn producer_send_name_deduplication_unique_ids() {
         let mut producer = env
             .producer()
             .name("my_producer")
+            .client_provided_name("my producer")
             .build(&stream)
             .await
             .unwrap();
@@ -543,6 +544,7 @@ async fn hash_super_steam_producer_test() {
                 routing_extractor: &hash_strategy_value_extractor,
             },
         ))
+        .client_provided_name("test super stream producer ")
         .build(&env.super_stream)
         .await
         .unwrap();

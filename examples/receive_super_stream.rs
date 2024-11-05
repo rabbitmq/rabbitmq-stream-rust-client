@@ -35,6 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut super_stream_consumer: SuperStreamConsumer = environment
         .super_stream_consumer()
         .offset(OffsetSpecification::First)
+        .client_provided_name("my super stream consumer for hello rust")
         .build(super_stream)
         .await
         .unwrap();

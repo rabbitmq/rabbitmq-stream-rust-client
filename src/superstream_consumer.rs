@@ -32,6 +32,7 @@ pub struct SuperStreamConsumerBuilder {
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
+    pub(crate) client_provided_name: String,
 }
 
 impl SuperStreamConsumerBuilder {
@@ -59,6 +60,7 @@ impl SuperStreamConsumerBuilder {
                 .environment
                 .consumer()
                 .offset(self.offset_specification.clone())
+                .client_provided_name(self.client_provided_name.as_str())
                 .filter_input(self.filter_configuration.clone())
                 .build(partition.as_str())
                 .await
@@ -93,6 +95,11 @@ impl SuperStreamConsumerBuilder {
 
     pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
         self.filter_configuration = filter_configuration;
+        self
+    }
+
+    pub fn client_provided_name(mut self, name: &str) -> Self {
+        self.client_provided_name = String::from(name);
         self
     }
 }

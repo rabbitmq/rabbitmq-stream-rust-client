@@ -39,6 +39,7 @@ async fn consumer_test() {
     let mut consumer = env
         .env
         .consumer()
+        .client_provided_name("my consumer")
         .offset(OffsetSpecification::Next)
         .build(&env.stream)
         .await
@@ -78,6 +79,7 @@ async fn super_stream_consumer_test() {
                 routing_extractor: &hash_strategy_value_extractor,
             },
         ))
+        .client_provided_name("test super stream consumer ")
         .build(&env.super_stream)
         .await
         .unwrap();
