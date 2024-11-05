@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.6.0...rabbitmq-stream-client-v0.6.1) - 2024-11-05
+
+### Fixed
+
+- fix a bug happening during sending of super_stream with routing_key ([#243](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/243))
+
+### Other
+
+- Update readme. A wrong license was written
+- Update dependencies ([#244](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/244))
+- Bump actions/checkout from 3 to 4 ([#202](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/202))
+- Update README.md
+- improving filtering examples + others ([#242](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/242))
+- Add client properties ([#237](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/237))
+- adding producer examples ([#240](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/240))
+
 ## [0.5.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.5.0...rabbitmq-stream-client-v0.5.1) - 2024-10-31
 
 ### Fixed
