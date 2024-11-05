@@ -58,7 +58,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut producer = environment
         .producer()
-        .name("test_producer")
         // we are telling the producer to use the callback filter_value_extractor to compute the filter
         .filter_value_extractor(filter_value_extractor)
         .build("test_stream_filtering")

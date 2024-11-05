@@ -144,7 +144,7 @@ and the relative examples from the tutorials:
 
 See also a simple example here on how to consume from a stream:
 
-[Consuming messages from a stream example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/simple-consume.rs)
+[Consuming messages from a stream example](./examples/simple-consume.rs)
 
 ## Super Stream
 
@@ -158,9 +158,9 @@ You can use SuperStreamProducer and SuperStreamConsumer classes which internally
 
 Have a look to the examples to see on how to work with super streams.
 
-See the [Super Stream Producer Example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/superstreams/send_super_stream.rs)
+See the [Super Stream Producer Example](./examples/superstreams/send_super_stream.rs)
 
-See the [Super Stream Consumer Example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/superstreams/receive_super_stream.rs)
+See the [Super Stream Consumer Example](./examples/superstreams/receive_super_stream.rs)
 
 
 ## Filtering
@@ -173,9 +173,9 @@ See the Java documentation for more details (Same concepts apply here):
 
 See Rust filtering examples:
 
-See the [Producer with filtering Example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/filtering/send_with_filtering.rs)
+See the [Producer with filtering Example](./examples/filtering/send_with_filtering.rs)
 
-See the [Consumer with filtering Example](https://github.com/rabbitmq/rabbitmq-stream-rust-client/blob/main/examples/filtering/receive_with_filtering.rs)
+See the [Consumer with filtering Example](./examples/filtering/receive_with_filtering.rs)
 
 
 ### Examples
