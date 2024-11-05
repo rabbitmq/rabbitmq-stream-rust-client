@@ -223,4 +223,4 @@ make run-benchmark
 Contributions are welcome! Please read our contributing guide to understand how to submit issues, enhancements, or patches.
 
 ## License
-This project is licensed under the MIT License. See the LICENSE file for details.
+See the LICENSE file for details.
