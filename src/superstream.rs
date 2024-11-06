@@ -14,15 +14,15 @@ pub struct DefaultSuperStreamMetadata {
 }
 
 impl DefaultSuperStreamMetadata {
-    pub async fn partitions(&mut self) -> Vec<String> {
+    pub async fn partitions(&mut self) -> &Vec<String> {
         if self.partitions.is_empty() {
             let response = self.client.partitions(self.super_stream.clone()).await;
 
             self.partitions = response.unwrap().streams;
         }
-        self.partitions.clone()
+        &self.partitions
     }
-    pub async fn routes(&mut self, routing_key: String) -> Vec<String> {
+    pub async fn routes(&mut self, routing_key: String) -> &Vec<String> {
         if !self.routes.contains_key(&routing_key) {
             let response = self
                 .client
@@ -33,7 +33,7 @@ impl DefaultSuperStreamMetadata {
                 .insert(routing_key.clone(), response.unwrap().streams);
         }
 
-        self.routes.get(routing_key.as_str()).unwrap().clone()
+        &self.routes.get(routing_key.as_str()).unwrap()
     }
 }
 
@@ -50,7 +50,8 @@ impl RoutingKeyRoutingStrategy {
     ) -> Vec<String> {
         let key = (self.routing_extractor)(message);
 
-        metadata.routes(key).await
+        metadata.routes(key).await.clone()
+
     }
 }
 
@@ -75,7 +76,7 @@ impl HashRoutingMurmurStrategy {
         let route = hash_result.unwrap() % number_of_partitions as u32;
 
         let stream = partitions.into_iter().nth(route as usize).unwrap();
-        streams.push(stream);
+        streams.push(stream.clone());
 
         streams
     }
