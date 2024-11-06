@@ -14,7 +14,7 @@ use crate::{
         publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
         query_publisher_sequence::QueryPublisherResponse, sasl_handshake::SaslHandshakeResponse,
         superstream_partitions::SuperStreamPartitionsResponse,
-        superstream_route::SuperStreamRouteResponse, tune::TunesCommand,
+        superstream_route::SuperStreamRouteResponse, tune::TunesCommand, consumer_update::ConsumerUpdateCommand
     },
     error::DecodeError,
     protocol::commands::*,
@@ -72,6 +72,7 @@ pub enum ResponseKind {
     ExchangeCommandVersions(ExchangeCommandVersionsResponse),
     SuperStreamPartitions(SuperStreamPartitionsResponse),
     SuperStreamRoute(SuperStreamRouteResponse),
+    ConsumerUpdate(ConsumerUpdateCommand),
 }
 
 impl Response {
@@ -106,6 +107,9 @@ impl Response {
             }
             ResponseKind::SuperStreamRoute(super_stream_route_command) => {
                 Some(super_stream_route_command.correlation_id)
+            }
+            ResponseKind::ConsumerUpdate(consumer_update_command) => {
+                Some(consumer_update_command.correlation_id)
             }
         }
     }
@@ -188,6 +192,8 @@ impl Decoder for Response {
                 .map(|(remaining, kind)| (remaining, ResponseKind::SuperStreamPartitions(kind)))?,
             COMMAND_ROUTE => SuperStreamRouteResponse::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::SuperStreamRoute(kind)))?,
+            COMMAND_CONSUMER_UPDATE => ConsumerUpdateCommand::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::ConsumerUpdate(kind)))?,
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
@@ -228,7 +234,7 @@ mod tests {
             query_publisher_sequence::QueryPublisherResponse,
             sasl_handshake::SaslHandshakeResponse,
             superstream_partitions::SuperStreamPartitionsResponse,
-            superstream_route::SuperStreamRouteResponse, tune::TunesCommand,
+            superstream_route::SuperStreamRouteResponse, tune::TunesCommand, consumer_update::ConsumerUpdateCommand
         },
         protocol::{
             commands::{
@@ -236,7 +242,7 @@ mod tests {
                 COMMAND_METADATA_UPDATE, COMMAND_OPEN, COMMAND_PARTITIONS, COMMAND_PEER_PROPERTIES,
                 COMMAND_PUBLISH_CONFIRM, COMMAND_PUBLISH_ERROR, COMMAND_QUERY_OFFSET,
                 COMMAND_QUERY_PUBLISHER_SEQUENCE, COMMAND_ROUTE, COMMAND_SASL_AUTHENTICATE,
-                COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
+                COMMAND_SASL_HANDSHAKE, COMMAND_TUNE, COMMAND_CONSUMER_UPDATE,
             },
             version::PROTOCOL_VERSION,
         },
@@ -244,6 +250,8 @@ mod tests {
         types::Header,
         ResponseCode,
     };
+    use crate::protocol::commands::COMMAND_CONSUMER_UPDATE;
+
     impl Encoder for ResponseKind {
         fn encoded_size(&self) -> u32 {
             match self {
@@ -272,6 +280,9 @@ mod tests {
                 }
                 ResponseKind::SuperStreamRoute(super_stream_response) => {
                     super_stream_response.encoded_size()
+                }
+                ResponseKind::ConsumerUpdate(consumer_update_response) => {
+                    consumer_update_response.encoded_size()
                 }
             }
         }
@@ -306,6 +317,9 @@ mod tests {
                 }
                 ResponseKind::SuperStreamRoute(super_stream_command_versions) => {
                     super_stream_command_versions.encode(writer)
+                }
+                ResponseKind::ConsumerUpdate(consumer_update_command_version) => {
+                    consumer_update_command_version.encode(writer)
                 }
             }
         }
@@ -492,6 +506,15 @@ mod tests {
             SuperStreamRouteResponse,
             ResponseKind::SuperStreamRoute,
             COMMAND_ROUTE
+        );
+    }
+
+    #[test]
+    fn consumer_update_response_test() {
+        response_test!(
+            ConsumerUpdateCommand,
+            ResponseKind::ConsumerUpdate,
+            COMMAND_CONSUMER_UPDATE
         );
     }
 }

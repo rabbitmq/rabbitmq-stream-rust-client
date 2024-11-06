@@ -29,6 +29,7 @@ pub mod superstream_partitions;
 pub mod superstream_route;
 pub mod tune;
 pub mod unsubscribe;
+pub mod consumer_update;
 
 pub trait Command {
     fn key(&self) -> u16;
