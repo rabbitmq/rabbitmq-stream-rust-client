@@ -6,15 +6,16 @@ use crate::{
         Decoder,
     },
     commands::{
-        close::CloseResponse, credit::CreditResponse, deliver::DeliverCommand,
-        exchange_command_versions::ExchangeCommandVersionsResponse, generic::GenericResponse,
-        heart_beat::HeartbeatResponse, metadata::MetadataResponse,
+        close::CloseResponse, consumer_update::ConsumerUpdateCommand,
+        consumer_update_request::ConsumerUpdateRequestCommand, credit::CreditResponse,
+        deliver::DeliverCommand, exchange_command_versions::ExchangeCommandVersionsResponse,
+        generic::GenericResponse, heart_beat::HeartbeatResponse, metadata::MetadataResponse,
         metadata_update::MetadataUpdateCommand, open::OpenResponse,
         peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
         publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
         query_publisher_sequence::QueryPublisherResponse, sasl_handshake::SaslHandshakeResponse,
         superstream_partitions::SuperStreamPartitionsResponse,
-        superstream_route::SuperStreamRouteResponse, tune::TunesCommand, consumer_update::ConsumerUpdateCommand
+        superstream_route::SuperStreamRouteResponse, tune::TunesCommand,
     },
     error::DecodeError,
     protocol::commands::*,
@@ -73,6 +74,7 @@ pub enum ResponseKind {
     SuperStreamPartitions(SuperStreamPartitionsResponse),
     SuperStreamRoute(SuperStreamRouteResponse),
     ConsumerUpdate(ConsumerUpdateCommand),
+    ConsumerUpdateRequest(ConsumerUpdateRequestCommand),
 }
 
 impl Response {
@@ -110,6 +112,9 @@ impl Response {
             }
             ResponseKind::ConsumerUpdate(consumer_update_command) => {
                 Some(consumer_update_command.correlation_id)
+            }
+            ResponseKind::ConsumerUpdateRequest(consumer_update_request_command) => {
+                Some(consumer_update_request_command.correlation_id)
             }
         }
     }
@@ -155,6 +160,7 @@ impl Decoder for Response {
             | COMMAND_CREATE_STREAM
             | COMMAND_CREATE_SUPER_STREAM
             | COMMAND_DELETE_SUPER_STREAM
+            | COMMAND_CONSUMER_UPDATE_REQUEST
             | COMMAND_DELETE_STREAM => {
                 GenericResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Generic(kind)))?
             }
@@ -225,7 +231,8 @@ mod tests {
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
-            close::CloseResponse, deliver::DeliverCommand,
+            close::CloseResponse, consumer_update::ConsumerUpdateCommand,
+            consumer_update_request::ConsumerUpdateRequestCommand, deliver::DeliverCommand,
             exchange_command_versions::ExchangeCommandVersionsResponse, generic::GenericResponse,
             heart_beat::HeartbeatResponse, metadata::MetadataResponse,
             metadata_update::MetadataUpdateCommand, open::OpenResponse,
@@ -234,15 +241,15 @@ mod tests {
             query_publisher_sequence::QueryPublisherResponse,
             sasl_handshake::SaslHandshakeResponse,
             superstream_partitions::SuperStreamPartitionsResponse,
-            superstream_route::SuperStreamRouteResponse, tune::TunesCommand, consumer_update::ConsumerUpdateCommand
+            superstream_route::SuperStreamRouteResponse, tune::TunesCommand,
         },
         protocol::{
             commands::{
-                COMMAND_CLOSE, COMMAND_DELIVER, COMMAND_HEARTBEAT, COMMAND_METADATA,
-                COMMAND_METADATA_UPDATE, COMMAND_OPEN, COMMAND_PARTITIONS, COMMAND_PEER_PROPERTIES,
-                COMMAND_PUBLISH_CONFIRM, COMMAND_PUBLISH_ERROR, COMMAND_QUERY_OFFSET,
-                COMMAND_QUERY_PUBLISHER_SEQUENCE, COMMAND_ROUTE, COMMAND_SASL_AUTHENTICATE,
-                COMMAND_SASL_HANDSHAKE, COMMAND_TUNE, COMMAND_CONSUMER_UPDATE,
+                COMMAND_CLOSE, COMMAND_CONSUMER_UPDATE, COMMAND_CONSUMER_UPDATE_REQUEST,
+                COMMAND_DELIVER, COMMAND_HEARTBEAT, COMMAND_METADATA, COMMAND_METADATA_UPDATE,
+                COMMAND_OPEN, COMMAND_PARTITIONS, COMMAND_PEER_PROPERTIES, COMMAND_PUBLISH_CONFIRM,
+                COMMAND_PUBLISH_ERROR, COMMAND_QUERY_OFFSET, COMMAND_QUERY_PUBLISHER_SEQUENCE,
+                COMMAND_ROUTE, COMMAND_SASL_AUTHENTICATE, COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
             },
             version::PROTOCOL_VERSION,
         },
@@ -250,7 +257,6 @@ mod tests {
         types::Header,
         ResponseCode,
     };
-    use crate::protocol::commands::COMMAND_CONSUMER_UPDATE;
 
     impl Encoder for ResponseKind {
         fn encoded_size(&self) -> u32 {
@@ -283,6 +289,9 @@ mod tests {
                 }
                 ResponseKind::ConsumerUpdate(consumer_update_response) => {
                     consumer_update_response.encoded_size()
+                }
+                ResponseKind::ConsumerUpdateRequest(consumer_update_request_response) => {
+                    consumer_update_request_response.encoded_size()
                 }
             }
         }
@@ -320,6 +329,9 @@ mod tests {
                 }
                 ResponseKind::ConsumerUpdate(consumer_update_command_version) => {
                     consumer_update_command_version.encode(writer)
+                }
+                ResponseKind::ConsumerUpdateRequest(consumer_update_request_command_version) => {
+                    consumer_update_request_command_version.encode(writer)
                 }
             }
         }
@@ -515,6 +527,15 @@ mod tests {
             ConsumerUpdateCommand,
             ResponseKind::ConsumerUpdate,
             COMMAND_CONSUMER_UPDATE
+        );
+    }
+
+    #[test]
+    fn consumer_update_request_response_test() {
+        response_test!(
+            ConsumerUpdateRequestCommand,
+            ResponseKind::ConsumerUpdateRequest,
+            COMMAND_CONSUMER_UPDATE_REQUEST
         );
     }
 }

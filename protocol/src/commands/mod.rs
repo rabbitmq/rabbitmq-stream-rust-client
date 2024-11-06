@@ -1,6 +1,8 @@
 use crate::protocol::version::PROTOCOL_VERSION;
 
 pub mod close;
+pub mod consumer_update;
+pub mod consumer_update_request;
 pub mod create_stream;
 pub mod create_super_stream;
 pub mod credit;
@@ -29,7 +31,6 @@ pub mod superstream_partitions;
 pub mod superstream_route;
 pub mod tune;
 pub mod unsubscribe;
-pub mod consumer_update;
 
 pub trait Command {
     fn key(&self) -> u16;

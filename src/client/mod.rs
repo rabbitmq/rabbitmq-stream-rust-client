@@ -34,6 +34,7 @@ use tokio_rustls::{rustls, TlsConnector};
 use tokio_util::codec::Framed;
 use tracing::trace;
 
+use crate::{error::ClientError, RabbitMQStreamResult};
 pub use message::ClientMessage;
 pub use metadata::{Broker, StreamMetadata};
 pub use metrics::MetricsCollector;
@@ -70,8 +71,6 @@ use rabbitmq_stream_protocol::{
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseCode, ResponseKind,
 };
-
-use crate::{error::ClientError, RabbitMQStreamResult};
 
 pub use self::handler::{MessageHandler, MessageResult};
 use self::{

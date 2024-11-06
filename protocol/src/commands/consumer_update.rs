@@ -20,11 +20,7 @@ pub struct ConsumerUpdateCommand {
 }
 
 impl ConsumerUpdateCommand {
-    pub fn new(
-        correlation_id: u32,
-        subscription_id: u8,
-        active: u8,
-    ) -> Self {
+    pub fn new(correlation_id: u32, subscription_id: u8, active: u8) -> Self {
         Self {
             correlation_id,
             subscription_id,
@@ -75,7 +71,7 @@ impl Command for ConsumerUpdateCommand {
 mod tests {
     use crate::commands::tests::command_encode_decode_test;
 
-    use super::{ConsumerUpdateCommand};
+    use super::ConsumerUpdateCommand;
 
     #[test]
     fn subscribe_request_test() {

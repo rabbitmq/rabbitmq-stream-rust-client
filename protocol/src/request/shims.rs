@@ -2,7 +2,8 @@ use crate::commands::create_super_stream::CreateSuperStreamCommand;
 use crate::commands::delete_super_stream::DeleteSuperStreamCommand;
 use crate::{
     commands::{
-        close::CloseRequest, create_stream::CreateStreamCommand, credit::CreditCommand,
+        close::CloseRequest, consumer_update_request::ConsumerUpdateRequestCommand,
+        create_stream::CreateStreamCommand, credit::CreditCommand,
         declare_publisher::DeclarePublisherCommand, delete::Delete,
         delete_publisher::DeletePublisherCommand,
         exchange_command_versions::ExchangeCommandVersionsRequest, heart_beat::HeartBeatCommand,
@@ -162,5 +163,11 @@ impl From<SuperStreamPartitionsRequest> for RequestKind {
 impl From<SuperStreamRouteRequest> for RequestKind {
     fn from(cmd: SuperStreamRouteRequest) -> Self {
         RequestKind::SuperStreamRoute(cmd)
+    }
+}
+
+impl From<ConsumerUpdateRequestCommand> for RequestKind {
+    fn from(cmd: ConsumerUpdateRequestCommand) -> Self {
+        RequestKind::ConsumerUpdateRequest(cmd)
     }
 }

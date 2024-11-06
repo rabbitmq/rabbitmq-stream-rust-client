@@ -3,9 +3,9 @@ use std::io::Write;
 use crate::{
     codec::{decoder::read_u32, Decoder, Encoder},
     commands::{
-        close::CloseRequest, create_stream::CreateStreamCommand,
-        create_super_stream::CreateSuperStreamCommand, credit::CreditCommand,
-        declare_publisher::DeclarePublisherCommand, delete::Delete,
+        close::CloseRequest, consumer_update_request::ConsumerUpdateRequestCommand,
+        create_stream::CreateStreamCommand, create_super_stream::CreateSuperStreamCommand,
+        credit::CreditCommand, declare_publisher::DeclarePublisherCommand, delete::Delete,
         delete_publisher::DeletePublisherCommand, delete_super_stream::DeleteSuperStreamCommand,
         exchange_command_versions::ExchangeCommandVersionsRequest, heart_beat::HeartBeatCommand,
         metadata::MetadataCommand, open::OpenCommand, peer_properties::PeerPropertiesCommand,
@@ -68,6 +68,7 @@ pub enum RequestKind {
     DeleteSuperStream(DeleteSuperStreamCommand),
     SuperStreamPartitions(SuperStreamPartitionsRequest),
     SuperStreamRoute(SuperStreamRouteRequest),
+    ConsumerUpdateRequest(ConsumerUpdateRequestCommand),
 }
 
 impl Encoder for RequestKind {
@@ -105,6 +106,9 @@ impl Encoder for RequestKind {
                 super_stream_partitions.encoded_size()
             }
             RequestKind::SuperStreamRoute(super_stream_route) => super_stream_route.encoded_size(),
+            RequestKind::ConsumerUpdateRequest(consumer_update_request) => {
+                consumer_update_request.encoded_size()
+            }
         }
     }
 
@@ -142,6 +146,9 @@ impl Encoder for RequestKind {
                 super_stream_partition.encode(writer)
             }
             RequestKind::SuperStreamRoute(super_stream_route) => super_stream_route.encode(writer),
+            RequestKind::ConsumerUpdateRequest(consumer_update_request) => {
+                consumer_update_request.encode(writer)
+            }
         }
     }
 }
@@ -222,6 +229,9 @@ impl Decoder for Request {
             COMMAND_ROUTE => {
                 SuperStreamRouteRequest::decode(input).map(|(i, kind)| (i, kind.into()))?
             }
+            COMMAND_CONSUMER_UPDATE_REQUEST => {
+                ConsumerUpdateRequestCommand::decode(input).map(|(i, kind)| (i, kind.into()))?
+            }
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Request { header, kind: cmd }))
@@ -234,9 +244,9 @@ mod tests {
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
-            close::CloseRequest, create_stream::CreateStreamCommand,
-            create_super_stream::CreateSuperStreamCommand, credit::CreditCommand,
-            declare_publisher::DeclarePublisherCommand, delete::Delete,
+            close::CloseRequest, consumer_update_request::ConsumerUpdateRequestCommand,
+            create_stream::CreateStreamCommand, create_super_stream::CreateSuperStreamCommand,
+            credit::CreditCommand, declare_publisher::DeclarePublisherCommand, delete::Delete,
             delete_publisher::DeletePublisherCommand,
             delete_super_stream::DeleteSuperStreamCommand,
             exchange_command_versions::ExchangeCommandVersionsRequest,
@@ -386,5 +396,10 @@ mod tests {
     #[test]
     fn request_route_command() {
         request_encode_decode_test::<SuperStreamRouteRequest>()
+    }
+
+    #[test]
+    fn request_consumer_update_request_command() {
+        request_encode_decode_test::<ConsumerUpdateRequestCommand>()
     }
 }

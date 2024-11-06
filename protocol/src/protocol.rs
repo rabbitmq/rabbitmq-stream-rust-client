@@ -33,8 +33,6 @@ pub mod commands {
     pub const COMMAND_CREATE_SUPER_STREAM: u16 = 29;
     pub const COMMAND_DELETE_SUPER_STREAM: u16 = 30;
     pub const COMMAND_CONSUMER_UPDATE_REQUEST: u16 = 32794;
-
-
 }
 
 // server responses
