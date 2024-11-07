@@ -34,6 +34,7 @@ pub struct SuperStreamConsumerBuilder {
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
     pub(crate) client_provided_name: String,
+    pub(crate) properties: HashMap<String, String>,
 }
 
 impl SuperStreamConsumerBuilder {
@@ -63,6 +64,7 @@ impl SuperStreamConsumerBuilder {
                 .offset(self.offset_specification.clone())
                 .client_provided_name(self.client_provided_name.as_str())
                 .filter_input(self.filter_configuration.clone())
+                .properties(self.properties.clone())
                 .build(partition.as_str())
                 .await
                 .unwrap();

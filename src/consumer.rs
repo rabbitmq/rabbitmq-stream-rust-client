@@ -89,10 +89,11 @@ pub struct ConsumerBuilder {
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
     pub(crate) client_provided_name: String,
+    pub(crate) properties: HashMap<String, String>,
 }
 
 impl ConsumerBuilder {
-    pub async fn build(self, stream: &str) -> Result<Consumer, ConsumerCreateError> {
+    pub async fn build(mut self, stream: &str) -> Result<Consumer, ConsumerCreateError> {
         // Connect to the user specified node first, then look for a random replica to connect to instead.
         // This is recommended for load balancing purposes
 
@@ -161,18 +162,17 @@ impl ConsumerBuilder {
         let msg_handler = ConsumerMessageHandler(consumer.clone());
         client.set_handler(msg_handler).await;
 
-        let mut properties = HashMap::new();
         if let Some(filter_input) = self.filter_configuration {
             if !client.filtering_supported() {
                 return Err(ConsumerCreateError::FilteringNotSupport);
             }
             for (index, item) in filter_input.filter_values.iter().enumerate() {
                 let key = format!("filter.{}", index);
-                properties.insert(key, item.to_owned());
+                self.properties.insert(key, item.to_owned());
             }
 
             let match_unfiltered_key = "match-unfiltered".to_string();
-            properties.insert(
+            self.properties.insert(
                 match_unfiltered_key,
                 filter_input.match_unfiltered.to_string(),
             );
@@ -184,7 +184,7 @@ impl ConsumerBuilder {
                 stream,
                 self.offset_specification,
                 1,
-                properties,
+                self.properties.clone(),
             )
             .await?;
 
@@ -219,6 +219,11 @@ impl ConsumerBuilder {
 
     pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
         self.filter_configuration = filter_configuration;
+        self
+    }
+
+    pub fn properties(mut self, properties: HashMap<String, String>) -> Self {
+        self.properties = properties;
         self
     }
 }
