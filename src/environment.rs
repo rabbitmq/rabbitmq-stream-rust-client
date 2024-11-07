@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use crate::producer::NoDedup;
 use crate::types::OffsetSpecification;
+use std::collections::HashMap;
 
 use crate::{
     client::{Client, ClientOptions, MetricsCollector},
@@ -74,6 +75,7 @@ impl Environment {
             offset_specification: OffsetSpecification::Next,
             filter_configuration: None,
             client_provided_name: String::from("rust-stream-consumer"),
+            properties: HashMap::new(),
         }
     }
 
@@ -83,6 +85,7 @@ impl Environment {
             offset_specification: OffsetSpecification::Next,
             filter_configuration: None,
             client_provided_name: String::from("rust-super-stream-consumer"),
+            properties: HashMap::new(),
         }
     }
 
