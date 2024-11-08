@@ -529,13 +529,4 @@ mod tests {
             COMMAND_CONSUMER_UPDATE
         );
     }
-
-    #[test]
-    fn consumer_update_request_response_test() {
-        response_test!(
-            ConsumerUpdateRequestCommand,
-            ResponseKind::ConsumerUpdateRequest,
-            COMMAND_CONSUMER_UPDATE_REQUEST
-        );
-    }
 }

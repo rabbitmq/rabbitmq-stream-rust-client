@@ -26,10 +26,13 @@ use crate::{
     Client, ClientOptions, Environment, MetricsCollector,
 };
 use futures::{task::AtomicWaker, Stream};
+use rabbitmq_stream_protocol::commands::consumer_update::ConsumerUpdateCommand;
 use rand::rngs::StdRng;
 use rand::{seq::SliceRandom, SeedableRng};
 
 type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
+
+type ConsumerUpdateListener = Option<Arc<dyn Fn(bool, &MessageContext) -> u64 + Send + Sync>>;
 
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
@@ -79,6 +82,26 @@ impl FilterConfiguration {
     ) -> FilterConfiguration {
         self.predicate = Some(Arc::new(predicate));
         self
+    }
+}
+
+pub struct MessageContext {
+    consumer: Consumer,
+    subscriber_name: String,
+    reference: String,
+}
+
+impl MessageContext {
+    pub fn get_consumer(self) -> Consumer {
+        self.consumer
+    }
+
+    pub fn get_subscriber_name(self) -> String {
+        self.subscriber_name
+    }
+
+    pub fn get_reference(self) -> String {
+        self.reference
     }
 }
 
@@ -317,27 +340,27 @@ impl MessageHandler for ConsumerMessageHandler {
     async fn handle_message(&self, item: MessageResult) -> crate::RabbitMQStreamResult<()> {
         match item {
             Some(Ok(response)) => {
-                if let ResponseKind::Deliver(delivery) = response.kind() {
+                if let ResponseKind::Deliver(delivery) = response.kind_ref() {
                     let mut offset = delivery.chunk_first_offset;
 
                     let len = delivery.messages.len();
+                    let d = delivery.clone();
                     trace!("Got delivery with messages {}", len);
 
                     // // client filter
                     let messages = match &self.0.filter_configuration {
                         Some(filter_input) => {
                             if let Some(f) = &filter_input.predicate {
-                                delivery
-                                    .messages
+                                d.messages
                                     .into_iter()
                                     .filter(|message| f(message))
                                     .collect::<Vec<Message>>()
                             } else {
-                                delivery.messages
+                                d.messages
                             }
                         }
 
-                        None => delivery.messages,
+                        None => d.messages,
                     };
 
                     for message in messages {
@@ -363,6 +386,8 @@ impl MessageHandler for ConsumerMessageHandler {
                     // TODO handle credit fail
                     let _ = self.0.client.credit(self.0.subscription_id, 1).await;
                     self.0.metrics_collector.consume(len as u64).await;
+                } else {
+                    println!("other message arrived");
                 }
             }
             Some(Err(err)) => {
@@ -377,6 +402,7 @@ impl MessageHandler for ConsumerMessageHandler {
         Ok(())
     }
 }
+
 /// Envelope from incoming message
 #[derive(Debug)]
 pub struct Delivery {

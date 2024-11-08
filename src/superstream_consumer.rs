@@ -105,6 +105,11 @@ impl SuperStreamConsumerBuilder {
         self.client_provided_name = String::from(name);
         self
     }
+
+    pub fn properties(mut self, properties: HashMap<String, String>) -> Self {
+        self.properties = properties;
+        self
+    }
 }
 
 impl Stream for SuperStreamConsumer {

@@ -74,7 +74,7 @@ mod tests {
     use super::ConsumerUpdateCommand;
 
     #[test]
-    fn subscribe_request_test() {
+    fn consumer_update_response_test() {
         command_encode_decode_test::<ConsumerUpdateCommand>();
     }
 }

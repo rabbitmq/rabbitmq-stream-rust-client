@@ -80,7 +80,7 @@ mod tests {
     use super::ConsumerUpdateRequestCommand;
 
     #[test]
-    fn subscribe_request_test() {
+    fn consumer_update_request_test() {
         command_encode_decode_test::<ConsumerUpdateRequestCommand>();
     }
 }
