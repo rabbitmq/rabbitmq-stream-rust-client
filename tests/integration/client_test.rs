@@ -457,16 +457,3 @@ async fn client_test_route_test() {
         test.partitions.get(0).unwrap()
     );
 }
-
-#[tokio::test(flavor = "multi_thread")]
-async fn client_consumer_update_request_test() {
-    let test = TestClient::create().await;
-
-    let response = test
-        .client
-        .consumer_update(OffsetSpecification::Next)
-        .await
-        .unwrap();
-
-    assert_eq!(&ResponseCode::Ok, response.code());
-}

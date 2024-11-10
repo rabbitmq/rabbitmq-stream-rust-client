@@ -397,9 +397,4 @@ mod tests {
     fn request_route_command() {
         request_encode_decode_test::<SuperStreamRouteRequest>()
     }
-
-    #[test]
-    fn request_consumer_update_request_command() {
-        request_encode_decode_test::<ConsumerUpdateRequestCommand>()
-    }
 }

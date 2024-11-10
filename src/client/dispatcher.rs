@@ -168,7 +168,7 @@ where
             match result {
                 Ok(item) => match item.correlation_id() {
                     Some(correlation_id) => match item.kind_ref() {
-                        ResponseKind::ConsumerUpdate(consumer_update) => state.notify(item).await,
+                        ResponseKind::ConsumerUpdate(_) => state.notify(item).await,
                         _ => state.dispatch(correlation_id, item).await,
                     },
                     None => state.notify(item).await,

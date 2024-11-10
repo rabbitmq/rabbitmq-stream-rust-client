@@ -27,6 +27,14 @@ impl ConsumerUpdateCommand {
             active,
         }
     }
+
+    pub fn get_correlation_id(&self) -> u32 {
+        self.correlation_id
+    }
+
+    pub fn is_active(&self) -> u8 {
+        self.active
+    }
 }
 
 impl Encoder for ConsumerUpdateCommand {

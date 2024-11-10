@@ -1,8 +1,10 @@
 use crate::client::Client;
-use crate::consumer::Delivery;
+use crate::consumer::{ConsumerUpdateListener, Delivery};
 use crate::error::{ConsumerCloseError, ConsumerDeliveryError};
 use crate::superstream::DefaultSuperStreamMetadata;
-use crate::{error::ConsumerCreateError, ConsumerHandle, Environment, FilterConfiguration};
+use crate::{
+    error::ConsumerCreateError, ConsumerHandle, Environment, FilterConfiguration, MessageContext,
+};
 use futures::task::AtomicWaker;
 use futures::{Stream, StreamExt};
 use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
@@ -33,6 +35,7 @@ pub struct SuperStreamConsumerBuilder {
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
+    pub(crate) consumer_update_listener: Option<ConsumerUpdateListener>,
     pub(crate) client_provided_name: String,
     pub(crate) properties: HashMap<String, String>,
 }
@@ -64,6 +67,7 @@ impl SuperStreamConsumerBuilder {
                 .offset(self.offset_specification.clone())
                 .client_provided_name(self.client_provided_name.as_str())
                 .filter_input(self.filter_configuration.clone())
+                .consumer_update_arc(self.consumer_update_listener.clone())
                 .properties(self.properties.clone())
                 .build(partition.as_str())
                 .await
@@ -98,6 +102,18 @@ impl SuperStreamConsumerBuilder {
 
     pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
         self.filter_configuration = filter_configuration;
+        self
+    }
+
+    pub fn consumer_update(
+        mut self,
+        consumer_update_listener: impl Fn(u8, &MessageContext) -> OffsetSpecification
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
+        let f = Arc::new(consumer_update_listener);
+        self.consumer_update_listener = Some(f);
         self
     }
 

@@ -15,6 +15,8 @@ use rabbitmq_stream_protocol::{
     commands::subscribe::OffsetSpecification, message::Message, ResponseKind,
 };
 
+use core::option::Option::None;
+
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tracing::trace;
 
@@ -26,13 +28,13 @@ use crate::{
     Client, ClientOptions, Environment, MetricsCollector,
 };
 use futures::{task::AtomicWaker, Stream};
-use rabbitmq_stream_protocol::commands::consumer_update::ConsumerUpdateCommand;
 use rand::rngs::StdRng;
 use rand::{seq::SliceRandom, SeedableRng};
 
 type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
 
-type ConsumerUpdateListener = Option<Arc<dyn Fn(bool, &MessageContext) -> u64 + Send + Sync>>;
+pub type ConsumerUpdateListener =
+    Arc<dyn Fn(u8, &MessageContext) -> OffsetSpecification + Send + Sync>;
 
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
@@ -43,6 +45,7 @@ pub struct Consumer {
 }
 
 struct ConsumerInternal {
+    name: Option<String>,
     client: Client,
     stream: String,
     offset_specification: OffsetSpecification,
@@ -52,6 +55,7 @@ struct ConsumerInternal {
     waker: AtomicWaker,
     metrics_collector: Arc<dyn MetricsCollector>,
     filter_configuration: Option<FilterConfiguration>,
+    consumer_update_listener: Option<ConsumerUpdateListener>,
 }
 
 impl ConsumerInternal {
@@ -86,22 +90,17 @@ impl FilterConfiguration {
 }
 
 pub struct MessageContext {
-    consumer: Consumer,
-    subscriber_name: String,
-    reference: String,
+    consumer_name: Option<String>,
+    stream: String,
 }
 
 impl MessageContext {
-    pub fn get_consumer(self) -> Consumer {
-        self.consumer
+    pub fn get_name(self) -> Option<String> {
+        self.consumer_name
     }
 
-    pub fn get_subscriber_name(self) -> String {
-        self.subscriber_name
-    }
-
-    pub fn get_reference(self) -> String {
-        self.reference
+    pub fn get_stream(self) -> String {
+        self.stream
     }
 }
 
@@ -111,6 +110,7 @@ pub struct ConsumerBuilder {
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
+    pub(crate) consumer_update_listener: Option<ConsumerUpdateListener>,
     pub(crate) client_provided_name: String,
     pub(crate) properties: HashMap<String, String>,
 }
@@ -172,6 +172,7 @@ impl ConsumerBuilder {
         let subscription_id = 1;
         let (tx, rx) = channel(10000);
         let consumer = Arc::new(ConsumerInternal {
+            name: self.consumer_name.clone(),
             subscription_id,
             stream: stream.to_string(),
             client: client.clone(),
@@ -181,6 +182,7 @@ impl ConsumerBuilder {
             waker: AtomicWaker::new(),
             metrics_collector: collector,
             filter_configuration: self.filter_configuration.clone(),
+            consumer_update_listener: self.consumer_update_listener.clone(),
         });
         let msg_handler = ConsumerMessageHandler(consumer.clone());
         client.set_handler(msg_handler).await;
@@ -213,7 +215,7 @@ impl ConsumerBuilder {
 
         if response.is_ok() {
             Ok(Consumer {
-                name: self.consumer_name,
+                name: self.consumer_name.clone(),
                 receiver: rx,
                 internal: consumer,
             })
@@ -242,6 +244,26 @@ impl ConsumerBuilder {
 
     pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
         self.filter_configuration = filter_configuration;
+        self
+    }
+
+    pub fn consumer_update(
+        mut self,
+        consumer_update_listener: impl Fn(u8, &MessageContext) -> OffsetSpecification
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
+        let f = Arc::new(consumer_update_listener);
+        self.consumer_update_listener = Some(f);
+        self
+    }
+
+    pub fn consumer_update_arc(
+        mut self,
+        consumer_update_listener: Option<crate::consumer::ConsumerUpdateListener>,
+    ) -> Self {
+        self.consumer_update_listener = consumer_update_listener;
         self
     }
 
@@ -386,8 +408,41 @@ impl MessageHandler for ConsumerMessageHandler {
                     // TODO handle credit fail
                     let _ = self.0.client.credit(self.0.subscription_id, 1).await;
                     self.0.metrics_collector.consume(len as u64).await;
-                } else {
-                    println!("other message arrived");
+                } else if let ResponseKind::ConsumerUpdate(consumer_update) = response.kind_ref() {
+                    trace!("Received a ConsumerUpdate message");
+                    // If no callback is provided by the user we will restart from Next by protocol
+                    // We need to respond to the server too
+                    if self.0.consumer_update_listener.is_none() {
+                        trace!("User defined callback is not provided");
+                        let offset_specification = OffsetSpecification::Next;
+                        let _ = self
+                            .0
+                            .client
+                            .consumer_update(
+                                consumer_update.get_correlation_id(),
+                                offset_specification,
+                            )
+                            .await;
+                    } else {
+                        // Otherwise the Offset specification is returned by the user callback
+                        let is_active = consumer_update.is_active();
+                        let message_context = MessageContext {
+                            consumer_name: self.0.name.clone(),
+                            stream: self.0.stream.clone(),
+                        };
+                        let consumer_update_listener_callback =
+                            self.0.consumer_update_listener.clone().unwrap();
+                        let offset_specification =
+                            consumer_update_listener_callback(is_active, &message_context);
+                        let _ = self
+                            .0
+                            .client
+                            .consumer_update(
+                                consumer_update.get_correlation_id(),
+                                offset_specification,
+                            )
+                            .await;
+                    }
                 }
             }
             Some(Err(err)) => {

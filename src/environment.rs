@@ -74,6 +74,7 @@ impl Environment {
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
             filter_configuration: None,
+            consumer_update_listener: None,
             client_provided_name: String::from("rust-stream-consumer"),
             properties: HashMap::new(),
         }
@@ -84,6 +85,7 @@ impl Environment {
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
             filter_configuration: None,
+            consumer_update_listener: None,
             client_provided_name: String::from("rust-super-stream-consumer"),
             properties: HashMap::new(),
         }
