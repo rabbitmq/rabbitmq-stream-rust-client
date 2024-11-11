@@ -99,8 +99,8 @@ impl MessageContext {
         self.consumer_name
     }
 
-    pub fn get_stream(self) -> String {
-        self.stream
+    pub fn get_stream(&self) -> String {
+        self.stream.clone()
     }
 }
 
