@@ -804,27 +804,59 @@ async fn super_stream_single_active_consumer_test_with_callback() {
         .unwrap();
 
     let mut properties = HashMap::new();
+    let notify_received_messages = Arc::new(Notify::new());
+
+    let mut result_stream_name_1 = Arc::new(Mutex::new(String::from("")));
+    let mut result_stream_name_2 = Arc::new(Mutex::new(String::from("")));
+    let mut result_stream_name_3 = Arc::new(Mutex::new(String::from("")));
 
     properties.insert("single-active-consumer".to_string(), "true".to_string());
     properties.insert("name".to_string(), "consumer-group-1".to_string());
     properties.insert("super-stream".to_string(), env.super_stream.clone());
 
-    let mut is_active: u8 = 0;
-    let mut stream: String = String::from("");
+    let mut result_stream_name_outer = result_stream_name_1.clone();
+    let mut result_stream_name_2_outer = result_stream_name_2.clone();
+    let mut result_stream_name_3_outer = result_stream_name_3.clone();
 
     let mut super_stream_consumer: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
         .offset(OffsetSpecification::First)
-        .properties(properties)
         .consumer_update(move |active, message_context| {
-            let mut stream_int = stream.clone();
-            async move {
-                is_active = active;
-                stream_int = message_context.get_stream().clone();
-            };
+            let mut result_consumer_name_int = result_stream_name_outer.clone();
+            *result_consumer_name_int.lock().unwrap() = message_context.get_stream().clone();
+
             OffsetSpecification::First
         })
+        .properties(properties.clone())
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let mut super_stream_consumer_2: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .offset(OffsetSpecification::First)
+        .consumer_update(move |active, message_context| {
+            let mut result_consumer_name_int = result_stream_name_2_outer.clone();
+            *result_consumer_name_int.lock().unwrap() = message_context.get_stream().clone();
+            OffsetSpecification::First
+        })
+        .properties(properties.clone())
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let mut super_stream_consumer_3: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .offset(OffsetSpecification::First)
+        .consumer_update(move |active, message_context| {
+            let mut result_consumer_name_int = result_stream_name_3_outer.clone();
+            *result_consumer_name_int.lock().unwrap() = message_context.get_stream().clone();
+            OffsetSpecification::First
+        })
+        .properties(properties.clone())
         .build(&env.super_stream)
         .await
         .unwrap();
@@ -837,18 +869,68 @@ async fn super_stream_single_active_consumer_test_with_callback() {
             .unwrap();
     }
 
-    let mut received_messages = 0;
-    let handle = super_stream_consumer.handle();
+    let mut received_messages = Arc::new(AtomicU32::new(1));
+    let handle_consumer_1 = super_stream_consumer.handle();
+    let handle_consumer_2 = super_stream_consumer_2.handle();
+    let handle_consumer_3 = super_stream_consumer_3.handle();
 
-    while let _ = super_stream_consumer.next().await.unwrap() {
-        received_messages = received_messages + 1;
-        if received_messages == message_count {
-            break;
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
         }
-    }
+    });
 
-    assert!(received_messages == message_count);
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer_2.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
+        }
+    });
+
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer_3.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
+        }
+    });
+
+    notify_received_messages.notified().await;
+
+    assert!(received_messages.load(Ordering::Relaxed) == message_count + 1);
+    assert!(env
+        .partitions
+        .contains(&(*result_stream_name_1.clone().lock().unwrap())));
+    assert!(env
+        .partitions
+        .contains(&(*result_stream_name_2.clone().lock().unwrap())));
+    assert!(env
+        .partitions
+        .contains(&(*result_stream_name_3.clone().lock().unwrap())));
 
     super_stream_producer.close().await.unwrap();
-    _ = handle.close().await;
+    _ = handle_consumer_1.close().await;
+    _ = handle_consumer_2.close().await;
+    _ = handle_consumer_3.close().await;
 }

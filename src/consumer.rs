@@ -95,8 +95,8 @@ pub struct MessageContext {
 }
 
 impl MessageContext {
-    pub fn get_name(self) -> Option<String> {
-        self.consumer_name
+    pub fn get_name(&self) -> Option<String> {
+        self.consumer_name.clone()
     }
 
     pub fn get_stream(&self) -> String {
