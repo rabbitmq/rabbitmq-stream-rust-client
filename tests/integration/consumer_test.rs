@@ -787,6 +787,7 @@ async fn super_stream_single_active_consumer_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn super_stream_single_active_consumer_test_with_callback() {
     let env = TestEnvironment::create_super_stream().await;
+    let super_stream_consumer_name = "super-stream-with-sac-enabled";
 
     let message_count = 1000;
     let mut super_stream_producer = env
@@ -807,19 +808,29 @@ async fn super_stream_single_active_consumer_test_with_callback() {
     let mut result_stream_name_2 = Arc::new(Mutex::new(String::from("")));
     let mut result_stream_name_3 = Arc::new(Mutex::new(String::from("")));
 
+    let mut result_name_1 = Arc::new(Mutex::new(String::from("")));
+    let mut result_name_2 = Arc::new(Mutex::new(String::from("")));
+    let mut result_name_3 = Arc::new(Mutex::new(String::from("")));
+
     let mut result_stream_name_outer = result_stream_name_1.clone();
     let mut result_stream_name_2_outer = result_stream_name_2.clone();
     let mut result_stream_name_3_outer = result_stream_name_3.clone();
 
+    let mut result_name_1_outer = result_name_1.clone();
+    let mut result_name_2_outer = result_name_2.clone();
+    let mut result_name_3_outer = result_name_3.clone();
+
     let mut super_stream_consumer: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
-        .name("super-stream-with-sac-enabled")
+        .name(super_stream_consumer_name)
         .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
         .consumer_update(move |active, message_context| {
-            let mut result_consumer_name_int = result_stream_name_outer.clone();
-            *result_consumer_name_int.lock().unwrap() = message_context.get_stream().clone();
+            let mut result_stream_name_int = result_stream_name_outer.clone();
+            let mut result_consumer_name_int = result_name_1_outer.clone();
+            *result_stream_name_int.lock().unwrap() = message_context.get_stream().clone();
+            *result_consumer_name_int.lock().unwrap() = message_context.get_name().clone().unwrap();
 
             OffsetSpecification::First
         })
@@ -834,8 +845,10 @@ async fn super_stream_single_active_consumer_test_with_callback() {
         .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
         .consumer_update(move |active, message_context| {
-            let mut result_consumer_name_int = result_stream_name_2_outer.clone();
-            *result_consumer_name_int.lock().unwrap() = message_context.get_stream().clone();
+            let mut result_stream_name_int = result_stream_name_2_outer.clone();
+            let mut result_consumer_name_int = result_name_2_outer.clone();
+            *result_stream_name_int.lock().unwrap() = message_context.get_stream().clone();
+            *result_consumer_name_int.lock().unwrap() = message_context.get_name().clone().unwrap();
             OffsetSpecification::First
         })
         .build(&env.super_stream)
@@ -849,8 +862,10 @@ async fn super_stream_single_active_consumer_test_with_callback() {
         .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
         .consumer_update(move |active, message_context| {
-            let mut result_consumer_name_int = result_stream_name_3_outer.clone();
-            *result_consumer_name_int.lock().unwrap() = message_context.get_stream().clone();
+            let mut result_stream_name_int = result_stream_name_3_outer.clone();
+            let mut result_consumer_name_int = result_name_3_outer.clone();
+            *result_stream_name_int.lock().unwrap() = message_context.get_stream().clone();
+            *result_consumer_name_int.lock().unwrap() = message_context.get_name().clone().unwrap();
             OffsetSpecification::First
         })
         .build(&env.super_stream)
@@ -924,6 +939,9 @@ async fn super_stream_single_active_consumer_test_with_callback() {
     assert!(env
         .partitions
         .contains(&(*result_stream_name_3.clone().lock().unwrap())));
+    assert!(super_stream_consumer_name == *result_name_1.clone().lock().unwrap());
+    assert!(super_stream_consumer_name == *result_name_2.clone().lock().unwrap());
+    assert!(super_stream_consumer_name == *result_name_3.clone().lock().unwrap());
 
     super_stream_producer.close().await.unwrap();
     _ = handle_consumer_1.close().await;
