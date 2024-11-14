@@ -113,13 +113,20 @@ pub struct ConsumerBuilder {
     pub(crate) consumer_update_listener: Option<ConsumerUpdateListener>,
     pub(crate) client_provided_name: String,
     pub(crate) properties: HashMap<String, String>,
+    pub(crate) is_single_active_consumer: bool,
 }
 
 impl ConsumerBuilder {
     pub async fn build(mut self, stream: &str) -> Result<Consumer, ConsumerCreateError> {
+        if (self.is_single_active_consumer
+            || self.properties.contains_key("single-active-consumer"))
+            && self.consumer_name.is_none()
+        {
+            return Err(ConsumerCreateError::SingleActiveConsumerNotSupported);
+        }
+
         // Connect to the user specified node first, then look for a random replica to connect to instead.
         // This is recommended for load balancing purposes
-
         let mut opt_with_client_provided_name = self.environment.options.client_options.clone();
         opt_with_client_provided_name.client_provided_name = self.client_provided_name.clone();
 
@@ -203,6 +210,13 @@ impl ConsumerBuilder {
             );
         }
 
+        if self.is_single_active_consumer {
+            self.properties
+                .insert("single-active-consumer".to_string(), "true".to_string());
+            self.properties
+                .insert("name".to_string(), self.consumer_name.clone().unwrap());
+        }
+
         let response = client
             .subscribe(
                 subscription_id,
@@ -239,6 +253,16 @@ impl ConsumerBuilder {
 
     pub fn name(mut self, consumer_name: &str) -> Self {
         self.consumer_name = Some(String::from(consumer_name));
+        self
+    }
+
+    pub fn name_optional(mut self, consumer_name: Option<String>) -> Self {
+        self.consumer_name = consumer_name;
+        self
+    }
+
+    pub fn enable_single_active_consumer(mut self, is_single_active_consumer: bool) -> Self {
+        self.is_single_active_consumer = is_single_active_consumer;
         self
     }
 

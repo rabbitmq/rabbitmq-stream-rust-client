@@ -34,23 +34,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         super_stream
     );
 
-    let mut properties = HashMap::new();
-
-    properties.insert("single-active-consumer".to_string(), "true".to_string());
-    properties.insert("name".to_string(), "consumer-group-1".to_string());
-    properties.insert("super-stream".to_string(), "hello-rust-super-stream".to_string());
-
     let mut super_stream_consumer: SuperStreamConsumer = environment
         .super_stream_consumer()
+        // Mandatory if sac is enabled
+        .name("consumer-group-1")
         .offset(OffsetSpecification::First)
+        .enable_single_active_consumer(true)
         .client_provided_name("my super stream consumer for hello rust")
-        /*We can decide a strategy to manage Offset specification in single active consumer based on is_active flag
-        By default if this clousure is not present the default strategy OffsetSpecification::NEXT will be set.*/
         .consumer_update(move |active, message_context| {
             println!("single active consumer: is active: {} on stream {}", active, message_context.get_stream());
             OffsetSpecification::First
         })
-        .properties(properties)
         .build(super_stream)
         .await
         .unwrap();

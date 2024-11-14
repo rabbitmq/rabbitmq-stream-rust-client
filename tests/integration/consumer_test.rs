@@ -687,18 +687,14 @@ async fn super_stream_single_active_consumer_test() {
         .await
         .unwrap();
 
-    let mut properties = HashMap::new();
     let notify_received_messages = Arc::new(Notify::new());
-
-    properties.insert("single-active-consumer".to_string(), "true".to_string());
-    properties.insert("name".to_string(), "consumer-group-1".to_string());
-    properties.insert("super-stream".to_string(), env.super_stream.clone());
 
     let mut super_stream_consumer: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
-        .properties(properties.clone())
         .build(&env.super_stream)
         .await
         .unwrap();
@@ -706,8 +702,9 @@ async fn super_stream_single_active_consumer_test() {
     let mut super_stream_consumer_2: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
-        .properties(properties.clone())
         .build(&env.super_stream)
         .await
         .unwrap();
@@ -715,8 +712,9 @@ async fn super_stream_single_active_consumer_test() {
     let mut super_stream_consumer_3: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
-        .properties(properties.clone())
         .build(&env.super_stream)
         .await
         .unwrap();
@@ -803,16 +801,11 @@ async fn super_stream_single_active_consumer_test_with_callback() {
         .await
         .unwrap();
 
-    let mut properties = HashMap::new();
     let notify_received_messages = Arc::new(Notify::new());
 
     let mut result_stream_name_1 = Arc::new(Mutex::new(String::from("")));
     let mut result_stream_name_2 = Arc::new(Mutex::new(String::from("")));
     let mut result_stream_name_3 = Arc::new(Mutex::new(String::from("")));
-
-    properties.insert("single-active-consumer".to_string(), "true".to_string());
-    properties.insert("name".to_string(), "consumer-group-1".to_string());
-    properties.insert("super-stream".to_string(), env.super_stream.clone());
 
     let mut result_stream_name_outer = result_stream_name_1.clone();
     let mut result_stream_name_2_outer = result_stream_name_2.clone();
@@ -821,6 +814,8 @@ async fn super_stream_single_active_consumer_test_with_callback() {
     let mut super_stream_consumer: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
         .consumer_update(move |active, message_context| {
             let mut result_consumer_name_int = result_stream_name_outer.clone();
@@ -828,7 +823,6 @@ async fn super_stream_single_active_consumer_test_with_callback() {
 
             OffsetSpecification::First
         })
-        .properties(properties.clone())
         .build(&env.super_stream)
         .await
         .unwrap();
@@ -836,13 +830,14 @@ async fn super_stream_single_active_consumer_test_with_callback() {
     let mut super_stream_consumer_2: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
         .consumer_update(move |active, message_context| {
             let mut result_consumer_name_int = result_stream_name_2_outer.clone();
             *result_consumer_name_int.lock().unwrap() = message_context.get_stream().clone();
             OffsetSpecification::First
         })
-        .properties(properties.clone())
         .build(&env.super_stream)
         .await
         .unwrap();
@@ -850,13 +845,14 @@ async fn super_stream_single_active_consumer_test_with_callback() {
     let mut super_stream_consumer_3: SuperStreamConsumer = env
         .env
         .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
         .offset(OffsetSpecification::First)
         .consumer_update(move |active, message_context| {
             let mut result_consumer_name_int = result_stream_name_3_outer.clone();
             *result_consumer_name_int.lock().unwrap() = message_context.get_stream().clone();
             OffsetSpecification::First
         })
-        .properties(properties.clone())
         .build(&env.super_stream)
         .await
         .unwrap();

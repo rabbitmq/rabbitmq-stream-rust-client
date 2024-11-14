@@ -77,17 +77,20 @@ impl Environment {
             consumer_update_listener: None,
             client_provided_name: String::from("rust-stream-consumer"),
             properties: HashMap::new(),
+            is_single_active_consumer: false,
         }
     }
 
     pub fn super_stream_consumer(&self) -> SuperStreamConsumerBuilder {
         SuperStreamConsumerBuilder {
+            super_stream_consumer_name: None,
             environment: self.clone(),
             offset_specification: OffsetSpecification::Next,
             filter_configuration: None,
             consumer_update_listener: None,
             client_provided_name: String::from("rust-super-stream-consumer"),
             properties: HashMap::new(),
+            is_single_active_consumer: false,
         }
     }
 

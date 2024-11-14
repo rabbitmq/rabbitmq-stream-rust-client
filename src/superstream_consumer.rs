@@ -32,21 +32,30 @@ struct SuperStreamConsumerInternal {
 
 /// Builder for [`Consumer`]
 pub struct SuperStreamConsumerBuilder {
+    pub(crate) super_stream_consumer_name: Option<String>,
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
     pub(crate) consumer_update_listener: Option<ConsumerUpdateListener>,
     pub(crate) client_provided_name: String,
+    pub(crate) is_single_active_consumer: bool,
     pub(crate) properties: HashMap<String, String>,
 }
 
 impl SuperStreamConsumerBuilder {
     pub async fn build(
-        self,
+        &mut self,
         super_stream: &str,
     ) -> Result<SuperStreamConsumer, ConsumerCreateError> {
         // Connect to the user specified node first, then look for a random replica to connect to instead.
         // This is recommended for load balancing purposes.
+        if (self.is_single_active_consumer
+            || self.properties.contains_key("single-active-consumer"))
+            && self.super_stream_consumer_name.is_none()
+        {
+            return Err(ConsumerCreateError::SingleActiveConsumerNotSupported);
+        }
+
         let client = self.environment.create_client().await?;
         let (tx, rx) = channel(10000);
 
@@ -58,17 +67,24 @@ impl SuperStreamConsumerBuilder {
         };
         let partitions = super_stream_metadata.partitions().await;
 
+        if self.is_single_active_consumer {
+            self.properties
+                .insert("super-stream".to_string(), super_stream.to_string());
+        }
+
         let mut handlers = Vec::<ConsumerHandle>::new();
         for partition in partitions.into_iter() {
             let tx_cloned = tx.clone();
             let mut consumer = self
                 .environment
                 .consumer()
+                .name_optional(self.super_stream_consumer_name.clone())
                 .offset(self.offset_specification.clone())
                 .client_provided_name(self.client_provided_name.as_str())
                 .filter_input(self.filter_configuration.clone())
                 .consumer_update_arc(self.consumer_update_listener.clone())
                 .properties(self.properties.clone())
+                .enable_single_active_consumer(self.is_single_active_consumer)
                 .build(partition.as_str())
                 .await
                 .unwrap();
@@ -97,6 +113,16 @@ impl SuperStreamConsumerBuilder {
 
     pub fn offset(mut self, offset_specification: OffsetSpecification) -> Self {
         self.offset_specification = offset_specification;
+        self
+    }
+
+    pub fn name(mut self, consumer_name: &str) -> Self {
+        self.super_stream_consumer_name = Some(String::from(consumer_name));
+        self
+    }
+
+    pub fn enable_single_active_consumer(mut self, is_single_active_consumer: bool) -> Self {
+        self.is_single_active_consumer = is_single_active_consumer;
         self
     }
 
