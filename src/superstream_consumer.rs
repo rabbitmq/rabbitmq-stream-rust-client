@@ -131,7 +131,7 @@ impl SuperStreamConsumerBuilder {
         self
     }
 
-    pub fn consumer_update(
+    pub fn consumer_update<Fut>(
         mut self,
         consumer_update_listener: impl Fn(u8, &MessageContext) -> OffsetSpecification
             + Send

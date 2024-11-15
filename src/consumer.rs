@@ -89,18 +89,24 @@ impl FilterConfiguration {
     }
 }
 
+#[derive(Clone)]
 pub struct MessageContext {
-    consumer_name: Option<String>,
+    name: String,
     stream: String,
+    client: Client,
 }
 
 impl MessageContext {
-    pub fn get_name(&self) -> Option<String> {
-        self.consumer_name.clone()
+    pub fn name(&self) -> String {
+        self.name.clone()
     }
 
-    pub fn get_stream(&self) -> String {
+    pub fn stream(&self) -> String {
         self.stream.clone()
+    }
+
+    pub fn client(&self) -> Client {
+        self.client.clone()
     }
 }
 
@@ -451,8 +457,9 @@ impl MessageHandler for ConsumerMessageHandler {
                         // Otherwise the Offset specification is returned by the user callback
                         let is_active = consumer_update.is_active();
                         let message_context = MessageContext {
-                            consumer_name: self.0.name.clone(),
+                            name: self.0.name.clone().unwrap(),
                             stream: self.0.stream.clone(),
+                            client: self.0.client.clone(),
                         };
                         let consumer_update_listener_callback =
                             self.0.consumer_update_listener.clone().unwrap();
