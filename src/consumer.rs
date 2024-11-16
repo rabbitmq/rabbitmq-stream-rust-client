@@ -16,7 +16,8 @@ use rabbitmq_stream_protocol::{
 };
 
 use core::option::Option::None;
-
+use futures::FutureExt;
+use std::future::Future;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tracing::trace;
 
@@ -27,14 +28,14 @@ use crate::{
     error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
     Client, ClientOptions, Environment, MetricsCollector,
 };
-use futures::{task::AtomicWaker, Stream};
+use futures::{future::BoxFuture, task::AtomicWaker, Stream};
 use rand::rngs::StdRng;
 use rand::{seq::SliceRandom, SeedableRng};
 
 type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
 
 pub type ConsumerUpdateListener =
-    Arc<dyn Fn(u8, &MessageContext) -> OffsetSpecification + Send + Sync>;
+    Arc<dyn Fn(u8, MessageContext) -> BoxFuture<'static, OffsetSpecification> + Send + Sync>;
 
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
@@ -277,14 +278,14 @@ impl ConsumerBuilder {
         self
     }
 
-    pub fn consumer_update(
+    pub fn consumer_update<Fut>(
         mut self,
-        consumer_update_listener: impl Fn(u8, &MessageContext) -> OffsetSpecification
-            + Send
-            + Sync
-            + 'static,
-    ) -> Self {
-        let f = Arc::new(consumer_update_listener);
+        consumer_update_listener: impl Fn(u8, MessageContext) -> Fut + Send + Sync + 'static,
+    ) -> Self
+    where
+        Fut: Future<Output = OffsetSpecification> + Send + Sync + 'static,
+    {
+        let f = Arc::new(move |a, b| consumer_update_listener(a, b).boxed());
         self.consumer_update_listener = Some(f);
         self
     }
@@ -464,7 +465,7 @@ impl MessageHandler for ConsumerMessageHandler {
                         let consumer_update_listener_callback =
                             self.0.consumer_update_listener.clone().unwrap();
                         let offset_specification =
-                            consumer_update_listener_callback(is_active, &message_context);
+                            consumer_update_listener_callback(is_active, message_context).await;
                         let _ = self
                             .0
                             .client

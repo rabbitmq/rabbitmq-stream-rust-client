@@ -6,9 +6,12 @@ use crate::{
     error::ConsumerCreateError, ConsumerHandle, Environment, FilterConfiguration, MessageContext,
 };
 use futures::task::AtomicWaker;
-use futures::{Stream, StreamExt};
+use futures::FutureExt;
+use futures::Stream;
+use futures::StreamExt;
 use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
 use std::collections::HashMap;
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
@@ -130,15 +133,14 @@ impl SuperStreamConsumerBuilder {
         self.filter_configuration = filter_configuration;
         self
     }
-
     pub fn consumer_update<Fut>(
         mut self,
-        consumer_update_listener: impl Fn(u8, &MessageContext) -> OffsetSpecification
-            + Send
-            + Sync
-            + 'static,
-    ) -> Self {
-        let f = Arc::new(consumer_update_listener);
+        consumer_update_listener: impl Fn(u8, MessageContext) -> Fut + Send + Sync + 'static,
+    ) -> Self
+    where
+        Fut: Future<Output = OffsetSpecification> + Send + Sync + 'static,
+    {
+        let f = Arc::new(move |a, b| consumer_update_listener(a, b).boxed());
         self.consumer_update_listener = Some(f);
         self
     }

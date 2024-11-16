@@ -829,10 +829,12 @@ async fn super_stream_single_active_consumer_test_with_callback() {
         .consumer_update(move |active, message_context| {
             let mut result_stream_name_int = result_stream_name_outer.clone();
             let mut result_consumer_name_int = result_name_1_outer.clone();
-            *result_stream_name_int.lock().unwrap() = message_context.get_stream().clone();
-            *result_consumer_name_int.lock().unwrap() = message_context.get_name().clone().unwrap();
+            async move {
+                *result_stream_name_int.lock().unwrap() = message_context.stream().clone();
+                *result_consumer_name_int.lock().unwrap() = message_context.name().clone();
 
-            OffsetSpecification::First
+                OffsetSpecification::First
+            }
         })
         .build(&env.super_stream)
         .await
@@ -847,9 +849,11 @@ async fn super_stream_single_active_consumer_test_with_callback() {
         .consumer_update(move |active, message_context| {
             let mut result_stream_name_int = result_stream_name_2_outer.clone();
             let mut result_consumer_name_int = result_name_2_outer.clone();
-            *result_stream_name_int.lock().unwrap() = message_context.get_stream().clone();
-            *result_consumer_name_int.lock().unwrap() = message_context.get_name().clone().unwrap();
-            OffsetSpecification::First
+            async move {
+                *result_stream_name_int.lock().unwrap() = message_context.stream().clone();
+                *result_consumer_name_int.lock().unwrap() = message_context.name().clone();
+                OffsetSpecification::First
+            }
         })
         .build(&env.super_stream)
         .await
@@ -864,9 +868,11 @@ async fn super_stream_single_active_consumer_test_with_callback() {
         .consumer_update(move |active, message_context| {
             let mut result_stream_name_int = result_stream_name_3_outer.clone();
             let mut result_consumer_name_int = result_name_3_outer.clone();
-            *result_stream_name_int.lock().unwrap() = message_context.get_stream().clone();
-            *result_consumer_name_int.lock().unwrap() = message_context.get_name().clone().unwrap();
-            OffsetSpecification::First
+            async move {
+                *result_stream_name_int.lock().unwrap() = message_context.stream().clone();
+                *result_consumer_name_int.lock().unwrap() = message_context.name().clone();
+                OffsetSpecification::First
+            }
         })
         .build(&env.super_stream)
         .await
