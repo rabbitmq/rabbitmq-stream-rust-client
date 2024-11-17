@@ -178,6 +178,10 @@ impl SuperStreamConsumer {
     pub fn handle(&self) -> SuperStreamConsumerHandle {
         SuperStreamConsumerHandle(self.internal.clone())
     }
+
+    pub fn client(&self) -> Client {
+        self.internal.client.clone()
+    }
 }
 
 impl SuperStreamConsumerInternal {

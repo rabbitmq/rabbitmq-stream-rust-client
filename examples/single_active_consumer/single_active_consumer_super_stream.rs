@@ -41,9 +41,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .offset(OffsetSpecification::First)
         .enable_single_active_consumer(true)
         .client_provided_name("my super stream consumer for hello rust")
-        .consumer_update(move |active, message_context| {
-            println!("single active consumer: is active: {} on stream {}", active, message_context.get_stream());
-            OffsetSpecification::First
+        .consumer_update(move |active, message_context|  async move {
+            let name = message_context.name();
+            let stream = message_context.stream();
+            let client = message_context.client();
+
+            println!(
+                "single active consumer: is active: {} on stream: {} with consumer_name: {}",
+                active, stream, name
+            );
+            let stored_offset = client.query_offset(name, stream.as_str()).await;
+
+            if let Err(e) = stored_offset {
+                return OffsetSpecification::First;
+            }
+            let stored_offset_u = stored_offset.unwrap();
+            println!("stored_offset_u {}", stored_offset_u.clone());
+            OffsetSpecification::Offset(stored_offset_u)
+
         })
         .build(super_stream)
         .await
@@ -63,6 +78,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 delivery.stream(),
                 delivery.offset()
             );
+
+            // Store an offset for every consumer
+            if delivery.consumer_name().is_some() && delivery.offset() == 1000   {
+                super_stream_consumer.client().store_offset(delivery.consumer_name().unwrap().as_str(), delivery.stream().as_str(), delivery.offset()).await;
+            }
+
         }
     }
 
