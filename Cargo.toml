@@ -16,7 +16,8 @@ readme = "README.md"
 members = [
     ".",
     "protocol",
-    "benchmark"
+    "benchmark",
+    "examples/super_stream_single_active_consumer", "examples/test_ss",
 ]
 
 

@@ -45,13 +45,13 @@ impl SuperStreamProducer<NoDedup> {
         &mut self,
         message: Message,
         cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut
-            + Send
-            + Sync
-            + 'static
-            + Clone,
+        + Send
+        + Sync
+        + 'static
+        + Clone,
     ) -> Result<(), SuperStreamProducerPublishError>
     where
-        Fut: Future<Output = ()> + Send + Sync + 'static,
+        Fut: Future<Output=()> + Send + Sync + 'static,
     {
         let routes = match &self.4 {
             RoutingStrategy::HashRoutingStrategy(routing_strategy) => {
@@ -68,6 +68,7 @@ impl SuperStreamProducer<NoDedup> {
 
         for route in routes.into_iter() {
             if !self.1.contains_key(route.as_str()) {
+                println!("Sending message to route: {}", route);
                 let producer = self
                     .0
                     .environment
