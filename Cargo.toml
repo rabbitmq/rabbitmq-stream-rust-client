@@ -17,7 +17,7 @@ members = [
     ".",
     "protocol",
     "benchmark",
-    "examples/super_stream_single_active_consumer", "examples/test_ss",
+    "examples/super_stream_single_active_consumer",
 ]
 
 
