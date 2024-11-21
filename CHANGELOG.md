@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.6.1...rabbitmq-stream-client-v0.7.0) - 2024-11-21
+
+### Other
+
+- reviewing sac example ([#258](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/258))
+- Update thiserror requirement from 1.0 to 2.0 ([#247](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/247))
+- Single active consumer implementation ([#248](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/248))
+- Bump codecov/codecov-action from 4.6.0 to 5.0.2 ([#256](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/256))
+- Bump codecov/codecov-action from 4.5.0 to 4.6.0 ([#254](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/254))
+- Bump actions-rs/toolchain from 1.0.6 to 1.0.7 ([#255](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/255))
+- Bump docker/build-push-action from 5 to 6 ([#253](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/253))
+- add ability to include properties to the consumers during subscriptions ([#249](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/249))
+
 ## [0.6.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.6.0...rabbitmq-stream-client-v0.6.1) - 2024-11-05
 
 ### Fixed
