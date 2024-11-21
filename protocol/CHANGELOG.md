@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.6.0...rabbitmq-stream-protocol-v0.7.0) - 2024-11-21
+
+### Other
+
+- Update fake requirement from 2.5 to 3.0 ([#251](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/251))
+- Single active consumer implementation ([#248](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/248))
+
 ## [0.6.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.5.0...rabbitmq-stream-protocol-v0.6.0) - 2024-10-31
 
 ### Other
