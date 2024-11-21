@@ -16,7 +16,7 @@ ordered-float = "4.1.0"
 uuid = "1"
 chrono = "0.4.26"
 num_enum = "0.7.0"
-derive_more = "0.99"
+derive_more = "1.0"
 
 [dev-dependencies]
 fake = { version = "3.0", features=['derive', 'chrono','uuid']}
