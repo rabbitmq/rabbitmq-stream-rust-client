@@ -159,6 +159,9 @@ pub enum ConsumerCreateError {
 
     #[error("Filtering is not supported by the broker (requires RabbitMQ 3.13+ and stream_filtering feature flag activated)")]
     FilteringNotSupport,
+
+    #[error("if you set single active consumer a consumer and super_stream consumer name need to be setup")]
+    SingleActiveConsumerNotSupported,
 }
 
 #[derive(Error, Debug)]

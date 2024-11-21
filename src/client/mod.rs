@@ -34,6 +34,7 @@ use tokio_rustls::{rustls, TlsConnector};
 use tokio_util::codec::Framed;
 use tracing::trace;
 
+use crate::{error::ClientError, RabbitMQStreamResult};
 pub use message::ClientMessage;
 pub use metadata::{Broker, StreamMetadata};
 pub use metrics::MetricsCollector;
@@ -41,6 +42,7 @@ pub use options::ClientOptions;
 use rabbitmq_stream_protocol::{
     commands::{
         close::{CloseRequest, CloseResponse},
+        consumer_update_request::ConsumerUpdateRequestCommand,
         create_stream::CreateStreamCommand,
         create_super_stream::CreateSuperStreamCommand,
         credit::CreditCommand,
@@ -70,8 +72,6 @@ use rabbitmq_stream_protocol::{
     types::PublishedMessage,
     FromResponse, Request, Response, ResponseCode, ResponseKind,
 };
-
-use crate::{error::ClientError, RabbitMQStreamResult};
 
 pub use self::handler::{MessageHandler, MessageResult};
 use self::{
@@ -851,5 +851,16 @@ impl Client {
             .with_no_client_auth();
 
         Ok(config)
+    }
+
+    pub async fn consumer_update(
+        &self,
+        correlation_id: u32,
+        offset_specification: OffsetSpecification,
+    ) -> RabbitMQStreamResult<GenericResponse> {
+        self.send_and_receive(|_| {
+            ConsumerUpdateRequestCommand::new(correlation_id, 1, offset_specification)
+        })
+        .await
     }
 }

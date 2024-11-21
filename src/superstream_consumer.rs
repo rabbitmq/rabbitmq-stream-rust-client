@@ -1,12 +1,17 @@
 use crate::client::Client;
-use crate::consumer::Delivery;
+use crate::consumer::{ConsumerUpdateListener, Delivery};
 use crate::error::{ConsumerCloseError, ConsumerDeliveryError};
 use crate::superstream::DefaultSuperStreamMetadata;
-use crate::{error::ConsumerCreateError, ConsumerHandle, Environment, FilterConfiguration};
+use crate::{
+    error::ConsumerCreateError, ConsumerHandle, Environment, FilterConfiguration, MessageContext,
+};
 use futures::task::AtomicWaker;
-use futures::{Stream, StreamExt};
+use futures::FutureExt;
+use futures::Stream;
+use futures::StreamExt;
 use rabbitmq_stream_protocol::commands::subscribe::OffsetSpecification;
 use std::collections::HashMap;
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
@@ -30,20 +35,30 @@ struct SuperStreamConsumerInternal {
 
 /// Builder for [`Consumer`]
 pub struct SuperStreamConsumerBuilder {
+    pub(crate) super_stream_consumer_name: Option<String>,
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
+    pub(crate) consumer_update_listener: Option<ConsumerUpdateListener>,
     pub(crate) client_provided_name: String,
+    pub(crate) is_single_active_consumer: bool,
     pub(crate) properties: HashMap<String, String>,
 }
 
 impl SuperStreamConsumerBuilder {
     pub async fn build(
-        self,
+        &mut self,
         super_stream: &str,
     ) -> Result<SuperStreamConsumer, ConsumerCreateError> {
         // Connect to the user specified node first, then look for a random replica to connect to instead.
         // This is recommended for load balancing purposes.
+        if (self.is_single_active_consumer
+            || self.properties.contains_key("single-active-consumer"))
+            && self.super_stream_consumer_name.is_none()
+        {
+            return Err(ConsumerCreateError::SingleActiveConsumerNotSupported);
+        }
+
         let client = self.environment.create_client().await?;
         let (tx, rx) = channel(10000);
 
@@ -55,16 +70,24 @@ impl SuperStreamConsumerBuilder {
         };
         let partitions = super_stream_metadata.partitions().await;
 
+        if self.is_single_active_consumer {
+            self.properties
+                .insert("super-stream".to_string(), super_stream.to_string());
+        }
+
         let mut handlers = Vec::<ConsumerHandle>::new();
         for partition in partitions.into_iter() {
             let tx_cloned = tx.clone();
             let mut consumer = self
                 .environment
                 .consumer()
+                .name_optional(self.super_stream_consumer_name.clone())
                 .offset(self.offset_specification.clone())
                 .client_provided_name(self.client_provided_name.as_str())
                 .filter_input(self.filter_configuration.clone())
+                .consumer_update_arc(self.consumer_update_listener.clone())
                 .properties(self.properties.clone())
+                .enable_single_active_consumer(self.is_single_active_consumer)
                 .build(partition.as_str())
                 .await
                 .unwrap();
@@ -96,13 +119,39 @@ impl SuperStreamConsumerBuilder {
         self
     }
 
+    pub fn name(mut self, consumer_name: &str) -> Self {
+        self.super_stream_consumer_name = Some(String::from(consumer_name));
+        self
+    }
+
+    pub fn enable_single_active_consumer(mut self, is_single_active_consumer: bool) -> Self {
+        self.is_single_active_consumer = is_single_active_consumer;
+        self
+    }
+
     pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
         self.filter_configuration = filter_configuration;
+        self
+    }
+    pub fn consumer_update<Fut>(
+        mut self,
+        consumer_update_listener: impl Fn(u8, MessageContext) -> Fut + Send + Sync + 'static,
+    ) -> Self
+    where
+        Fut: Future<Output = OffsetSpecification> + Send + Sync + 'static,
+    {
+        let f = Arc::new(move |a, b| consumer_update_listener(a, b).boxed());
+        self.consumer_update_listener = Some(f);
         self
     }
 
     pub fn client_provided_name(mut self, name: &str) -> Self {
         self.client_provided_name = String::from(name);
+        self
+    }
+
+    pub fn properties(mut self, properties: HashMap<String, String>) -> Self {
+        self.properties = properties;
         self
     }
 }
@@ -128,6 +177,10 @@ impl SuperStreamConsumer {
 
     pub fn handle(&self) -> SuperStreamConsumerHandle {
         SuperStreamConsumerHandle(self.internal.clone())
+    }
+
+    pub fn client(&self) -> Client {
+        self.internal.client.clone()
     }
 }
 

@@ -11,15 +11,17 @@ use rabbitmq_stream_client::{
     types::{Delivery, Message, OffsetSpecification, SuperStreamConsumer},
     Consumer, FilterConfiguration, NoDedup, Producer,
 };
-use tokio::task;
-use tokio::time::sleep;
+use std::collections::HashMap;
 
 use crate::producer_test::routing_key_strategy_value_extractor;
+use rabbitmq_stream_client::types::MessageContext;
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
 use rabbitmq_stream_protocol::ResponseCode;
 use std::sync::atomic::{AtomicU32, Ordering};
+use tokio::sync::Notify;
+use tokio::task;
 use {std::sync::Arc, std::sync::Mutex};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -666,4 +668,289 @@ async fn consumer_test_with_filtering_match_unfiltered() {
         .len();
 
     assert!(repsonse_length == filtering_response_length);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn super_stream_single_active_consumer_test() {
+    let env = TestEnvironment::create_super_stream().await;
+
+    let message_count = 1000;
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
+            HashRoutingMurmurStrategy {
+                routing_extractor: &hash_strategy_value_extractor,
+            },
+        ))
+        .client_provided_name("test super stream consumer ")
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let notify_received_messages = Arc::new(Notify::new());
+
+    let mut super_stream_consumer: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
+        .offset(OffsetSpecification::First)
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let mut super_stream_consumer_2: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
+        .offset(OffsetSpecification::First)
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let mut super_stream_consumer_3: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
+        .offset(OffsetSpecification::First)
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    for n in 0..message_count {
+        let msg = Message::builder().body(format!("message{}", n)).build();
+        let _ = super_stream_producer
+            .send(msg, |confirmation_status| async move {})
+            .await
+            .unwrap();
+    }
+
+    let mut received_messages = Arc::new(AtomicU32::new(1));
+    let handle_consumer_1 = super_stream_consumer.handle();
+    let handle_consumer_2 = super_stream_consumer_2.handle();
+    let handle_consumer_3 = super_stream_consumer_3.handle();
+
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
+        }
+    });
+
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer_2.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
+        }
+    });
+
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer_3.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
+        }
+    });
+
+    notify_received_messages.notified().await;
+
+    assert!(received_messages.load(Ordering::Relaxed) == message_count + 1);
+
+    super_stream_producer.close().await.unwrap();
+    _ = handle_consumer_1.close().await;
+    _ = handle_consumer_2.close().await;
+    _ = handle_consumer_3.close().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn super_stream_single_active_consumer_test_with_callback() {
+    let env = TestEnvironment::create_super_stream().await;
+    let super_stream_consumer_name = "super-stream-with-sac-enabled";
+
+    let message_count = 1000;
+    let mut super_stream_producer = env
+        .env
+        .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
+            HashRoutingMurmurStrategy {
+                routing_extractor: &hash_strategy_value_extractor,
+            },
+        ))
+        .client_provided_name("test super stream consumer ")
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let notify_received_messages = Arc::new(Notify::new());
+
+    let mut result_stream_name_1 = Arc::new(Mutex::new(String::from("")));
+    let mut result_stream_name_2 = Arc::new(Mutex::new(String::from("")));
+    let mut result_stream_name_3 = Arc::new(Mutex::new(String::from("")));
+
+    let mut result_name_1 = Arc::new(Mutex::new(String::from("")));
+    let mut result_name_2 = Arc::new(Mutex::new(String::from("")));
+    let mut result_name_3 = Arc::new(Mutex::new(String::from("")));
+
+    let mut result_stream_name_outer = result_stream_name_1.clone();
+    let mut result_stream_name_2_outer = result_stream_name_2.clone();
+    let mut result_stream_name_3_outer = result_stream_name_3.clone();
+
+    let mut result_name_1_outer = result_name_1.clone();
+    let mut result_name_2_outer = result_name_2.clone();
+    let mut result_name_3_outer = result_name_3.clone();
+
+    let mut super_stream_consumer: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .name(super_stream_consumer_name)
+        .enable_single_active_consumer(true)
+        .offset(OffsetSpecification::First)
+        .consumer_update(move |active, message_context| {
+            let mut result_stream_name_int = result_stream_name_outer.clone();
+            let mut result_consumer_name_int = result_name_1_outer.clone();
+            async move {
+                *result_stream_name_int.lock().unwrap() = message_context.stream().clone();
+                *result_consumer_name_int.lock().unwrap() = message_context.name().clone();
+
+                OffsetSpecification::First
+            }
+        })
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let mut super_stream_consumer_2: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
+        .offset(OffsetSpecification::First)
+        .consumer_update(move |active, message_context| {
+            let mut result_stream_name_int = result_stream_name_2_outer.clone();
+            let mut result_consumer_name_int = result_name_2_outer.clone();
+            async move {
+                *result_stream_name_int.lock().unwrap() = message_context.stream().clone();
+                *result_consumer_name_int.lock().unwrap() = message_context.name().clone();
+                OffsetSpecification::First
+            }
+        })
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    let mut super_stream_consumer_3: SuperStreamConsumer = env
+        .env
+        .super_stream_consumer()
+        .name("super-stream-with-sac-enabled")
+        .enable_single_active_consumer(true)
+        .offset(OffsetSpecification::First)
+        .consumer_update(move |active, message_context| {
+            let mut result_stream_name_int = result_stream_name_3_outer.clone();
+            let mut result_consumer_name_int = result_name_3_outer.clone();
+            async move {
+                *result_stream_name_int.lock().unwrap() = message_context.stream().clone();
+                *result_consumer_name_int.lock().unwrap() = message_context.name().clone();
+                OffsetSpecification::First
+            }
+        })
+        .build(&env.super_stream)
+        .await
+        .unwrap();
+
+    for n in 0..message_count {
+        let msg = Message::builder().body(format!("message{}", n)).build();
+        let _ = super_stream_producer
+            .send(msg, |confirmation_status| async move {})
+            .await
+            .unwrap();
+    }
+
+    let mut received_messages = Arc::new(AtomicU32::new(1));
+    let handle_consumer_1 = super_stream_consumer.handle();
+    let handle_consumer_2 = super_stream_consumer_2.handle();
+    let handle_consumer_3 = super_stream_consumer_3.handle();
+
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
+        }
+    });
+
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer_2.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
+        }
+    });
+
+    let received_message_outer = received_messages.clone();
+    let notify_received_messages_outer = notify_received_messages.clone();
+    task::spawn(async move {
+        let received_messages_int = received_message_outer.clone();
+        let notify_received_messages_inner = notify_received_messages_outer.clone();
+        while let _ = super_stream_consumer_3.next().await.unwrap() {
+            let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
+            if message_count == rec_msg {
+                notify_received_messages_inner.notify_one();
+                break;
+            }
+        }
+    });
+
+    notify_received_messages.notified().await;
+
+    assert!(received_messages.load(Ordering::Relaxed) == message_count + 1);
+    assert!(env
+        .partitions
+        .contains(&(*result_stream_name_1.clone().lock().unwrap())));
+    assert!(env
+        .partitions
+        .contains(&(*result_stream_name_2.clone().lock().unwrap())));
+    assert!(env
+        .partitions
+        .contains(&(*result_stream_name_3.clone().lock().unwrap())));
+    assert!(super_stream_consumer_name == *result_name_1.clone().lock().unwrap());
+    assert!(super_stream_consumer_name == *result_name_2.clone().lock().unwrap());
+    assert!(super_stream_consumer_name == *result_name_3.clone().lock().unwrap());
+
+    super_stream_producer.close().await.unwrap();
+    _ = handle_consumer_1.close().await;
+    _ = handle_consumer_2.close().await;
+    _ = handle_consumer_3.close().await;
 }

@@ -1,5 +1,5 @@
 use futures::Stream;
-use rabbitmq_stream_protocol::Response;
+use rabbitmq_stream_protocol::{Response, ResponseKind};
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, Ordering},
     Arc,
@@ -167,7 +167,10 @@ where
         while let Some(result) = stream.next().await {
             match result {
                 Ok(item) => match item.correlation_id() {
-                    Some(correlation_id) => state.dispatch(correlation_id, item).await,
+                    Some(correlation_id) => match item.kind_ref() {
+                        ResponseKind::ConsumerUpdate(_) => state.notify(item).await,
+                        _ => state.dispatch(correlation_id, item).await,
+                    },
                     None => state.notify(item).await,
                 },
                 Err(e) => {

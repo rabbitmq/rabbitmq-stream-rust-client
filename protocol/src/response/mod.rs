@@ -6,9 +6,10 @@ use crate::{
         Decoder,
     },
     commands::{
-        close::CloseResponse, credit::CreditResponse, deliver::DeliverCommand,
-        exchange_command_versions::ExchangeCommandVersionsResponse, generic::GenericResponse,
-        heart_beat::HeartbeatResponse, metadata::MetadataResponse,
+        close::CloseResponse, consumer_update::ConsumerUpdateCommand,
+        consumer_update_request::ConsumerUpdateRequestCommand, credit::CreditResponse,
+        deliver::DeliverCommand, exchange_command_versions::ExchangeCommandVersionsResponse,
+        generic::GenericResponse, heart_beat::HeartbeatResponse, metadata::MetadataResponse,
         metadata_update::MetadataUpdateCommand, open::OpenResponse,
         peer_properties::PeerPropertiesResponse, publish_confirm::PublishConfirm,
         publish_error::PublishErrorResponse, query_offset::QueryOffsetResponse,
@@ -72,6 +73,8 @@ pub enum ResponseKind {
     ExchangeCommandVersions(ExchangeCommandVersionsResponse),
     SuperStreamPartitions(SuperStreamPartitionsResponse),
     SuperStreamRoute(SuperStreamRouteResponse),
+    ConsumerUpdate(ConsumerUpdateCommand),
+    ConsumerUpdateRequest(ConsumerUpdateRequestCommand),
 }
 
 impl Response {
@@ -106,6 +109,12 @@ impl Response {
             }
             ResponseKind::SuperStreamRoute(super_stream_route_command) => {
                 Some(super_stream_route_command.correlation_id)
+            }
+            ResponseKind::ConsumerUpdate(consumer_update_command) => {
+                Some(consumer_update_command.correlation_id)
+            }
+            ResponseKind::ConsumerUpdateRequest(consumer_update_request_command) => {
+                Some(consumer_update_request_command.correlation_id)
             }
         }
     }
@@ -151,6 +160,7 @@ impl Decoder for Response {
             | COMMAND_CREATE_STREAM
             | COMMAND_CREATE_SUPER_STREAM
             | COMMAND_DELETE_SUPER_STREAM
+            | COMMAND_CONSUMER_UPDATE_REQUEST
             | COMMAND_DELETE_STREAM => {
                 GenericResponse::decode(input).map(|(i, kind)| (i, ResponseKind::Generic(kind)))?
             }
@@ -188,6 +198,8 @@ impl Decoder for Response {
                 .map(|(remaining, kind)| (remaining, ResponseKind::SuperStreamPartitions(kind)))?,
             COMMAND_ROUTE => SuperStreamRouteResponse::decode(input)
                 .map(|(remaining, kind)| (remaining, ResponseKind::SuperStreamRoute(kind)))?,
+            COMMAND_CONSUMER_UPDATE => ConsumerUpdateCommand::decode(input)
+                .map(|(remaining, kind)| (remaining, ResponseKind::ConsumerUpdate(kind)))?,
             n => return Err(DecodeError::UnsupportedResponseType(n)),
         };
         Ok((input, Response { header, kind }))
@@ -219,7 +231,8 @@ mod tests {
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
-            close::CloseResponse, deliver::DeliverCommand,
+            close::CloseResponse, consumer_update::ConsumerUpdateCommand,
+            consumer_update_request::ConsumerUpdateRequestCommand, deliver::DeliverCommand,
             exchange_command_versions::ExchangeCommandVersionsResponse, generic::GenericResponse,
             heart_beat::HeartbeatResponse, metadata::MetadataResponse,
             metadata_update::MetadataUpdateCommand, open::OpenResponse,
@@ -232,11 +245,11 @@ mod tests {
         },
         protocol::{
             commands::{
-                COMMAND_CLOSE, COMMAND_DELIVER, COMMAND_HEARTBEAT, COMMAND_METADATA,
-                COMMAND_METADATA_UPDATE, COMMAND_OPEN, COMMAND_PARTITIONS, COMMAND_PEER_PROPERTIES,
-                COMMAND_PUBLISH_CONFIRM, COMMAND_PUBLISH_ERROR, COMMAND_QUERY_OFFSET,
-                COMMAND_QUERY_PUBLISHER_SEQUENCE, COMMAND_ROUTE, COMMAND_SASL_AUTHENTICATE,
-                COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
+                COMMAND_CLOSE, COMMAND_CONSUMER_UPDATE, COMMAND_CONSUMER_UPDATE_REQUEST,
+                COMMAND_DELIVER, COMMAND_HEARTBEAT, COMMAND_METADATA, COMMAND_METADATA_UPDATE,
+                COMMAND_OPEN, COMMAND_PARTITIONS, COMMAND_PEER_PROPERTIES, COMMAND_PUBLISH_CONFIRM,
+                COMMAND_PUBLISH_ERROR, COMMAND_QUERY_OFFSET, COMMAND_QUERY_PUBLISHER_SEQUENCE,
+                COMMAND_ROUTE, COMMAND_SASL_AUTHENTICATE, COMMAND_SASL_HANDSHAKE, COMMAND_TUNE,
             },
             version::PROTOCOL_VERSION,
         },
@@ -244,6 +257,7 @@ mod tests {
         types::Header,
         ResponseCode,
     };
+
     impl Encoder for ResponseKind {
         fn encoded_size(&self) -> u32 {
             match self {
@@ -272,6 +286,12 @@ mod tests {
                 }
                 ResponseKind::SuperStreamRoute(super_stream_response) => {
                     super_stream_response.encoded_size()
+                }
+                ResponseKind::ConsumerUpdate(consumer_update_response) => {
+                    consumer_update_response.encoded_size()
+                }
+                ResponseKind::ConsumerUpdateRequest(consumer_update_request_response) => {
+                    consumer_update_request_response.encoded_size()
                 }
             }
         }
@@ -306,6 +326,12 @@ mod tests {
                 }
                 ResponseKind::SuperStreamRoute(super_stream_command_versions) => {
                     super_stream_command_versions.encode(writer)
+                }
+                ResponseKind::ConsumerUpdate(consumer_update_command_version) => {
+                    consumer_update_command_version.encode(writer)
+                }
+                ResponseKind::ConsumerUpdateRequest(consumer_update_request_command_version) => {
+                    consumer_update_request_command_version.encode(writer)
                 }
             }
         }
@@ -492,6 +518,15 @@ mod tests {
             SuperStreamRouteResponse,
             ResponseKind::SuperStreamRoute,
             COMMAND_ROUTE
+        );
+    }
+
+    #[test]
+    fn consumer_update_response_test() {
+        response_test!(
+            ConsumerUpdateCommand,
+            ResponseKind::ConsumerUpdate,
+            COMMAND_CONSUMER_UPDATE
         );
     }
 }

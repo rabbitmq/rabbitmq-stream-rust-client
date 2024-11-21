@@ -15,6 +15,9 @@ use rabbitmq_stream_protocol::{
     commands::subscribe::OffsetSpecification, message::Message, ResponseKind,
 };
 
+use core::option::Option::None;
+use futures::FutureExt;
+use std::future::Future;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tracing::trace;
 
@@ -25,11 +28,14 @@ use crate::{
     error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
     Client, ClientOptions, Environment, MetricsCollector,
 };
-use futures::{task::AtomicWaker, Stream};
+use futures::{future::BoxFuture, task::AtomicWaker, Stream};
 use rand::rngs::StdRng;
 use rand::{seq::SliceRandom, SeedableRng};
 
 type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
+
+pub type ConsumerUpdateListener =
+    Arc<dyn Fn(u8, MessageContext) -> BoxFuture<'static, OffsetSpecification> + Send + Sync>;
 
 /// API for consuming RabbitMQ stream messages
 pub struct Consumer {
@@ -40,6 +46,7 @@ pub struct Consumer {
 }
 
 struct ConsumerInternal {
+    name: Option<String>,
     client: Client,
     stream: String,
     offset_specification: OffsetSpecification,
@@ -49,6 +56,7 @@ struct ConsumerInternal {
     waker: AtomicWaker,
     metrics_collector: Arc<dyn MetricsCollector>,
     filter_configuration: Option<FilterConfiguration>,
+    consumer_update_listener: Option<ConsumerUpdateListener>,
 }
 
 impl ConsumerInternal {
@@ -82,21 +90,50 @@ impl FilterConfiguration {
     }
 }
 
+#[derive(Clone)]
+pub struct MessageContext {
+    name: String,
+    stream: String,
+    client: Client,
+}
+
+impl MessageContext {
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn stream(&self) -> String {
+        self.stream.clone()
+    }
+
+    pub fn client(&self) -> Client {
+        self.client.clone()
+    }
+}
+
 /// Builder for [`Consumer`]
 pub struct ConsumerBuilder {
     pub(crate) consumer_name: Option<String>,
     pub(crate) environment: Environment,
     pub(crate) offset_specification: OffsetSpecification,
     pub(crate) filter_configuration: Option<FilterConfiguration>,
+    pub(crate) consumer_update_listener: Option<ConsumerUpdateListener>,
     pub(crate) client_provided_name: String,
     pub(crate) properties: HashMap<String, String>,
+    pub(crate) is_single_active_consumer: bool,
 }
 
 impl ConsumerBuilder {
     pub async fn build(mut self, stream: &str) -> Result<Consumer, ConsumerCreateError> {
+        if (self.is_single_active_consumer
+            || self.properties.contains_key("single-active-consumer"))
+            && self.consumer_name.is_none()
+        {
+            return Err(ConsumerCreateError::SingleActiveConsumerNotSupported);
+        }
+
         // Connect to the user specified node first, then look for a random replica to connect to instead.
         // This is recommended for load balancing purposes
-
         let mut opt_with_client_provided_name = self.environment.options.client_options.clone();
         opt_with_client_provided_name.client_provided_name = self.client_provided_name.clone();
 
@@ -149,6 +186,7 @@ impl ConsumerBuilder {
         let subscription_id = 1;
         let (tx, rx) = channel(10000);
         let consumer = Arc::new(ConsumerInternal {
+            name: self.consumer_name.clone(),
             subscription_id,
             stream: stream.to_string(),
             client: client.clone(),
@@ -158,6 +196,7 @@ impl ConsumerBuilder {
             waker: AtomicWaker::new(),
             metrics_collector: collector,
             filter_configuration: self.filter_configuration.clone(),
+            consumer_update_listener: self.consumer_update_listener.clone(),
         });
         let msg_handler = ConsumerMessageHandler(consumer.clone());
         client.set_handler(msg_handler).await;
@@ -178,6 +217,13 @@ impl ConsumerBuilder {
             );
         }
 
+        if self.is_single_active_consumer {
+            self.properties
+                .insert("single-active-consumer".to_string(), "true".to_string());
+            self.properties
+                .insert("name".to_string(), self.consumer_name.clone().unwrap());
+        }
+
         let response = client
             .subscribe(
                 subscription_id,
@@ -190,7 +236,7 @@ impl ConsumerBuilder {
 
         if response.is_ok() {
             Ok(Consumer {
-                name: self.consumer_name,
+                name: self.consumer_name.clone(),
                 receiver: rx,
                 internal: consumer,
             })
@@ -217,8 +263,38 @@ impl ConsumerBuilder {
         self
     }
 
+    pub fn name_optional(mut self, consumer_name: Option<String>) -> Self {
+        self.consumer_name = consumer_name;
+        self
+    }
+
+    pub fn enable_single_active_consumer(mut self, is_single_active_consumer: bool) -> Self {
+        self.is_single_active_consumer = is_single_active_consumer;
+        self
+    }
+
     pub fn filter_input(mut self, filter_configuration: Option<FilterConfiguration>) -> Self {
         self.filter_configuration = filter_configuration;
+        self
+    }
+
+    pub fn consumer_update<Fut>(
+        mut self,
+        consumer_update_listener: impl Fn(u8, MessageContext) -> Fut + Send + Sync + 'static,
+    ) -> Self
+    where
+        Fut: Future<Output = OffsetSpecification> + Send + Sync + 'static,
+    {
+        let f = Arc::new(move |a, b| consumer_update_listener(a, b).boxed());
+        self.consumer_update_listener = Some(f);
+        self
+    }
+
+    pub fn consumer_update_arc(
+        mut self,
+        consumer_update_listener: Option<crate::consumer::ConsumerUpdateListener>,
+    ) -> Self {
+        self.consumer_update_listener = consumer_update_listener;
         self
     }
 
@@ -317,27 +393,27 @@ impl MessageHandler for ConsumerMessageHandler {
     async fn handle_message(&self, item: MessageResult) -> crate::RabbitMQStreamResult<()> {
         match item {
             Some(Ok(response)) => {
-                if let ResponseKind::Deliver(delivery) = response.kind() {
+                if let ResponseKind::Deliver(delivery) = response.kind_ref() {
                     let mut offset = delivery.chunk_first_offset;
 
                     let len = delivery.messages.len();
+                    let d = delivery.clone();
                     trace!("Got delivery with messages {}", len);
 
                     // // client filter
                     let messages = match &self.0.filter_configuration {
                         Some(filter_input) => {
                             if let Some(f) = &filter_input.predicate {
-                                delivery
-                                    .messages
+                                d.messages
                                     .into_iter()
                                     .filter(|message| f(message))
                                     .collect::<Vec<Message>>()
                             } else {
-                                delivery.messages
+                                d.messages
                             }
                         }
 
-                        None => delivery.messages,
+                        None => d.messages,
                     };
 
                     for message in messages {
@@ -351,6 +427,7 @@ impl MessageHandler for ConsumerMessageHandler {
                             .0
                             .sender
                             .send(Ok(Delivery {
+                                name: self.0.name.clone(),
                                 stream: self.0.stream.clone(),
                                 subscription_id: self.0.subscription_id,
                                 message,
@@ -363,6 +440,42 @@ impl MessageHandler for ConsumerMessageHandler {
                     // TODO handle credit fail
                     let _ = self.0.client.credit(self.0.subscription_id, 1).await;
                     self.0.metrics_collector.consume(len as u64).await;
+                } else if let ResponseKind::ConsumerUpdate(consumer_update) = response.kind_ref() {
+                    trace!("Received a ConsumerUpdate message");
+                    // If no callback is provided by the user we will restart from Next by protocol
+                    // We need to respond to the server too
+                    if self.0.consumer_update_listener.is_none() {
+                        trace!("User defined callback is not provided");
+                        let offset_specification = OffsetSpecification::Next;
+                        let _ = self
+                            .0
+                            .client
+                            .consumer_update(
+                                consumer_update.get_correlation_id(),
+                                offset_specification,
+                            )
+                            .await;
+                    } else {
+                        // Otherwise the Offset specification is returned by the user callback
+                        let is_active = consumer_update.is_active();
+                        let message_context = MessageContext {
+                            name: self.0.name.clone().unwrap(),
+                            stream: self.0.stream.clone(),
+                            client: self.0.client.clone(),
+                        };
+                        let consumer_update_listener_callback =
+                            self.0.consumer_update_listener.clone().unwrap();
+                        let offset_specification =
+                            consumer_update_listener_callback(is_active, message_context).await;
+                        let _ = self
+                            .0
+                            .client
+                            .consumer_update(
+                                consumer_update.get_correlation_id(),
+                                offset_specification,
+                            )
+                            .await;
+                    }
                 }
             }
             Some(Err(err)) => {
@@ -377,9 +490,11 @@ impl MessageHandler for ConsumerMessageHandler {
         Ok(())
     }
 }
+
 /// Envelope from incoming message
 #[derive(Debug)]
 pub struct Delivery {
+    name: Option<String>,
     stream: String,
     subscription_id: u8,
     message: Message,
@@ -405,5 +520,9 @@ impl Delivery {
     /// Get a reference to the delivery's offset.
     pub fn offset(&self) -> u64 {
         self.offset
+    }
+
+    pub fn consumer_name(&self) -> Option<String> {
+        self.name.clone()
     }
 }
