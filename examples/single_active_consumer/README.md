@@ -1,22 +1,79 @@
-Single active consumer
+Super stream example
 ---
 
-This is an example to enable single active consumer functionality for superstream:
-https://www.rabbitmq.com/blog/2022/07/05/rabbitmq-3-11-feature-preview-single-active-consumer-for-streams
-https://www.rabbitmq.com/blog/2022/07/13/rabbitmq-3-11-feature-preview-super-streams
+[Super Streams Documentation](https://www.rabbitmq.com/streams.html#super-streams) for more details.
+[Super Streams blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-super-streams)
 
-This folder contains a consumer and a super-stream consumer configured to enable it.
-You can use the example in the super-stream folder to produce messages for a super-stream.
 
-You can then run the single_active_consumer_super_stream.rs in this folder.
-Assuming the super-stream is composed by three streams, you can see that the Consumer will consume messages from all the streams part of the superstream.
+This example shows how to use the Super Stream feature in RabbitMQ 3.11.0.
 
-You can then run another consumer in parallel. 
-now you'll see that one of the two consumers will consume from 2 streams while the other on one stream.
+Then run the producer in one terminal:
 
-If you run another you'll see that every Consumer will read from a single stream.
+    $  cargo run --release -- --producer
 
-If you then stop one of the Consumer you'll notice that the related stream is now read from on the Consumer which is still running.
+
+And the consumer in another terminal:
+
+    $ cargo run --release -- --consumer
+
+You should see the consumer receiving the messages from the producer.
+
+It would be something like:
+```bash
+$ cargo run -- --producer
+Starting SuperStream Producer
+Super Stream Producer connected to RabbitMQ
+Super Stream Producer sent 0 messages to invoices
+Super Stream Producer sent 1 messages to invoices
+Super Stream Producer sent 2 messages to invoices
+Super Stream Producer sent 3 messages to invoices
+```
+
+```bash
+$ cargo run --release -- --consumer my_first_consumer
+Starting SuperStream Consumer my_first_consumer
+Super Stream Consumer connected to RabbitMQ. ConsumerName my_first_consumer
+Consumer Name my_first_consumer: Got message: super_stream_message_1 from stream: invoices-1 with offset: 33 
+Consumer Name my_first_consumer: Got message: super_stream_message_2 from stream: invoices-2 with offset: 34 
+Consumer Name my_first_consumer: Got message: super_stream_message_3 from stream: invoices-0 with offset: 37 
+Consumer Name my_first_consumer: Got message: super_stream_message_4 from stream: invoices-0 with offset: 36 
+Consumer Name my_first_consumer: Got message: super_stream_message_5 from stream: invoices-1 with offset: 39 
+Consumer Name my_first_consumer: Got message: super_stream_message_6 from stream: invoices-2 with offset: 40 
+Consumer Name my_first_consumer: Got message: super_stream_message_7 from stream: invoices-0 with offset: 41 
+Consumer Name my_first_consumer: Got message: super_stream_message_8 from stream: invoices-1 with offset: 42 
+Consumer Name my_first_consumer: Got message: super_stream_message_9 from stream: invoices-2 with offset: 43 
+Consumer Name my_first_consumer: Got message: super_stream_message_10 from stream: invoices-1 with offset: 44 
+```
+
+To see the Single active consumer in action, run another consumer:
+
+    $ cargo run --release -- --consumer my_second_consumer
+
+You should see the second consumer receiving the part of the messages from the producer. In thi case only the messages coming from the `invoices-1`.
+
+It should be something like:
+```bash
+$ cargo run --release -- --consumer my_second_consumer
+Starting SuperStream Consumer my_second_consumer
+Super Stream Consumer connected to RabbitMQ. ConsumerName my_second_consumer
+Consumer Name my_second_consumer: Got message: super_stream_message_64 from stream: invoices-1 with offset: 86 
+Consumer Name my_second_consumer: Got message: super_stream_message_65 from stream: invoices-1 with offset: 87
+Consumer Name my_second_consumer: Got message: super_stream_message_66 from stream: invoices-1 with offset: 88
+Consumer Name my_second_consumer: Got message: super_stream_message_67 from stream: invoices-1 with offset: 89 
+Consumer Name my_second_consumer: Got message: super_stream_message_68 from stream: invoices-1 with offset: 90
+Consumer Name my_second_consumer: Got message: super_stream_message_69 from stream: invoices-1 with offset: 90
+Consumer Name my_second_consumer: Got message: super_stream_message_70 from stream: invoices-1 with offset: 90
+```
+and the first consumer should be receiving the rest of the messages:
+```bash
+Consumer Name my_first_consumer: Got message: super_stream_message_88 from stream: invoices-0 with offset: 92 
+Consumer Name my_first_consumer: Got message: super_stream_message_87 from stream: invoices-2 with offset: 93
+Consumer Name my_first_consumer: Got message: super_stream_message_89 from stream: invoices-2 with offset: 95
+Consumer Name my_first_consumer: Got message: super_stream_message_90 from stream: invoices-0 with offset: 97 
+Consumer Name my_first_consumer: Got message: super_stream_message_91 from stream: invoices-0 with offset: 96
+Consumer Name my_first_consumer: Got message: super_stream_message_92 from stream: invoices-2 with offset: 99
+Consumer Name my_first_consumer: Got message: super_stream_message_93 from stream: invoices-2 with offset: 101
+```
 
 
 
