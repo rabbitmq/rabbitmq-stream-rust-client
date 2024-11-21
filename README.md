@@ -45,6 +45,7 @@ Welcome to the documentation for the RabbitMQ Stream Rust Client. This guide pro
     - [Publishing Messages](#publishing-messages)
     - [Consuming Messages](#consuming-messages)
     - [Super Stream](#super-stream)
+    - [Single Active Consumer](#single-active-consumer)
     - [Filtering](#filtering)
 5. [Examples](#examples)
 6. [Development](#development)
@@ -171,6 +172,19 @@ See the [Super Stream Producer Example using Routing key mode](./examples/supers
 
 See the [Super Stream Consumer Example](./examples/superstreams/receive_super_stream.rs)
 
+## Single active consumer
+
+The client supports the single-active-consumer feature:
+
+[single-active-consumer feature](https://www.rabbitmq.com/blog/2022/07/05/rabbitmq-3-11-feature-preview-single-active-consumer-for-streams)
+
+See the Java doc for further information (Same concepts apply here):
+
+[Single-Active-Consumer Java doc](https://rabbitmq.github.io/rabbitmq-stream-java-client/stable/htmlsingle/#single-active-consumer)
+
+See the Rust full example here:
+
+[Single-Active-Consumer-Full-Example](/examples/single_active_consumer)
 
 ## Filtering
 

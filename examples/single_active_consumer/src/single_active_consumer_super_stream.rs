@@ -1,21 +1,21 @@
 use futures::StreamExt;
 use rabbitmq_stream_client::error::StreamCreateError;
 use rabbitmq_stream_client::types::{
-    ByteCapacity, OffsetSpecification, ResponseCode,
+    ByteCapacity, OffsetSpecification, ResponseCode, SuperStreamConsumer,
 };
 
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn start_consumer(consumer_name: String) -> Result<(), Box<dyn std::error::Error>> {
     use rabbitmq_stream_client::Environment;
     let environment = Environment::builder().build().await?;
-    let message_count = 1000000;
-    let stream = "hello-rust-super-stream-2";
+    let mut consumer_name_tmp = String::from("");
+
+
+    println!("Super Stream Consumer connected to RabbitMQ. ConsumerName {}", consumer_name);
 
     let create_response = environment
         .stream_creator()
         .max_length(ByteCapacity::GB(5))
-        .create(stream)
+        .create_super_stream(crate::SUPER_STREAM, 3, None)
         .await;
 
     if let Err(e) = create_response {
@@ -31,17 +31,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!(
         "Super stream consumer example, consuming messages from the super stream {}",
-        stream
+        crate::SUPER_STREAM
     );
 
-    let mut consumer = environment
-        .consumer()
+    let mut super_stream_consumer: SuperStreamConsumer = environment
+        .super_stream_consumer()
         // Mandatory if sac is enabled
         .name("consumer-group-1")
         .offset(OffsetSpecification::First)
         .enable_single_active_consumer(true)
         .client_provided_name("my super stream consumer for hello rust")
-        .consumer_update(move |active, message_context|  async move {
+        .consumer_update(move |active, message_context| async move {
             let name = message_context.name();
             let stream = message_context.stream();
             let client = message_context.client();
@@ -52,25 +52,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             let stored_offset = client.query_offset(name, stream.as_str()).await;
 
-            if let Err(e) = stored_offset {
+            if let Err(_) = stored_offset {
                 return OffsetSpecification::First;
             }
-
             let stored_offset_u = stored_offset.unwrap();
-            println!("restarting from stored_offset:  {}", stored_offset_u);
+            println!("offset: {} stored", stored_offset_u.clone());
             OffsetSpecification::Offset(stored_offset_u)
-
         })
-        .build(stream)
+        .build(crate::SUPER_STREAM)
         .await
         .unwrap();
 
-    for i in 0..message_count {
-        let delivery = consumer.next().await.unwrap();
+    loop {
+        let delivery = super_stream_consumer.next().await.unwrap();
         {
             let delivery = delivery.unwrap();
             println!(
-                "Got message: {:#?} from stream: {} with offset: {}",
+                "Consumer name {}: Got message: {:#?} from stream: {} with offset: {}",
+                consumer_name,
                 delivery
                     .message()
                     .data()
@@ -80,18 +79,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 delivery.offset()
             );
 
-            //store an offset
-            if i == 10000  {
-                let _ = consumer
-                    .store_offset(i)
-                    .await
-                    .unwrap_or_else(|e| println!("Err: {}", e));
-            }
+            // Store an offset for every consumer
+            // store the offset each time a message is consumed
+            // that is not a best practice, but it is done here for demonstration purposes
+            super_stream_consumer
+                .client()
+                .store_offset(
+                    delivery.consumer_name().unwrap().as_str(),
+                    delivery.stream().as_str(),
+                    delivery.offset(),
+                )
+                .await?;
         }
     }
-
-    println!("Stopping consumer...");
-    let _ = consumer.handle().close().await;
-    println!("consumer stopped");
-    Ok(())
 }
