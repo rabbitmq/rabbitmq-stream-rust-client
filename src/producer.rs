@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::vec;
 use std::{
     marker::PhantomData,
     sync::{
@@ -19,7 +18,7 @@ use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
 
 use crate::client::ClientMessage;
 use crate::MetricsCollector;
-use crate::{client::MessageHandler, ClientOptions, RabbitMQStreamResult};
+use crate::{client::MessageHandler, RabbitMQStreamResult};
 use crate::{
     client::{Client, MessageResult},
     environment::Environment,
@@ -119,13 +118,14 @@ impl<T> ProducerBuilder<T> {
         // The leader is the recommended node for writing, because writing to a replica will redundantly pass these messages
         // to the leader anyway - it is the only one capable of writing.
 
-        let mut opt_with_client_provided_name = self.environment.options.client_options.clone();
-        opt_with_client_provided_name.client_provided_name = self.client_provided_name.clone();
+        let metrics_collector = self.environment.options.client_options.collector.clone();
 
-        let mut client = self
+        let client_unwrapped = self
             .environment
-            .create_client_with_options(opt_with_client_provided_name.clone())
+            .create_producer_client(stream, self.client_provided_name.clone())
             .await?;
+
+        let client = client_unwrapped;
 
         let mut publish_version = 1;
 
@@ -135,44 +135,6 @@ impl<T> ProducerBuilder<T> {
             } else {
                 return Err(ProducerCreateError::FilteringNotSupport);
             }
-        }
-
-        let metrics_collector = self.environment.options.client_options.collector.clone();
-        if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
-            tracing::debug!(
-                "Connecting to leader node {:?} of stream {}",
-                metadata.leader,
-                stream
-            );
-            let load_balancer_mode = self.environment.options.client_options.load_balancer_mode;
-            if load_balancer_mode {
-                // Producer must connect to leader node
-                let options: ClientOptions = self.environment.options.client_options.clone();
-                loop {
-                    let temp_client = Client::connect(options.clone()).await?;
-                    let mapping = temp_client.connection_properties().await;
-                    if let Some(advertised_host) = mapping.get("advertised_host") {
-                        if *advertised_host == metadata.leader.host.clone() {
-                            client.close().await?;
-                            client = temp_client;
-                            break;
-                        }
-                    }
-                    temp_client.close().await?;
-                }
-            } else {
-                client.close().await?;
-                client = Client::connect(ClientOptions {
-                    host: metadata.leader.host.clone(),
-                    port: metadata.leader.port as u16,
-                    ..opt_with_client_provided_name.clone()
-                })
-                .await?
-            };
-        } else {
-            return Err(ProducerCreateError::StreamDoesNotExist {
-                stream: stream.into(),
-            });
         }
 
         let waiting_confirmations: WaiterMap = Arc::new(DashMap::new());
