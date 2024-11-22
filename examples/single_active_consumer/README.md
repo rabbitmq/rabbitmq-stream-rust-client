@@ -1,11 +1,11 @@
-Super stream example
+Single active consumer example
 ---
 
-[Super Streams Documentation](https://www.rabbitmq.com/streams.html#super-streams) for more details.
-[Super Streams blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-super-streams)
+[Single-Active-Consumer Java doc](https://rabbitmq.github.io/rabbitmq-stream-java-client/stable/htmlsingle/#single-active-consumer) for more details
+[single-active-consumer blog post](https://www.rabbitmq.com/blog/2022/07/05/rabbitmq-3-11-feature-preview-single-active-consumer-for-streams)
 
 
-This example shows how to use the Super Stream feature in RabbitMQ 3.11.0.
+This example shows how to use the Single active consumer feature in RabbitMQ 3.11.0.
 
 Then run the producer in one terminal:
 
