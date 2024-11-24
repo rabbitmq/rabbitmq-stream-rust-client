@@ -132,12 +132,10 @@ impl ConsumerBuilder {
 
         let collector = self.environment.options.client_options.collector.clone();
 
-        let client_uwrapped = self
+        let client = self
             .environment
             .create_consumer_client(stream, self.client_provided_name.clone())
             .await?;
-
-        let client = client_uwrapped.clone();
 
         let subscription_id = 1;
         let (tx, rx) = channel(10000);

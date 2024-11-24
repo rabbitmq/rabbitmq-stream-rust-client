@@ -120,12 +120,10 @@ impl<T> ProducerBuilder<T> {
 
         let metrics_collector = self.environment.options.client_options.collector.clone();
 
-        let client_unwrapped = self
+        let client = self
             .environment
             .create_producer_client(stream, self.client_provided_name.clone())
             .await?;
-
-        let client = client_unwrapped;
 
         let mut publish_version = 1;
 

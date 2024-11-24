@@ -39,7 +39,7 @@ impl Environment {
         Ok(Environment { options })
     }
 
-    pub async fn create_producer_client(
+    pub(crate) async fn create_producer_client(
         self,
         stream: &str,
         client_provided_name: String,
@@ -91,7 +91,7 @@ impl Environment {
         Ok(client)
     }
 
-    pub async fn create_consumer_client(
+    pub(crate) async fn create_consumer_client(
         self,
         stream: &str,
         client_provided_name: String,
