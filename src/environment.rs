@@ -4,12 +4,15 @@ use std::time::Duration;
 
 use crate::producer::NoDedup;
 use crate::types::OffsetSpecification;
+use rand::prelude::SliceRandom;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::collections::HashMap;
 
 use crate::{
     client::{Client, ClientOptions, MetricsCollector},
     consumer::ConsumerBuilder,
-    error::StreamDeleteError,
+    error::{ConsumerCreateError, ProducerCreateError, StreamDeleteError},
     producer::ProducerBuilder,
     stream_creator::StreamCreator,
     superstream::RoutingStrategy,
@@ -34,6 +37,114 @@ impl Environment {
         let client = Client::connect(options.client_options.clone()).await?;
         client.close().await?;
         Ok(Environment { options })
+    }
+
+    pub(crate) async fn create_producer_client(
+        self,
+        stream: &str,
+        client_provided_name: String,
+    ) -> Result<Client, ProducerCreateError> {
+        let mut opt_with_client_provided_name = self.options.client_options.clone();
+        opt_with_client_provided_name.client_provided_name = client_provided_name.clone();
+
+        let mut client = self
+            .create_client_with_options(opt_with_client_provided_name.clone())
+            .await?;
+
+        if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
+            tracing::debug!(
+                "Connecting to leader node {:?} of stream {}",
+                metadata.leader,
+                stream
+            );
+            let load_balancer_mode = self.options.client_options.load_balancer_mode;
+            if load_balancer_mode {
+                // Producer must connect to leader node
+                let options: ClientOptions = self.options.client_options.clone();
+                loop {
+                    let temp_client = Client::connect(options.clone()).await?;
+                    let mapping = temp_client.connection_properties().await;
+                    if let Some(advertised_host) = mapping.get("advertised_host") {
+                        if *advertised_host == metadata.leader.host.clone() {
+                            client.close().await?;
+                            client = temp_client;
+                            break;
+                        }
+                    }
+                    temp_client.close().await?;
+                }
+            } else {
+                client.close().await?;
+                client = Client::connect(ClientOptions {
+                    host: metadata.leader.host.clone(),
+                    port: metadata.leader.port as u16,
+                    ..opt_with_client_provided_name.clone()
+                })
+                .await?
+            };
+        } else {
+            return Err(ProducerCreateError::StreamDoesNotExist {
+                stream: stream.into(),
+            });
+        }
+
+        Ok(client)
+    }
+
+    pub(crate) async fn create_consumer_client(
+        self,
+        stream: &str,
+        client_provided_name: String,
+    ) -> Result<Client, ConsumerCreateError> {
+        let mut opt_with_client_provided_name = self.options.client_options.clone();
+        opt_with_client_provided_name.client_provided_name = client_provided_name.clone();
+
+        let mut client = self
+            .create_client_with_options(opt_with_client_provided_name.clone())
+            .await?;
+
+        if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
+            // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
+            // This is desired behavior in case there is only one node in the cluster.
+            if let Some(replica) = metadata.replicas.choose(&mut StdRng::from_entropy()) {
+                tracing::debug!(
+                    "Picked replica {:?} out of possible candidates {:?} for stream {}",
+                    replica,
+                    metadata.replicas,
+                    stream
+                );
+                let load_balancer_mode = self.options.client_options.load_balancer_mode;
+                if load_balancer_mode {
+                    let options = self.options.client_options.clone();
+                    loop {
+                        let temp_client = Client::connect(options.clone()).await?;
+                        let mapping = temp_client.connection_properties().await;
+                        if let Some(advertised_host) = mapping.get("advertised_host") {
+                            if *advertised_host == replica.host.clone() {
+                                client.close().await?;
+                                client = temp_client;
+                                break;
+                            }
+                        }
+                        temp_client.close().await?;
+                    }
+                } else {
+                    client.close().await?;
+                    client = Client::connect(ClientOptions {
+                        host: replica.host.clone(),
+                        port: replica.port as u16,
+                        ..self.options.client_options
+                    })
+                    .await?;
+                }
+            }
+        } else {
+            return Err(ConsumerCreateError::StreamDoesNotExist {
+                stream: stream.into(),
+            });
+        }
+
+        Ok(client)
     }
 
     /// Returns a builder for creating a stream with a specific configuration

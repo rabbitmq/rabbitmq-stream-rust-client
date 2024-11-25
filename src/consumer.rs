@@ -26,11 +26,9 @@ use crate::error::ConsumerStoreOffsetError;
 use crate::{
     client::{MessageHandler, MessageResult},
     error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
-    Client, ClientOptions, Environment, MetricsCollector,
+    Client, Environment, MetricsCollector,
 };
 use futures::{future::BoxFuture, task::AtomicWaker, Stream};
-use rand::rngs::StdRng;
-use rand::{seq::SliceRandom, SeedableRng};
 
 type FilterPredicate = Option<Arc<dyn Fn(&Message) -> bool + Send + Sync>>;
 
@@ -132,56 +130,12 @@ impl ConsumerBuilder {
             return Err(ConsumerCreateError::SingleActiveConsumerNotSupported);
         }
 
-        // Connect to the user specified node first, then look for a random replica to connect to instead.
-        // This is recommended for load balancing purposes
-        let mut opt_with_client_provided_name = self.environment.options.client_options.clone();
-        opt_with_client_provided_name.client_provided_name = self.client_provided_name.clone();
-
-        let mut client = self
-            .environment
-            .create_client_with_options(opt_with_client_provided_name)
-            .await?;
         let collector = self.environment.options.client_options.collector.clone();
-        if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
-            // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
-            // This is desired behavior in case there is only one node in the cluster.
-            if let Some(replica) = metadata.replicas.choose(&mut StdRng::from_entropy()) {
-                tracing::debug!(
-                    "Picked replica {:?} out of possible candidates {:?} for stream {}",
-                    replica,
-                    metadata.replicas,
-                    stream
-                );
-                let load_balancer_mode = self.environment.options.client_options.load_balancer_mode;
-                if load_balancer_mode {
-                    let options = self.environment.options.client_options.clone();
-                    loop {
-                        let temp_client = Client::connect(options.clone()).await?;
-                        let mapping = temp_client.connection_properties().await;
-                        if let Some(advertised_host) = mapping.get("advertised_host") {
-                            if *advertised_host == replica.host.clone() {
-                                client.close().await?;
-                                client = temp_client;
-                                break;
-                            }
-                        }
-                        temp_client.close().await?;
-                    }
-                } else {
-                    client.close().await?;
-                    client = Client::connect(ClientOptions {
-                        host: replica.host.clone(),
-                        port: replica.port as u16,
-                        ..self.environment.options.client_options
-                    })
-                    .await?;
-                }
-            }
-        } else {
-            return Err(ConsumerCreateError::StreamDoesNotExist {
-                stream: stream.into(),
-            });
-        }
+
+        let client = self
+            .environment
+            .create_consumer_client(stream, self.client_provided_name.clone())
+            .await?;
 
         let subscription_id = 1;
         let (tx, rx) = channel(10000);
