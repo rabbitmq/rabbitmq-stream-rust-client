@@ -1,7 +1,9 @@
 use rabbitmq_stream_client::error::StreamCreateError;
 use rabbitmq_stream_client::types::{
     ByteCapacity, HashRoutingMurmurStrategy, Message, ResponseCode, RoutingStrategy,
+    SuperStreamProducer,
 };
+use rabbitmq_stream_client::NoDedup;
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -67,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Super stream example. Sending {} messages to the super stream: {}",
         message_count, super_stream
     );
-    let mut super_stream_producer = environment
+    let mut super_stream_producer: SuperStreamProducer<NoDedup> = environment
         .super_stream_producer(RoutingStrategy::HashRoutingStrategy(
             HashRoutingMurmurStrategy {
                 routing_extractor: &hash_strategy_value_extractor,

@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create("test")
         .await?;
 
-    let mut producer = environment
+    let producer = environment
         .producer()
         .client_provided_name("my producer")
         .build("test")

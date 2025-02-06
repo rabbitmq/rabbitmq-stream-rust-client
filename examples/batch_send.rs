@@ -1,4 +1,3 @@
-use futures::StreamExt;
 use rabbitmq_stream_client::{
     types::{ByteCapacity, Message},
     Environment,

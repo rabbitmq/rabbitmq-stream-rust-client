@@ -1,6 +1,6 @@
 use rabbitmq_stream_client::error::StreamCreateError;
 use rabbitmq_stream_client::types::{
-    ByteCapacity, RoutingKeyRoutingStrategy, Message, ResponseCode, RoutingStrategy,
+    ByteCapacity, Message, ResponseCode, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -83,14 +83,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let counter = confirmed_messages.clone();
         let notifier = notify_on_send.clone();
         // Region names are the same as the binding_keys we specified during superstream creation
-        let mut region = "";
-        if i % 3 == 0   {
-            region = "EMEA"
-        } else if i % 3 == 1   {
-            region = "APAC"
-        }  else  {
-            region = "AMER"
-        }
+        let region = if i % 3 == 0 {
+            "EMEA"
+        } else if i % 3 == 1 {
+            "APAC"
+        } else {
+            "AMER"
+        };
 
         let msg = Message::builder()
             .body(format!("super stream message_{}", i))

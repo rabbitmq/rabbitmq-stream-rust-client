@@ -103,6 +103,7 @@ pub mod types {
     pub use crate::superstream::RoutingKeyRoutingStrategy;
     pub use crate::superstream::RoutingStrategy;
     pub use crate::superstream_consumer::SuperStreamConsumer;
+    pub use crate::superstream_producer::SuperStreamProducer;
     pub use rabbitmq_stream_protocol::message::Message;
     pub use rabbitmq_stream_protocol::{Response, ResponseCode, ResponseKind};
 

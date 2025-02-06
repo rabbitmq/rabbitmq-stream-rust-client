@@ -42,3 +42,16 @@ murmur3 = "0.5.2"
 tracing-subscriber = "0.3.1"
 fake = { version = "3.0.0", features = ['derive'] }
 chrono = "0.4.26"
+
+[[example]]
+name="receive_super_stream"
+path="examples/superstreams/receive_super_stream.rs"
+[[example]]
+name="send_super_stream_hash"
+path="examples/superstreams/send_super_stream_hash.rs"
+[[example]]
+name="send_super_stream_routing_key"
+path="examples/superstreams/send_super_stream_routing_key.rs"
+[[example]]
+name="send_super_stream"
+path="examples/superstreams/send_super_stream.rs"
