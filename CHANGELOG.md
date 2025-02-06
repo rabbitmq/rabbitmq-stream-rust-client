@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.7.0...rabbitmq-stream-client-v0.7.1) - 2025-02-06
+
+### Other
+
+- Expose SuperStreamProducer struct ([#267](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/267))
+- Bump codecov/codecov-action from 5.0.2 to 5.3.1 ([#264](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/264))
+- Moving producers/consumers client connection creation to Environment ([#259](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/259))
+
 ## [0.7.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.6.1...rabbitmq-stream-client-v0.7.0) - 2024-11-21
 
 ### Other
