@@ -37,9 +37,11 @@ impl DefaultSuperStreamMetadata {
     }
 }
 
+type RoutingExtractor = dyn Fn(&Message) -> String + 'static + Sync + Send;
+
 #[derive(Clone)]
 pub struct RoutingKeyRoutingStrategy {
-    pub routing_extractor: &'static dyn Fn(&Message) -> String,
+    pub routing_extractor: &'static RoutingExtractor,
 }
 
 impl RoutingKeyRoutingStrategy {
@@ -56,7 +58,7 @@ impl RoutingKeyRoutingStrategy {
 
 #[derive(Clone)]
 pub struct HashRoutingMurmurStrategy {
-    pub routing_extractor: &'static dyn Fn(&Message) -> String,
+    pub routing_extractor: &'static RoutingExtractor,
 }
 
 impl HashRoutingMurmurStrategy {
@@ -85,4 +87,17 @@ impl HashRoutingMurmurStrategy {
 pub enum RoutingStrategy {
     HashRoutingStrategy(HashRoutingMurmurStrategy),
     RoutingKeyStrategy(RoutingKeyRoutingStrategy),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<RoutingStrategy>();
+        assert_send_sync::<HashRoutingMurmurStrategy>();
+        assert_send_sync::<RoutingKeyRoutingStrategy>();
+    }
 }

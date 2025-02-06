@@ -158,3 +158,18 @@ impl<T> SuperStreamProducerBuilder<T> {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::Dedup;
+
+    use super::*;
+
+    #[test]
+    fn test_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<SuperStreamProducer<NoDedup>>();
+        assert_send_sync::<SuperStreamProducer<Dedup>>();
+    }
+}
