@@ -765,10 +765,12 @@ impl Client {
         let mut roots = rustls::RootCertStore::empty();
         let cert_bytes = std::fs::read(root_ca_cert.unwrap());
 
-        let root_cert_store = rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).unwrap();
+        let root_cert_store: Result<Vec<_>, _> =
+            rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).collect();
+        let root_cert_store = root_cert_store.unwrap();
 
         root_cert_store
-            .iter()
+            .into_iter()
             .for_each(|cert| roots.add(&rustls::Certificate(cert.to_vec())).unwrap());
         Ok(roots)
     }
@@ -777,8 +779,11 @@ impl Client {
         client_cert: &Path,
     ) -> std::io::Result<Vec<rustls::Certificate>> {
         let mut pem = BufReader::new(File::open(client_cert)?);
-        let certs = rustls_pemfile::certs(&mut pem)?;
-        let certs = certs.into_iter().map(rustls::Certificate);
+        let certs: Result<Vec<_>, _> = rustls_pemfile::certs(&mut pem).collect();
+        let certs = certs?;
+        let certs = certs
+            .into_iter()
+            .map(|cert| rustls::Certificate(cert.to_vec()));
         Ok(certs.collect())
     }
 
@@ -786,8 +791,11 @@ impl Client {
         client_private_key: &Path,
     ) -> std::io::Result<Vec<PrivateKey>> {
         let mut pem = BufReader::new(File::open(client_private_key)?);
-        let keys = rustls_pemfile::pkcs8_private_keys(&mut pem)?;
-        let keys = keys.into_iter().map(PrivateKey);
+        let keys: Result<Vec<_>, _> = rustls_pemfile::pkcs8_private_keys(&mut pem).collect();
+        let keys = keys?;
+        let keys = keys
+            .into_iter()
+            .map(|c| PrivateKey(c.secret_pkcs8_der().to_vec()));
         Ok(keys.collect())
     }
 
