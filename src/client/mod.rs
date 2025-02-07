@@ -779,7 +779,7 @@ impl Client {
     ) -> std::io::Result<Vec<CertificateDer<'static>>> {
         let mut pem = BufReader::new(File::open(client_cert)?);
         rustls_pemfile::certs(&mut pem)
-            .map(|c| c.map(|c| c.into_owned()))
+            .map(|c| c.map(CertificateDer::into_owned))
             .collect()
     }
 
@@ -789,7 +789,7 @@ impl Client {
         let mut pem = BufReader::new(File::open(client_private_key)?);
         let keys: Result<Vec<_>, _> = rustls_pemfile::pkcs8_private_keys(&mut pem).collect();
         let keys = keys?;
-        let keys = keys.into_iter().map(|c| PrivateKeyDer::from(c));
+        let keys = keys.into_iter().map(PrivateKeyDer::from);
         Ok(keys.collect())
     }
 
