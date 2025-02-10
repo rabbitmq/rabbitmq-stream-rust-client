@@ -319,40 +319,37 @@ impl TlsConfigurationBuilder {
         self
     }
 
-    pub fn add_root_certificates<T>(mut self, root_certificates_path: T) -> TlsConfigurationBuilder
+    pub fn add_root_certificates<T>(self, root_certificates_path: T) -> TlsConfigurationBuilder
     where
         T: Into<PathBuf>,
     {
-        self.root_certificates_path = Some(root_certificates_path.into());
-        self
+        let mut s = self.enable(true);
+        s.root_certificates_path = Some(root_certificates_path.into());
+        s
     }
 
     #[cfg(feature = "serde")]
-    fn add_client_certificates_path<T>(
-        mut self,
-        client_certificates_path: T,
-    ) -> TlsConfigurationBuilder
+    fn add_client_certificates_path<T>(self, client_certificates_path: T) -> TlsConfigurationBuilder
     where
         T: Into<PathBuf>,
     {
-        self.client_certificates_path = Some(client_certificates_path.into());
-        self
+        let mut s = self.enable(true);
+        s.client_certificates_path = Some(client_certificates_path.into());
+        s
     }
 
     #[cfg(feature = "serde")]
-    fn add_client_private_key_path<T>(
-        mut self,
-        client_private_key_path: T,
-    ) -> TlsConfigurationBuilder
+    fn add_client_private_key_path<T>(self, client_private_key_path: T) -> TlsConfigurationBuilder
     where
         T: Into<PathBuf>,
     {
-        self.client_private_key_path = Some(client_private_key_path.into());
-        self
+        let mut s = self.enable(true);
+        s.client_private_key_path = Some(client_private_key_path.into());
+        s
     }
 
     pub fn add_client_certificates_keys<T1, T2>(
-        mut self,
+        self,
         client_certificates_path: T1,
         client_private_key_path: T2,
     ) -> TlsConfigurationBuilder
@@ -360,9 +357,10 @@ impl TlsConfigurationBuilder {
         T1: Into<PathBuf>,
         T2: Into<PathBuf>,
     {
-        self.client_certificates_path = Some(client_certificates_path.into());
-        self.client_private_key_path = Some(client_private_key_path.into());
-        self
+        let mut s = self.enable(true);
+        s.client_certificates_path = Some(client_certificates_path.into());
+        s.client_private_key_path = Some(client_private_key_path.into());
+        s
     }
 
     pub fn build(self) -> Result<TlsConfiguration, &'static str> {
