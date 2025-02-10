@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use std::ops::DerefMut;
 use std::{
     collections::HashMap,
@@ -19,16 +17,12 @@ use pin_project::pin_project;
 use rabbitmq_stream_protocol::commands::exchange_command_versions::{
     ExchangeCommandVersionsRequest, ExchangeCommandVersionsResponse,
 };
-use std::{fs::File, io::BufReader, path::Path};
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
 use tokio::io::ReadBuf;
 use tokio::sync::RwLock;
 use tokio::{net::TcpStream, sync::Notify};
 use tokio_rustls::client::TlsStream;
-use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
-use tokio_rustls::rustls::ClientConfig;
-use tokio_rustls::{rustls, TlsConnector};
 
 use tokio_util::codec::Framed;
 use tracing::trace;
@@ -93,7 +87,7 @@ mod task;
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio-stream")))]
 #[pin_project(project = StreamProj)]
 #[derive(Debug)]
-enum GenericTcpStream {
+pub enum GenericTcpStream {
     Tcp(#[pin] TcpStream),
     SecureTcp(#[pin] TlsStream<TcpStream>),
 }
@@ -526,34 +520,7 @@ impl Client {
         ),
         ClientError,
     > {
-        let stream = if broker.tls.enabled() {
-            let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
-            let config: ClientConfig;
-
-            if !broker.tls.trust_certificates_enabled() {
-                let roots = Self::build_root_store(Some(Path::new(
-                    &broker.tls.get_root_certificates_path(),
-                )))
-                .await?;
-                config = Self::build_tls_client_configuration(
-                    broker.tls.get_client_certificates_path(),
-                    &roots,
-                    broker,
-                )
-                .await?;
-            } else {
-                config = Self::build_tls_client_configuration_untrusted().await?;
-            }
-
-            let connector = TlsConnector::from(Arc::new(config));
-            let domain = ServerName::try_from(broker.host.clone()).unwrap();
-            let conn = connector.connect(domain, stream).await?;
-            GenericTcpStream::SecureTcp(conn)
-        } else {
-            let stream = TcpStream::connect((broker.host.as_str(), broker.port)).await?;
-            GenericTcpStream::Tcp(stream)
-        };
-
+        let stream = broker.build_generic_tcp_stream().await?;
         let stream = Framed::new(stream, RabbitMqStreamCodec {});
 
         let (sink, stream) = stream.split();
@@ -756,141 +723,6 @@ impl Client {
         trace!("Received heartbeat");
         let mut state = self.state.write().await;
         state.last_heatbeat = Instant::now();
-    }
-
-    async fn build_root_store(
-        root_ca_cert: Option<&Path>,
-    ) -> std::io::Result<rustls::RootCertStore> {
-        let mut roots = rustls::RootCertStore::empty();
-        let cert_bytes = std::fs::read(root_ca_cert.unwrap());
-
-        let root_cert_store: Result<Vec<_>, _> =
-            rustls_pemfile::certs(&mut cert_bytes.unwrap().as_ref()).collect();
-        let root_cert_store = root_cert_store.unwrap();
-
-        root_cert_store
-            .into_iter()
-            .for_each(|cert| roots.add(cert).unwrap());
-        Ok(roots)
-    }
-
-    async fn build_client_certificates(
-        client_cert: &Path,
-    ) -> std::io::Result<Vec<CertificateDer<'static>>> {
-        let mut pem = BufReader::new(File::open(client_cert)?);
-        rustls_pemfile::certs(&mut pem)
-            .map(|c| c.map(CertificateDer::into_owned))
-            .collect()
-    }
-
-    async fn build_client_private_keys(
-        client_private_key: &Path,
-    ) -> std::io::Result<Vec<PrivateKeyDer<'static>>> {
-        let mut pem = BufReader::new(File::open(client_private_key)?);
-        let keys: Result<Vec<_>, _> = rustls_pemfile::pkcs8_private_keys(&mut pem).collect();
-        let keys = keys?;
-        let keys = keys.into_iter().map(PrivateKeyDer::from);
-        Ok(keys.collect())
-    }
-
-    async fn build_tls_client_configuration(
-        client_certificate_path: String,
-        roots: &rustls::RootCertStore,
-        broker: &ClientOptions,
-    ) -> Result<ClientConfig, ClientError> {
-        let config: ClientConfig;
-
-        if client_certificate_path.is_empty() {
-            config = ClientConfig::builder()
-                .with_root_certificates(roots.clone())
-                .with_no_client_auth();
-        } else {
-            let client_certs = Self::build_client_certificates(Path::new(
-                &broker.tls.get_client_certificates_path(),
-            ))
-            .await?;
-            let client_keys =
-                Self::build_client_private_keys(Path::new(&broker.tls.get_client_keys_path()))
-                    .await?;
-            config = ClientConfig::builder()
-                .with_root_certificates(roots.clone())
-                .with_client_auth_cert(client_certs, client_keys.into_iter().next().unwrap())
-                .unwrap();
-        }
-
-        Ok(config)
-    }
-
-    async fn build_tls_client_configuration_untrusted() -> Result<ClientConfig, ClientError> {
-        mod danger {
-            use rustls::client::danger::HandshakeSignatureValid;
-            use rustls::client::danger::ServerCertVerified;
-            use tokio_rustls::rustls::{
-                self, client::danger::ServerCertVerifier, pki_types::ServerName,
-            };
-
-            #[derive(Debug)]
-            pub struct NoCertificateVerification {}
-
-            impl ServerCertVerifier for NoCertificateVerification {
-                fn verify_tls12_signature(
-                    &self,
-                    _: &[u8],
-                    _: &rustls::pki_types::CertificateDer<'_>,
-                    _: &rustls::DigitallySignedStruct,
-                ) -> Result<HandshakeSignatureValid, rustls::Error> {
-                    Ok(HandshakeSignatureValid::assertion())
-                }
-
-                fn verify_tls13_signature(
-                    &self,
-                    _: &[u8],
-                    _: &rustls::pki_types::CertificateDer<'_>,
-                    _: &rustls::DigitallySignedStruct,
-                ) -> Result<HandshakeSignatureValid, rustls::Error> {
-                    Ok(HandshakeSignatureValid::assertion())
-                }
-
-                fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-                    use rustls::SignatureScheme;
-                    // I know know if this is correct
-                    vec![
-                        SignatureScheme::RSA_PKCS1_SHA1,
-                        SignatureScheme::ECDSA_SHA1_Legacy,
-                        SignatureScheme::RSA_PKCS1_SHA256,
-                        SignatureScheme::ECDSA_NISTP256_SHA256,
-                        SignatureScheme::RSA_PKCS1_SHA384,
-                        SignatureScheme::ECDSA_NISTP384_SHA384,
-                        SignatureScheme::RSA_PKCS1_SHA512,
-                        SignatureScheme::ECDSA_NISTP521_SHA512,
-                        SignatureScheme::RSA_PSS_SHA256,
-                        SignatureScheme::RSA_PSS_SHA384,
-                        SignatureScheme::RSA_PSS_SHA512,
-                        SignatureScheme::ED25519,
-                        SignatureScheme::ED448,
-                    ]
-                }
-
-                fn verify_server_cert(
-                    &self,
-                    _: &rustls::pki_types::CertificateDer<'_>,
-                    _: &[rustls::pki_types::CertificateDer<'_>],
-                    _: &ServerName<'_>,
-                    _: &[u8],
-                    _: rustls::pki_types::UnixTime,
-                ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error>
-                {
-                    Ok(ServerCertVerified::assertion())
-                }
-            }
-        }
-
-        let config = ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(Arc::new(danger::NoCertificateVerification {}))
-            .with_no_client_auth();
-
-        Ok(config)
     }
 
     pub async fn consumer_update(

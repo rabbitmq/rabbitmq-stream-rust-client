@@ -37,11 +37,16 @@ async-trait = "0.1.51"
 rand = "0.8"
 dashmap = "6.1.0"
 murmur3 = "0.5.2"
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 tracing-subscriber = "0.3.1"
 fake = { version = "3.0.0", features = ['derive'] }
 chrono = "0.4.26"
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]
 
 [[example]]
 name="receive_super_stream"
