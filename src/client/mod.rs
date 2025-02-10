@@ -37,7 +37,7 @@ use crate::{error::ClientError, RabbitMQStreamResult};
 pub use message::ClientMessage;
 pub use metadata::{Broker, StreamMetadata};
 pub use metrics::MetricsCollector;
-pub use options::ClientOptions;
+pub use options::{ClientOptions, TlsConfiguration, TlsConfigurationBuilder};
 use rabbitmq_stream_protocol::{
     commands::{
         close::{CloseRequest, CloseResponse},

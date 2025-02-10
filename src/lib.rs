@@ -85,12 +85,14 @@ mod superstream_producer;
 
 pub type RabbitMQStreamResult<T> = Result<T, error::ClientError>;
 
-pub use crate::client::{Client, ClientOptions, MetricsCollector};
+pub use crate::client::{
+    Client, ClientOptions, MetricsCollector, TlsConfiguration, TlsConfigurationBuilder,
+};
 
 pub use crate::consumer::{
     Consumer, ConsumerBuilder, ConsumerHandle, FilterConfiguration, MessageContext,
 };
-pub use crate::environment::{Environment, EnvironmentBuilder, TlsConfiguration};
+pub use crate::environment::{Environment, EnvironmentBuilder};
 pub use crate::producer::{Dedup, NoDedup, Producer, ProducerBuilder};
 pub mod types {
 
