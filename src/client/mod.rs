@@ -852,8 +852,23 @@ impl Client {
                 }
 
                 fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+                    use rustls::SignatureScheme;
                     // I know know if this is correct
-                    vec![]
+                    vec![
+                        SignatureScheme::RSA_PKCS1_SHA1,
+                        SignatureScheme::ECDSA_SHA1_Legacy,
+                        SignatureScheme::RSA_PKCS1_SHA256,
+                        SignatureScheme::ECDSA_NISTP256_SHA256,
+                        SignatureScheme::RSA_PKCS1_SHA384,
+                        SignatureScheme::ECDSA_NISTP384_SHA384,
+                        SignatureScheme::RSA_PKCS1_SHA512,
+                        SignatureScheme::ECDSA_NISTP521_SHA512,
+                        SignatureScheme::RSA_PSS_SHA256,
+                        SignatureScheme::RSA_PSS_SHA384,
+                        SignatureScheme::RSA_PSS_SHA512,
+                        SignatureScheme::ED25519,
+                        SignatureScheme::ED448,
+                    ]
                 }
 
                 fn verify_server_cert(

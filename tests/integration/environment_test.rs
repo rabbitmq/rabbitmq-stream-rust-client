@@ -166,6 +166,7 @@ async fn environment_tls_connection_trust_certificates() {
         .build()
         .await;
 
+    env.as_ref().unwrap();
     assert!(matches!(env, Ok(Environment { .. })));
 }
 
