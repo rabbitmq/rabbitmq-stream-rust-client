@@ -13,6 +13,31 @@ async fn environment_create_test() {
     let _ = TestEnvironment::create().await;
 }
 
+#[cfg(all(feature = "serde", test))]
+mod tests {
+    use rabbitmq_stream_client::ClientOptions;
+
+    use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_environment_build_from_client_option() {
+        let j = r#"
+{
+    "host": "localhost",
+    "tls": {
+        "enabled": false
+    }
+}
+        "#;
+        let stream: String = Faker.fake();
+        let client_options: ClientOptions = serde_json::from_str(j).unwrap();
+        let env = Environment::from_client_option(client_options)
+            .await
+            .unwrap();
+        env.stream_creator().create(&stream).await.unwrap();
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn environment_create_and_delete_super_stream_test() {
     let super_stream = "super_stream_test";

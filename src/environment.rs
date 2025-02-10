@@ -32,6 +32,16 @@ impl Environment {
         EnvironmentBuilder(EnvironmentOptions::default())
     }
 
+    #[cfg(feature = "serde")]
+    pub async fn from_client_option(
+        client_options: impl Into<ClientOptions>,
+    ) -> RabbitMQStreamResult<Self> {
+        let env_option = EnvironmentOptions {
+            client_options: client_options.into(),
+        };
+        Self::boostrap(env_option).await
+    }
+
     async fn boostrap(options: EnvironmentOptions) -> RabbitMQStreamResult<Self> {
         // check connection
         let client = Client::connect(options.client_options.clone()).await?;
