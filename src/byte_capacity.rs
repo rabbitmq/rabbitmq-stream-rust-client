@@ -29,74 +29,46 @@ impl<'de> serde::Deserialize<'de> for ByteCapacity {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::Visitor;
-        use std::fmt;
+        use serde::Deserialize;
 
-        struct U32OrStringVisitor;
-
-        impl Visitor<'_> for U32OrStringVisitor {
-            type Value = ByteCapacity;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a u64 or a \\d+(B|KB|MB|GB|TB) string")
-            }
-
-            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(ByteCapacity::B(v))
-            }
-
-            fn visit_str<E>(self, str: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                if str.ends_with("TB") {
-                    let num = str
-                        .trim_end_matches("TB")
-                        .parse()
-                        .map_err(serde::de::Error::custom)?;
-                    Ok(ByteCapacity::TB(num))
-                } else if str.ends_with("GB") {
-                    let num = str
-                        .trim_end_matches("GB")
-                        .parse()
-                        .map_err(serde::de::Error::custom)?;
-                    Ok(ByteCapacity::GB(num))
-                } else if str.ends_with("MB") {
-                    let num = str
-                        .trim_end_matches("MB")
-                        .parse()
-                        .map_err(serde::de::Error::custom)?;
-                    Ok(ByteCapacity::MB(num))
-                } else if str.ends_with("KB") {
-                    let num = str
-                        .trim_end_matches("KB")
-                        .parse()
-                        .map_err(serde::de::Error::custom)?;
-                    Ok(ByteCapacity::KB(num))
-                } else if str.ends_with("B") {
-                    let num = str
-                        .trim_end_matches("B")
-                        .parse()
-                        .map_err(serde::de::Error::custom)?;
-                    Ok(ByteCapacity::B(num))
-                } else {
-                    let num = str.parse().map_err(serde::de::Error::custom)?;
-                    Ok(ByteCapacity::B(num))
-                }
-            }
-
-            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                self.visit_str(&v)
-            }
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum StringOrNumber {
+            String(String),
+            Number(u64),
         }
 
-        deserializer.deserialize_any(U32OrStringVisitor)
+        macro_rules! match_suffix {
+            ($str: ident, $suf: expr, $variant: expr) => {
+                if $str.ends_with($suf) {
+                    let num = $str
+                        .trim_end_matches($suf)
+                        .parse()
+                        .map_err(serde::de::Error::custom)?;
+                    return Ok(($variant)(num));
+                }
+            };
+        }
+
+        let s_or_n = StringOrNumber::deserialize(deserializer)?;
+
+        match s_or_n {
+            StringOrNumber::String(str) => {
+                match_suffix!(str, "TB", ByteCapacity::TB);
+                match_suffix!(str, "GB", ByteCapacity::GB);
+                match_suffix!(str, "MB", ByteCapacity::MB);
+                match_suffix!(str, "KB", ByteCapacity::KB);
+                match_suffix!(str, "B", ByteCapacity::B);
+
+                let num = str.parse().map_err(|_| {
+                    serde::de::Error::custom(
+                        "Expect a number or a string with a TB|GB|MB|KB|B suffix",
+                    )
+                })?;
+                Ok(ByteCapacity::B(num))
+            }
+            StringOrNumber::Number(num) => Ok(ByteCapacity::B(num)),
+        }
     }
 }
 
@@ -130,5 +102,16 @@ mod tests {
             serde_json::from_str::<ByteCapacity>("\"5\""),
             Ok(ByteCapacity::B(5))
         ));
+        assert!(matches!(
+            serde_json::from_str::<ByteCapacity>("5"),
+            Ok(ByteCapacity::B(5))
+        ));
+        let err = serde_json::from_str::<ByteCapacity>("\"Wrong string format\"")
+            .err()
+            .expect("Expect an error");
+        assert_eq!(
+            err.to_string(),
+            "Expect a number or a string with a TB|GB|MB|KB|B suffix"
+        );
     }
 }
