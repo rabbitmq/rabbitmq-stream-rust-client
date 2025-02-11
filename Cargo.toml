@@ -10,7 +10,8 @@ keywords = ["AMQP", "IoT", "messaging", "streams"]
 categories = ["network-programming"]
 readme = "README.md"
 
-
+[package.metadata."docs.rs"]
+all-features = true
 
 [workspace]
 members = [

@@ -40,6 +40,7 @@ impl Environment {
     /// use rabbitmq_stream_client::Environment;
     /// use rabbitmq_stream_client::ClientOptions;
     ///
+    /// #[derive(serde::Deserialize)]
     /// struct MyConfig {
     ///     rabbitmq: ClientOptions
     /// }
