@@ -32,6 +32,34 @@ impl Environment {
         EnvironmentBuilder(EnvironmentOptions::default())
     }
 
+    /// Create environment instance from client options.
+    /// This allow to create an `Environment` instance from configuration.
+    ///
+    /// ```rust,no_run
+    /// # async fn doc_fn() -> Result<(), Box<dyn std::error::Error>> {
+    /// use rabbitmq_stream_client::Environment;
+    /// use rabbitmq_stream_client::ClientOptions;
+    ///
+    /// struct MyConfig {
+    ///     rabbitmq: ClientOptions
+    /// }
+    ///
+    /// let j = r#"
+    /// {
+    ///     "rabbitmq": {
+    ///         "host": "localhost",
+    ///         "tls": {
+    ///             "enabled": false
+    ///         }
+    ///     }
+    /// }
+    ///         "#;
+    ///  let my_config: MyConfig = serde_json::from_str(j).unwrap();
+    ///  let env = Environment::from_client_option(my_config.rabbitmq)
+    ///     .await
+    ///     .unwrap();
+    /// # Ok(())
+    /// # }
     #[cfg(feature = "serde")]
     pub async fn from_client_option(
         client_options: impl Into<ClientOptions>,
