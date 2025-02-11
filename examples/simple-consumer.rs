@@ -33,8 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap();
 
-    while let delivery = consumer.next().await.unwrap() {
-        let delivery = delivery.unwrap();
+    while let Some(Ok(delivery)) = consumer.next().await {
         println!(
             "Got message: {:#?} from stream: {} with offset: {}",
             delivery

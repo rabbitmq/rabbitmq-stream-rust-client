@@ -5,13 +5,14 @@ fmt:
 	cargo fmt --all -- --check
 
 clippy:
-	cargo clippy --all -- -D warnings
+	cargo clippy --all --all-features -- -D warnings
 
 build: fmt clippy
+	cargo build --all-features
 	cargo build
 
 test: build
-	cargo test --all -- --nocapture
+	cargo test --all --all-features -- --nocapture
 
 watch: build
 	cargo watch -x 'test --all -- --nocapture'

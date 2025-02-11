@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::producer::NoDedup;
 use crate::types::OffsetSpecification;
+use crate::{client::TlsConfiguration, producer::NoDedup};
 use rand::prelude::SliceRandom;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -30,6 +30,45 @@ pub struct Environment {
 impl Environment {
     pub fn builder() -> EnvironmentBuilder {
         EnvironmentBuilder(EnvironmentOptions::default())
+    }
+
+    /// Create environment instance from client options.
+    /// This allow to create an `Environment` instance from configuration.
+    ///
+    /// ```rust,no_run
+    /// # async fn doc_fn() -> Result<(), Box<dyn std::error::Error>> {
+    /// use rabbitmq_stream_client::Environment;
+    /// use rabbitmq_stream_client::ClientOptions;
+    ///
+    /// #[derive(serde::Deserialize)]
+    /// struct MyConfig {
+    ///     rabbitmq: ClientOptions
+    /// }
+    ///
+    /// let j = r#"
+    /// {
+    ///     "rabbitmq": {
+    ///         "host": "localhost",
+    ///         "tls": {
+    ///             "enabled": false
+    ///         }
+    ///     }
+    /// }
+    ///         "#;
+    ///  let my_config: MyConfig = serde_json::from_str(j).unwrap();
+    ///  let env = Environment::from_client_option(my_config.rabbitmq)
+    ///     .await
+    ///     .unwrap();
+    /// # Ok(())
+    /// # }
+    #[cfg(feature = "serde")]
+    pub async fn from_client_option(
+        client_options: impl Into<ClientOptions>,
+    ) -> RabbitMQStreamResult<Self> {
+        let env_option = EnvironmentOptions {
+            client_options: client_options.into(),
+        };
+        Self::boostrap(env_option).await
     }
 
     async fn boostrap(options: EnvironmentOptions) -> RabbitMQStreamResult<Self> {
@@ -310,108 +349,4 @@ impl EnvironmentBuilder {
 #[derive(Clone, Default)]
 pub struct EnvironmentOptions {
     pub(crate) client_options: ClientOptions,
-}
-
-/** Helper for tls configuration */
-#[derive(Clone)]
-pub struct TlsConfiguration {
-    pub(crate) enabled: bool,
-    pub(crate) trust_certificates: bool,
-    pub(crate) root_certificates_path: String,
-    pub(crate) client_certificates_path: String,
-    pub(crate) client_keys_path: String,
-}
-
-impl Default for TlsConfiguration {
-    fn default() -> TlsConfiguration {
-        TlsConfiguration {
-            enabled: true,
-            trust_certificates: false,
-            root_certificates_path: String::from(""),
-            client_certificates_path: String::from(""),
-            client_keys_path: String::from(""),
-        }
-    }
-}
-
-impl TlsConfiguration {
-    pub fn enable(&mut self, enabled: bool) {
-        self.enabled = enabled
-    }
-
-    pub fn enabled(&self) -> bool {
-        self.enabled
-    }
-
-    pub fn trust_certificates(&mut self, trust_certificates: bool) {
-        self.trust_certificates = trust_certificates
-    }
-
-    pub fn trust_certificates_enabled(&self) -> bool {
-        self.trust_certificates
-    }
-
-    pub fn get_root_certificates_path(&self) -> String {
-        self.root_certificates_path.clone()
-    }
-    //
-    pub fn add_root_certificates_path(&mut self, certificate_path: String) {
-        self.root_certificates_path = certificate_path
-    }
-
-    pub fn get_client_certificates_path(&self) -> String {
-        self.client_certificates_path.clone()
-    }
-
-    pub fn get_client_keys_path(&self) -> String {
-        self.client_keys_path.clone()
-    }
-    //
-    pub fn add_client_certificates_keys(
-        &mut self,
-        certificate_path: String,
-        client_private_key_path: String,
-    ) {
-        self.client_certificates_path = certificate_path;
-        self.client_keys_path = client_private_key_path;
-    }
-}
-
-pub struct TlsConfigurationBuilder(TlsConfiguration);
-
-impl TlsConfigurationBuilder {
-    pub fn enable(mut self, enable: bool) -> TlsConfigurationBuilder {
-        self.0.enabled = enable;
-        self
-    }
-
-    pub fn trust_certificates(mut self, trust_certificates: bool) -> TlsConfigurationBuilder {
-        self.0.trust_certificates = trust_certificates;
-        self
-    }
-
-    pub fn add_root_certificates(mut self, certificate_path: String) -> TlsConfigurationBuilder {
-        self.0.root_certificates_path = certificate_path;
-        self
-    }
-
-    pub fn add_client_certificates_keys(
-        mut self,
-        certificate_path: String,
-        client_private_key_path: String,
-    ) -> TlsConfigurationBuilder {
-        self.0.client_certificates_path = certificate_path;
-        self.0.client_keys_path = client_private_key_path;
-        self
-    }
-
-    pub fn build(self) -> TlsConfiguration {
-        self.0
-    }
-}
-
-impl TlsConfiguration {
-    pub fn builder() -> TlsConfigurationBuilder {
-        TlsConfigurationBuilder(TlsConfiguration::default())
-    }
 }

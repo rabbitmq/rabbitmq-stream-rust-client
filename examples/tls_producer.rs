@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // it will start a rabbitmq server with compatible TLS certificates
     let tls_configuration: TlsConfiguration = TlsConfiguration::builder()
         .add_root_certificates(String::from(".ci/certs/ca_certificate.pem"))
-        .build();
+        .build()?;
 
     // Use this configuration if you want to trust the certificates
     // without providing the root certificate and the client certificates
