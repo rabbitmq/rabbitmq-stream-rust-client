@@ -560,7 +560,6 @@ mod tests {
 
         let tls = TlsConfiguration::builder()
             .enable(true)
-            // .add_root_certificates("test")
             .add_client_certificates_keys("cert", "priv")
             .build();
         assert!(tls.is_err());
