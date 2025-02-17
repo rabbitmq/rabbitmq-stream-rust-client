@@ -9,9 +9,6 @@ use crate::{
 
 use super::Command;
 
-#[cfg(test)]
-use fake::Fake;
-
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Eq, Debug)]
 pub struct TunesCommand {

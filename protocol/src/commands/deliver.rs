@@ -9,8 +9,6 @@ use crate::{
     protocol::commands::COMMAND_DELIVER,
 };
 use byteorder::{BigEndian, WriteBytesExt};
-#[cfg(test)]
-use fake::Fake;
 
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -163,7 +161,7 @@ mod tests {
 
     use super::{DeliverCommand, Message};
     impl Dummy<Faker> for Message {
-        fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &Faker, _rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(_config: &Faker, _rng: &mut R) -> Self {
             Message::new(InternalMessage::default())
         }
     }

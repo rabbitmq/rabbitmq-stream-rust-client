@@ -1,8 +1,5 @@
 use std::io::Write;
 
-#[cfg(test)]
-use fake::Fake;
-
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},
@@ -62,7 +59,6 @@ impl Command for DeleteSuperStreamCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::commands::create_super_stream::CreateSuperStreamCommand;
     use crate::commands::tests::command_encode_decode_test;
 
     use super::DeleteSuperStreamCommand;

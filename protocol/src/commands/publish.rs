@@ -11,9 +11,6 @@ use super::Command;
 
 use crate::types::PublishedMessage;
 
-#[cfg(test)]
-use fake::Fake;
-
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Eq, Debug)]
 pub struct PublishCommand {
