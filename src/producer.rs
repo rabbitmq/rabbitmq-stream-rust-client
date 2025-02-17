@@ -28,12 +28,6 @@ use crate::{
 type WaiterMap = Arc<DashMap<u64, ProducerMessageWaiter>>;
 type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
 
-type ConfirmCallback = Arc<
-    dyn Fn(Result<ConfirmationStatus, ProducerPublishError>) -> BoxFuture<'static, ()>
-        + Send
-        + Sync,
->;
-
 #[derive(Debug)]
 pub struct ConfirmationStatus {
     publishing_id: u64,
@@ -323,7 +317,7 @@ impl Producer<NoDedup> {
     pub async fn send<Fut>(
         &self,
         message: Message,
-        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+        cb: impl FnOnce(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
     ) -> Result<(), ProducerPublishError>
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
@@ -359,7 +353,7 @@ impl Producer<Dedup> {
     pub async fn send<Fut>(
         &mut self,
         message: Message,
-        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+        cb: impl FnOnce(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
     ) -> Result<(), ProducerPublishError>
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
@@ -430,7 +424,7 @@ impl<T> Producer<T> {
     async fn do_send<Fut>(
         &self,
         message: Message,
-        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+        cb: impl FnOnce(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
     ) -> Result<(), ProducerPublishError>
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
@@ -442,7 +436,7 @@ impl<T> Producer<T> {
     async fn internal_send<Fut>(
         &self,
         message: Message,
-        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+        cb: impl FnOnce(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
     ) -> Result<(), ProducerPublishError>
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
@@ -460,8 +454,10 @@ impl<T> Producer<T> {
             msg.filter_value_extract(f.as_ref())
         }
 
-        let waiter = ProducerMessageWaiter::waiter_with_cb(cb, message);
-        self.0.waiting_confirmations.insert(publishing_id, waiter);
+        let waiter = OnceProducerMessageWaiter::waiter_with_cb(cb, message);
+        self.0
+            .waiting_confirmations
+            .insert(publishing_id, ProducerMessageWaiter::Once(waiter));
 
         if self.0.accumulator.add(msg).await? {
             self.0.batch_send().await?;
@@ -485,7 +481,9 @@ impl<T> Producer<T> {
 
         let mut wrapped_msgs = Vec::with_capacity(messages.len());
         for message in messages {
-            let waiter = ProducerMessageWaiter::waiter_with_arc_cb(arc_cb.clone(), message.clone());
+            let waiter =
+                SharedProducerMessageWaiter::waiter_with_arc_cb(arc_cb.clone(), message.clone());
+
             let publishing_id = match message.publishing_id() {
                 Some(publishing_id) => *publishing_id,
                 None => self.0.publish_sequence.fetch_add(1, Ordering::Relaxed),
@@ -499,7 +497,7 @@ impl<T> Producer<T> {
 
             self.0
                 .waiting_confirmations
-                .insert(publishing_id, waiter.clone());
+                .insert(publishing_id, ProducerMessageWaiter::Shared(waiter.clone()));
         }
 
         self.0
@@ -542,19 +540,6 @@ struct ProducerConfirmHandler {
     metrics_collector: Arc<dyn MetricsCollector>,
 }
 
-impl ProducerConfirmHandler {
-    async fn with_waiter(
-        &self,
-        publishing_id: u64,
-        cb: impl FnOnce(ProducerMessageWaiter) -> BoxFuture<'static, ()>,
-    ) {
-        match self.waiting_confirmations.remove(&publishing_id) {
-            Some(confirm_sender) => cb(confirm_sender.1).await,
-            None => todo!(),
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl MessageHandler for ProducerConfirmHandler {
     async fn handle_message(&self, item: MessageResult) -> RabbitMQStreamResult<()> {
@@ -566,13 +551,33 @@ impl MessageHandler for ProducerConfirmHandler {
                         let confirm_len = confirm.publishing_ids.len();
                         for publishing_id in &confirm.publishing_ids {
                             let id = *publishing_id;
-                            self.with_waiter(*publishing_id, move |waiter| {
-                                async move {
-                                    let _ = waiter.handle_confirm(id).await;
+
+                            let waiter = match self.waiting_confirmations.remove(publishing_id) {
+                                Some((_, confirm_sender)) => confirm_sender,
+                                None => todo!(),
+                            };
+                            match waiter {
+                                ProducerMessageWaiter::Once(waiter) => {
+                                    let cb = waiter.cb;
+                                    cb(Ok(ConfirmationStatus {
+                                        publishing_id: id,
+                                        confirmed: true,
+                                        status: ResponseCode::Ok,
+                                        message: waiter.msg,
+                                    }))
+                                    .await;
                                 }
-                                .boxed()
-                            })
-                            .await;
+                                ProducerMessageWaiter::Shared(waiter) => {
+                                    let cb = waiter.cb;
+                                    cb(Ok(ConfirmationStatus {
+                                        publishing_id: id,
+                                        confirmed: true,
+                                        status: ResponseCode::Ok,
+                                        message: waiter.msg,
+                                    }))
+                                    .await;
+                                }
+                            }
                         }
                         self.metrics_collector
                             .publish_confirm(confirm_len as u64)
@@ -583,13 +588,33 @@ impl MessageHandler for ProducerConfirmHandler {
                         for err in &error.publishing_errors {
                             let code = err.error_code.clone();
                             let id = err.publishing_id;
-                            self.with_waiter(err.publishing_id, move |waiter| {
-                                async move {
-                                    let _ = waiter.handle_error(id, code).await;
+
+                            let waiter = match self.waiting_confirmations.remove(&id) {
+                                Some((_, confirm_sender)) => confirm_sender,
+                                None => todo!(),
+                            };
+                            match waiter {
+                                ProducerMessageWaiter::Once(waiter) => {
+                                    let cb = waiter.cb;
+                                    cb(Ok(ConfirmationStatus {
+                                        publishing_id: id,
+                                        confirmed: false,
+                                        status: code,
+                                        message: waiter.msg,
+                                    }))
+                                    .await;
                                 }
-                                .boxed()
-                            })
-                            .await;
+                                ProducerMessageWaiter::Shared(waiter) => {
+                                    let cb = waiter.cb;
+                                    cb(Ok(ConfirmationStatus {
+                                        publishing_id: id,
+                                        confirmed: false,
+                                        status: code,
+                                        message: waiter.msg,
+                                    }))
+                                    .await;
+                                }
+                            }
                         }
                     }
                     _ => {}
@@ -608,54 +633,53 @@ impl MessageHandler for ProducerConfirmHandler {
     }
 }
 
-#[derive(Clone)]
-struct ProducerMessageWaiter {
+type ConfirmCallback = Box<
+    dyn FnOnce(Result<ConfirmationStatus, ProducerPublishError>) -> BoxFuture<'static, ()>
+        + Send
+        + Sync,
+>;
+
+type ArcConfirmCallback = Arc<
+    dyn Fn(Result<ConfirmationStatus, ProducerPublishError>) -> BoxFuture<'static, ()>
+        + Send
+        + Sync,
+>;
+
+enum ProducerMessageWaiter {
+    Once(OnceProducerMessageWaiter),
+    Shared(SharedProducerMessageWaiter),
+}
+
+struct OnceProducerMessageWaiter {
     cb: ConfirmCallback,
     msg: Message,
 }
-
-impl ProducerMessageWaiter {
+impl OnceProducerMessageWaiter {
     fn waiter_with_cb<Fut>(
-        cb: impl Fn(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
+        cb: impl FnOnce(Result<ConfirmationStatus, ProducerPublishError>) -> Fut + Send + Sync + 'static,
         msg: Message,
     ) -> Self
     where
         Fut: Future<Output = ()> + Send + Sync + 'static,
     {
         Self {
-            cb: Arc::new(move |confirm_status| cb(confirm_status).boxed()),
+            cb: Box::new(move |confirm_status| cb(confirm_status).boxed()),
             msg,
         }
     }
+}
 
-    fn waiter_with_arc_cb(confirm_callback: ConfirmCallback, msg: Message) -> Self {
+#[derive(Clone)]
+struct SharedProducerMessageWaiter {
+    cb: ArcConfirmCallback,
+    msg: Message,
+}
+
+impl SharedProducerMessageWaiter {
+    fn waiter_with_arc_cb(confirm_callback: ArcConfirmCallback, msg: Message) -> Self {
         Self {
             cb: confirm_callback,
             msg,
         }
-    }
-    async fn handle_confirm(self, publishing_id: u64) -> RabbitMQStreamResult<()> {
-        (self.cb)(Ok(ConfirmationStatus {
-            publishing_id,
-            confirmed: true,
-            status: ResponseCode::Ok,
-            message: self.msg,
-        }))
-        .await;
-        Ok(())
-    }
-    async fn handle_error(
-        self,
-        publishing_id: u64,
-        status: ResponseCode,
-    ) -> RabbitMQStreamResult<()> {
-        (self.cb)(Ok(ConfirmationStatus {
-            publishing_id,
-            confirmed: false,
-            status,
-            message: self.msg,
-        }))
-        .await;
-        Ok(())
     }
 }

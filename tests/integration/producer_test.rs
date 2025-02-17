@@ -232,6 +232,38 @@ async fn producer_send_with_callback() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn producer_send_with_callback_can_drop() {
+    let env = TestEnvironment::create().await;
+    let reference: String = Faker.fake();
+
+    let mut producer = env
+        .env
+        .producer()
+        .name(&reference)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    // A non copy structure
+    struct Foo;
+
+    let f = Foo;
+    producer
+        .send(
+            Message::builder().body(b"message".to_vec()).build(),
+            move |_| {
+                // this callback is an FnOnce, so we can drop a value here
+                drop(f);
+                async {}
+            },
+        )
+        .await
+        .unwrap();
+
+    producer.close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn producer_batch_send_with_callback() {
     let env = TestEnvironment::create().await;
 
@@ -449,7 +481,7 @@ async fn producer_send_after_close_error() {
     );
 }
 
-pub fn routing_key_strategy_value_extractor(message: &Message) -> String {
+pub fn routing_key_strategy_value_extractor(_: &Message) -> String {
     return "0".to_string();
 }
 
