@@ -19,6 +19,6 @@ num_enum = "0.7.0"
 derive_more = "0.99"
 
 [dev-dependencies]
-fake = { version = "3.0", features=['derive', 'chrono','uuid']}
+fake = { version = "4.0", features=['derive', 'chrono','uuid']}
 rand = "0.8"
 pretty_assertions = "1.2.0"
