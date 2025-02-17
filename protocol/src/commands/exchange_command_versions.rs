@@ -10,9 +10,6 @@ use crate::{
 use super::Command;
 use byteorder::{BigEndian, WriteBytesExt};
 
-#[cfg(test)]
-use fake::Fake;
-
 #[cfg_attr(test, derive(fake::Dummy))]
 #[derive(PartialEq, Eq, Debug)]
 pub struct ExchangeCommandVersion(u16, u16, u16);

@@ -168,7 +168,6 @@ mod tests {
     use std::ops::Range;
 
     use fake::{Dummy, Fake, Faker};
-    use rand::Rng;
 
     use crate::message::amqp::{
         tests::type_encode_decode_test_fuzzy,
@@ -179,7 +178,7 @@ mod tests {
     const DEFAULT_LEN_RANGE: Range<usize> = 0..10;
 
     impl Dummy<Faker> for List {
-        fn dummy_with_rng<R: Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
             let len: usize = DEFAULT_LEN_RANGE.fake_with_rng(rng);
             let mut m = List::new();
 

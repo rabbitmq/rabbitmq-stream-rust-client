@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-#[cfg(test)]
-use fake::Fake;
-
 use crate::{
     codec::{Decoder, Encoder},
     error::{DecodeError, EncodeError},

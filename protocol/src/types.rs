@@ -20,9 +20,6 @@ impl Header {
     }
 }
 
-#[cfg(test)]
-use fake::Fake;
-
 use crate::{message::Message, ResponseCode};
 
 #[cfg_attr(test, derive(fake::Dummy))]

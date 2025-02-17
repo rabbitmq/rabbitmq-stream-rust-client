@@ -5,9 +5,6 @@ use crate::message::amqp::codec::{AmqpDecoder, AmqpEncoder};
 use crate::message::amqp::error::{AmqpDecodeError, AmqpEncodeError};
 use crate::utils::TupleMapperSecond;
 
-#[cfg(test)]
-use fake::Fake;
-
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub enum Descriptor {

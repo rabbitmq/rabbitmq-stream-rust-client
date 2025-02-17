@@ -15,9 +15,6 @@ use super::{
     AmqpEncodeError, AmqpEncoder,
 };
 
-#[cfg(test)]
-use fake::Fake;
-
 /// Properties of the message
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(test, derive(fake::Dummy))]

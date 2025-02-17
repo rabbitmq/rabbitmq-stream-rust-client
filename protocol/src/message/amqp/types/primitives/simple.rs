@@ -17,9 +17,6 @@ use crate::{
     utils::TupleMapperSecond,
 };
 
-#[cfg(test)]
-use fake::Fake;
-
 /// Primitive AMQP 1.0 data type
 #[derive(Debug, Eq, PartialEq, Hash, Clone, From, TryInto)]
 #[try_into(owned, ref, ref_mut)]
@@ -691,20 +688,20 @@ mod tests {
     use crate::message::amqp::{tests::type_encode_decode_test_fuzzy, types::SimpleValue};
 
     impl Dummy<Faker> for Float {
-        fn dummy_with_rng<R: rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::RngCore + ?Sized>(config: &Faker, rng: &mut R) -> Self {
             let num: f32 = config.fake_with_rng(rng);
             Float(OrderedFloat::from(num))
         }
     }
     impl Dummy<Faker> for Double {
-        fn dummy_with_rng<R: rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
             let num: f64 = config.fake_with_rng(rng);
             Double(OrderedFloat::from(num))
         }
     }
 
     impl Dummy<Faker> for Timestamp {
-        fn dummy_with_rng<R: rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
             let mut dt: DateTime<Utc> = config.fake_with_rng(rng);
             dt = dt.with_nanosecond(0).unwrap();
             Timestamp(dt)

@@ -10,8 +10,6 @@ use crate::{
 };
 
 use byteorder::{BigEndian, WriteBytesExt};
-#[cfg(test)]
-use fake::Fake;
 
 use super::Str;
 

@@ -11,9 +11,6 @@ use super::{
     types::{list_decoder, Boolean, List},
     AmqpDecodeError, AmqpDecoder, AmqpEncodeError, AmqpEncoder,
 };
-#[cfg(test)]
-use fake::Fake;
-
 /// Header of the message
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(fake::Dummy))]

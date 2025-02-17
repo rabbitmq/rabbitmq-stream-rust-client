@@ -52,7 +52,7 @@ mod tests {
     where
         T: Dummy<Faker> + AmqpDecoder + AmqpEncoder + Debug + PartialEq,
     {
-        let mut rng = rand::thread_rng();
+        let mut rng = fake::rand::rng();
         let len: usize = DEFAULT_LEN_RANGE.fake_with_rng(&mut rng);
 
         for _ in 0..len {
