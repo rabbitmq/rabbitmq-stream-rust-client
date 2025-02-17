@@ -5,7 +5,6 @@ use std::{
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
 };
 
 use dashmap::DashMap;
@@ -71,21 +70,6 @@ pub struct ProducerInternal {
     filter_value_extractor: Option<FilterValueExtractor>,
 }
 
-impl ProducerInternal {
-    async fn batch_send(&self) -> Result<(), ProducerPublishError> {
-        let messages = self.accumulator.get(self.batch_size).await?;
-
-        if !messages.is_empty() {
-            debug!("Sending batch of {} messages", messages.len());
-            self.client
-                .publish(self.producer_id, messages, self.publish_version)
-                .await?;
-        }
-
-        Ok(())
-    }
-}
-
 /// API for publising messages to RabbitMQ stream
 #[derive(Clone)]
 pub struct Producer<T>(Arc<ProducerInternal>, PhantomData<T>);
@@ -95,7 +79,6 @@ pub struct ProducerBuilder<T> {
     pub(crate) environment: Environment,
     pub(crate) name: Option<String>,
     pub batch_size: usize,
-    pub batch_publishing_delay: Duration,
     pub(crate) data: PhantomData<T>,
     pub filter_value_extractor: Option<FilterValueExtractor>,
     pub(crate) client_provided_name: String,
@@ -169,7 +152,7 @@ impl<T> ProducerBuilder<T> {
 
             let internal_producer = Arc::new(producer);
             let producer = Producer(internal_producer.clone(), PhantomData);
-            schedule_batch_send(internal_producer, self.batch_publishing_delay);
+            schedule_batch_send(internal_producer);
 
             Ok(producer)
         } else {
@@ -185,11 +168,6 @@ impl<T> ProducerBuilder<T> {
         self
     }
 
-    pub fn batch_delay(mut self, delay: Duration) -> Self {
-        self.batch_publishing_delay = delay;
-        self
-    }
-
     pub fn client_provided_name(mut self, name: &str) -> Self {
         self.client_provided_name = String::from(name);
         self
@@ -201,7 +179,6 @@ impl<T> ProducerBuilder<T> {
             environment: self.environment,
             name: self.name,
             batch_size: self.batch_size,
-            batch_publishing_delay: self.batch_publishing_delay,
             data: PhantomData,
             filter_value_extractor: None,
             client_provided_name: String::from("rust-stream-producer"),
@@ -229,7 +206,6 @@ impl<T> ProducerBuilder<T> {
 pub struct MessageAccumulator {
     sender: mpsc::Sender<ClientMessage>,
     receiver: Mutex<mpsc::Receiver<ClientMessage>>,
-    capacity: usize,
     message_count: AtomicUsize,
 }
 
@@ -239,52 +215,50 @@ impl MessageAccumulator {
         Self {
             sender,
             receiver: Mutex::new(receiver),
-            capacity: batch_size,
             message_count: AtomicUsize::new(0),
         }
     }
 
-    pub async fn add(&self, message: ClientMessage) -> RabbitMQStreamResult<bool> {
+    pub async fn add(&self, message: ClientMessage) -> RabbitMQStreamResult<()> {
         self.sender
             .send(message)
             .await
-            .map_err(|err| ClientError::GenericError(Box::new(err)))?;
-
-        let val = self.message_count.fetch_add(1, Ordering::Relaxed);
-
-        Ok(val + 1 == self.capacity)
+            .map_err(|err| ClientError::GenericError(Box::new(err)))
     }
 
-    pub async fn get(&self, batch_size: usize) -> RabbitMQStreamResult<Vec<ClientMessage>> {
-        let mut messages = Vec::with_capacity(batch_size);
-        let mut count = 0;
+    pub async fn get(&self, buffer: &mut Vec<ClientMessage>, batch_size: usize) -> (bool, usize) {
         let mut receiver = self.receiver.lock().await;
-        while count < batch_size {
-            match receiver.try_recv().ok() {
-                Some(message) => {
-                    messages.push(message);
-                    count += 1;
-                }
-                _ => break,
-            }
-        }
+
+        let count = receiver.recv_many(buffer, batch_size).await;
         self.message_count
-            .fetch_sub(messages.len(), Ordering::Relaxed);
-        Ok(messages)
+            .fetch_sub(count, Ordering::Relaxed);
+
+        // `recv_many` returns 0 only if the channel is closed
+        // Read https://docs.rs/tokio/latest/tokio/sync/mpsc/struct.Receiver.html#method.recv_many
+        (count == 0, count)
     }
 }
 
-fn schedule_batch_send(producer: Arc<ProducerInternal>, delay: Duration) {
+fn schedule_batch_send(producer: Arc<ProducerInternal>) {
     tokio::task::spawn(async move {
-        let mut interval = tokio::time::interval(delay);
-
-        debug!("Starting batch send interval every {:?}", delay);
+        let mut buffer = Vec::with_capacity(producer.batch_size);
         loop {
-            interval.tick().await;
+            let (is_closed, count) = producer.accumulator.get(&mut buffer, producer.batch_size).await;
 
-            match producer.batch_send().await {
-                Ok(_) => {}
-                Err(e) => error!("Error publishing batch {:?}", e),
+            if is_closed {
+                error!("Channel is closed and this is bad");
+                break;
+            }
+
+            if count > 0 {
+                debug!("Sending batch of {} messages", count);
+                let messages: Vec<_> = buffer.drain(..count).collect();
+                match producer.client
+                    .publish(producer.producer_id, messages, producer.publish_version)
+                    .await {
+                        Ok(_) => {}
+                        Err(e) => error!("Error publishing batch {:?}", e),
+                };
             }
         }
     });
@@ -459,9 +433,7 @@ impl<T> Producer<T> {
             .waiting_confirmations
             .insert(publishing_id, ProducerMessageWaiter::Once(waiter));
 
-        if self.0.accumulator.add(msg).await? {
-            self.0.batch_send().await?;
-        }
+        self.0.accumulator.add(msg).await?;
 
         Ok(())
     }

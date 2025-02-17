@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::types::OffsetSpecification;
 use crate::{client::TlsConfiguration, producer::NoDedup};
@@ -197,7 +196,6 @@ impl Environment {
             environment: self.clone(),
             name: None,
             batch_size: 100,
-            batch_publishing_delay: Duration::from_millis(100),
             data: PhantomData,
             filter_value_extractor: None,
             client_provided_name: String::from("rust-stream-producer"),
