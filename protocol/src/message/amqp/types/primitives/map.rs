@@ -132,7 +132,6 @@ mod tests {
     use crate::message::amqp::types::{SimpleValue, Value};
 
     use fake::{Dummy, Fake, Faker};
-    use rand::Rng;
 
     use std::{hash::Hash, ops::Range};
 
@@ -142,7 +141,7 @@ mod tests {
     where
         K: Dummy<Faker> + Hash + Eq,
     {
-        fn dummy_with_rng<R: Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
             let len: usize = DEFAULT_LEN_RANGE.fake_with_rng(rng);
             let mut m = Map::default();
 
@@ -154,7 +153,7 @@ mod tests {
         }
 
         fn dummy(config: &Faker) -> Self {
-            let mut r = rand::thread_rng();
+            let mut r = fake::rand::rng();
             Dummy::<Faker>::dummy_with_rng(config, &mut r)
         }
     }
@@ -163,7 +162,7 @@ mod tests {
     where
         K: Dummy<Faker> + Hash + Eq,
     {
-        fn dummy_with_rng<R: Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
             let len: usize = DEFAULT_LEN_RANGE.fake_with_rng(rng);
             let mut m = Map::default();
 
@@ -175,7 +174,7 @@ mod tests {
         }
 
         fn dummy(config: &Faker) -> Self {
-            let mut r = rand::thread_rng();
+            let mut r = fake::rand::rng();
             Dummy::<Faker>::dummy_with_rng(config, &mut r)
         }
     }

@@ -78,7 +78,7 @@ mod tests {
 
     use super::MessageBody;
     impl Dummy<Faker> for MessageBody {
-        fn dummy_with_rng<R: rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
             MessageBody {
                 data: config.fake_with_rng(rng),
                 sequence: config.fake_with_rng(rng),

@@ -244,9 +244,9 @@ mod tests {
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
-            close::CloseRequest, consumer_update_request::ConsumerUpdateRequestCommand,
-            create_stream::CreateStreamCommand, create_super_stream::CreateSuperStreamCommand,
-            credit::CreditCommand, declare_publisher::DeclarePublisherCommand, delete::Delete,
+            close::CloseRequest, create_stream::CreateStreamCommand,
+            create_super_stream::CreateSuperStreamCommand, credit::CreditCommand,
+            declare_publisher::DeclarePublisherCommand, delete::Delete,
             delete_publisher::DeletePublisherCommand,
             delete_super_stream::DeleteSuperStreamCommand,
             exchange_command_versions::ExchangeCommandVersionsRequest,

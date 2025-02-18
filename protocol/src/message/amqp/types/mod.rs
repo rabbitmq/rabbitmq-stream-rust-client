@@ -6,9 +6,6 @@ pub use primitives::*;
 
 use super::{codec::constants::TypeCode, AmqpDecoder, AmqpEncodeError, AmqpEncoder};
 
-#[cfg(test)]
-use fake::Fake;
-
 mod annotations;
 mod definitions;
 mod descriptor;

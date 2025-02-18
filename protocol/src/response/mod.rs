@@ -223,8 +223,6 @@ where
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
-
     use byteorder::{BigEndian, WriteBytesExt};
 
     use super::{Response, ResponseKind};

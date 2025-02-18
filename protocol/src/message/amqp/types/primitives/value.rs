@@ -14,9 +14,6 @@ use crate::{
 };
 use derive_more::From;
 
-#[cfg(test)]
-use fake::Fake;
-
 /// AMQP 1.0 data types
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 #[cfg_attr(test, derive(fake::Dummy))]
