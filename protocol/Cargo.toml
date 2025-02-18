@@ -16,7 +16,7 @@ ordered-float = "4.1.0"
 uuid = "1"
 chrono = "0.4.26"
 num_enum = "0.7.0"
-derive_more = "0.99"
+derive_more = "2.0"
 
 [dev-dependencies]
 pretty_assertions = "1.2.0"
