@@ -73,7 +73,7 @@ fn hash_strategy_value_extractor(message: &Message) -> String {
     let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
     return s;
 }
-/*
+
 #[tokio::test(flavor = "multi_thread")]
 async fn super_stream_consumer_test() {
     let env = TestEnvironment::create_super_stream().await;
@@ -122,7 +122,6 @@ async fn super_stream_consumer_test() {
     super_stream_producer.close().await.unwrap();
     _ = handle.close().await;
 }
-*/
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test_offset_specification_offset() {

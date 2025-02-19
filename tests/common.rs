@@ -79,20 +79,17 @@ impl Drop for TestClient {
         if self.stream != "" {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
-                    let r = self.client.delete_stream(&self.stream).await;
-                    if let Err(e) = r {
-                        eprintln!("Error deleting stream: {:?}", e);
-                    }
+                    self.client.delete_stream(&self.stream).await.unwrap();
                 })
             });
         }
         if self.super_stream != "" {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
-                    let r = self.client.delete_super_stream(&self.super_stream).await;
-                    if let Err(e) = r {
-                        eprintln!("Error deleting super stream: {:?}", e);
-                    }
+                    self.client
+                        .delete_super_stream(&self.super_stream)
+                        .await
+                        .unwrap();
                 })
             });
         }
@@ -135,12 +132,7 @@ impl Drop for TestEnvironment {
         if self.stream != "" {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
-                    let r = self.env.delete_stream(&self.stream).await;
-                    // Since we generate stream name randomly,
-                    // it doesn't matter if the deletion goes wrong
-                    if let Err(e) = r {
-                        eprintln!("Error deleting stream: {:?}", e);
-                    }
+                    self.env.delete_stream(&self.stream).await.unwrap();
                 })
             });
         }
@@ -148,12 +140,10 @@ impl Drop for TestEnvironment {
             tokio::task::block_in_place(|| {
                 println!("Deleting super stream: {}", self.super_stream);
                 tokio::runtime::Handle::current().block_on(async {
-                    let r = self.env.delete_super_stream(&self.super_stream).await;
-                    // Since we generate super stream name randomly,
-                    // it doesn't matter if the deletion goes wrong
-                    if let Err(e) = r {
-                        eprintln!("Error deleting super stream: {:?}", e);
-                    }
+                    self.env
+                        .delete_super_stream(&self.super_stream)
+                        .await
+                        .unwrap();
                 })
             });
         }

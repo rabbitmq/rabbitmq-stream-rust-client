@@ -220,10 +220,13 @@ impl MessageAccumulator {
     }
 
     pub async fn add(&self, message: ClientMessage) -> RabbitMQStreamResult<()> {
-        self.sender
-            .send(message)
-            .await
-            .map_err(|err| ClientError::GenericError(Box::new(err)))
+        match self.sender.send(message).await {
+            Ok(_) => {
+                self.message_count.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            }
+            Err(e) => Err(ClientError::GenericError(Box::new(e))),
+        }
     }
 
     pub async fn get(&self, buffer: &mut Vec<ClientMessage>, batch_size: usize) -> (bool, usize) {
