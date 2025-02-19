@@ -52,12 +52,10 @@ async fn environment_create_and_delete_super_stream_test() {
         .create_super_stream(&super_stream, 3, None)
         .await;
 
-    println!("{:?}", response);
     assert_eq!(response.is_ok(), true);
 
     let response = env.delete_super_stream(&super_stream).await;
 
-    println!("{:?}", response);
     assert_eq!(response.is_ok(), true);
 }
 

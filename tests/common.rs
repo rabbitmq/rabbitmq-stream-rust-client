@@ -138,7 +138,6 @@ impl Drop for TestEnvironment {
         }
         if self.super_stream != "" {
             tokio::task::block_in_place(|| {
-                println!("Deleting super stream: {}", self.super_stream);
                 tokio::runtime::Handle::current().block_on(async {
                     self.env
                         .delete_super_stream(&self.super_stream)
