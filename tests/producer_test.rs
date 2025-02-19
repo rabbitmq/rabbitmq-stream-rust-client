@@ -10,7 +10,10 @@ use rabbitmq_stream_client::{
     Environment,
 };
 
-use crate::common::{Countdown, TestEnvironment};
+#[path = "./common.rs"]
+mod common;
+
+use common::*;
 
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,

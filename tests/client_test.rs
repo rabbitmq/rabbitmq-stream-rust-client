@@ -12,7 +12,10 @@ use rabbitmq_stream_client::{
     Client, ClientOptions,
 };
 
-use crate::common::TestClient;
+#[path = "./common.rs"]
+mod common;
+
+use common::*;
 
 #[tokio::test]
 async fn client_connection_test() {

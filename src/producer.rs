@@ -230,8 +230,7 @@ impl MessageAccumulator {
         let mut receiver = self.receiver.lock().await;
 
         let count = receiver.recv_many(buffer, batch_size).await;
-        self.message_count
-            .fetch_sub(count, Ordering::Relaxed);
+        self.message_count.fetch_sub(count, Ordering::Relaxed);
 
         // `recv_many` returns 0 only if the channel is closed
         // Read https://docs.rs/tokio/latest/tokio/sync/mpsc/struct.Receiver.html#method.recv_many
@@ -243,7 +242,10 @@ fn schedule_batch_send(producer: Arc<ProducerInternal>) {
     tokio::task::spawn(async move {
         let mut buffer = Vec::with_capacity(producer.batch_size);
         loop {
-            let (is_closed, count) = producer.accumulator.get(&mut buffer, producer.batch_size).await;
+            let (is_closed, count) = producer
+                .accumulator
+                .get(&mut buffer, producer.batch_size)
+                .await;
 
             if is_closed {
                 error!("Channel is closed and this is bad");
@@ -253,11 +255,20 @@ fn schedule_batch_send(producer: Arc<ProducerInternal>) {
             if count > 0 {
                 debug!("Sending batch of {} messages", count);
                 let messages: Vec<_> = buffer.drain(..count).collect();
-                match producer.client
+                match producer
+                    .client
                     .publish(producer.producer_id, messages, producer.publish_version)
-                    .await {
-                        Ok(_) => {}
-                        Err(e) => error!("Error publishing batch {:?}", e),
+                    .await
+                {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("Error publishing batch {:?}", e);
+
+                        // Stop loop if producer is closed
+                        if producer.closed.load(Ordering::Relaxed) {
+                            break;
+                        }
+                    }
                 };
             }
         }

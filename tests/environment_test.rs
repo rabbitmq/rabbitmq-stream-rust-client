@@ -6,7 +6,10 @@ use rabbitmq_stream_client::types::ByteCapacity;
 use rabbitmq_stream_client::{error, Environment, TlsConfiguration};
 use rabbitmq_stream_protocol::ResponseCode;
 
-use crate::common::TestEnvironment;
+#[path = "./common.rs"]
+mod common;
+
+use common::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn environment_create_test() {
@@ -40,19 +43,21 @@ mod tests {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn environment_create_and_delete_super_stream_test() {
-    let super_stream = "super_stream_test";
+    let super_stream: String = Faker.fake();
     let env = Environment::builder().build().await.unwrap();
 
     let response = env
         .stream_creator()
         .max_length(ByteCapacity::GB(5))
-        .create_super_stream(super_stream, 3, None)
+        .create_super_stream(&super_stream, 3, None)
         .await;
 
+    println!("{:?}", response);
     assert_eq!(response.is_ok(), true);
 
-    let response = env.delete_super_stream(super_stream).await;
+    let response = env.delete_super_stream(&super_stream).await;
 
+    println!("{:?}", response);
     assert_eq!(response.is_ok(), true);
 }
 
