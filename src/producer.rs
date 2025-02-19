@@ -465,7 +465,6 @@ impl<T> Producer<T> {
 
         let arc_cb = Arc::new(move |status| cb(status).boxed());
 
-        let mut wrapped_msgs = Vec::with_capacity(messages.len());
         for message in messages {
             let waiter =
                 SharedProducerMessageWaiter::waiter_with_arc_cb(arc_cb.clone(), message.clone());
@@ -479,17 +478,13 @@ impl<T> Producer<T> {
             if let Some(f) = self.0.filter_value_extractor.as_ref() {
                 client_message.filter_value_extract(f.as_ref())
             }
-            wrapped_msgs.push(client_message);
 
+            // Queue the message for sending
+            self.0.accumulator.add(client_message).await?;
             self.0
                 .waiting_confirmations
                 .insert(publishing_id, ProducerMessageWaiter::Shared(waiter.clone()));
         }
-
-        self.0
-            .client
-            .publish(self.0.producer_id, wrapped_msgs, self.0.publish_version)
-            .await?;
 
         Ok(())
     }
