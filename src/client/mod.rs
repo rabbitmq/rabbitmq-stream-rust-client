@@ -622,7 +622,7 @@ impl Client {
         M: FnOnce(u32) -> R,
     {
         let Some((correlation_id, mut receiver)) = self.dispatcher.response_channel() else {
-            trace!("Connection si closed here");
+            trace!("Connection is closed here");
             return Err(ClientError::ConnectionClosed);
         };
 

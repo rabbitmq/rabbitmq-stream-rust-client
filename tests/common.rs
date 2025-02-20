@@ -78,8 +78,9 @@ impl Drop for TestClient {
     fn drop(&mut self) {
         if self.stream != "" {
             tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current()
-                    .block_on(async { self.client.delete_stream(&self.stream).await.unwrap() })
+                tokio::runtime::Handle::current().block_on(async {
+                    self.client.delete_stream(&self.stream).await.unwrap();
+                })
             });
         }
         if self.super_stream != "" {
@@ -88,7 +89,7 @@ impl Drop for TestClient {
                     self.client
                         .delete_super_stream(&self.super_stream)
                         .await
-                        .unwrap()
+                        .unwrap();
                 })
             });
         }
@@ -130,8 +131,9 @@ impl Drop for TestEnvironment {
     fn drop(&mut self) {
         if self.stream != "" {
             tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current()
-                    .block_on(async { self.env.delete_stream(&self.stream).await.unwrap() })
+                tokio::runtime::Handle::current().block_on(async {
+                    self.env.delete_stream(&self.stream).await.unwrap();
+                })
             });
         }
         if self.super_stream != "" {
@@ -140,7 +142,7 @@ impl Drop for TestEnvironment {
                     self.env
                         .delete_super_stream(&self.super_stream)
                         .await
-                        .unwrap()
+                        .unwrap();
                 })
             });
         }

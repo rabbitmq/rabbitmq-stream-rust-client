@@ -66,3 +66,6 @@ path="examples/superstreams/send_super_stream.rs"
 name="environment_deserialization"
 path="examples/environment_deserialization.rs"
 
+[[bin]]
+name = "perf-producer"
+path = "src/bin/perf-producer.rs"

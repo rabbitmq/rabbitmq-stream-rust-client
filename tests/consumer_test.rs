@@ -1,6 +1,10 @@
 use std::time::Duration;
 
-use crate::common::TestEnvironment;
+#[path = "./common.rs"]
+mod common;
+
+use common::*;
+
 use fake::{Fake, Faker};
 use futures::StreamExt;
 use rabbitmq_stream_client::{
@@ -12,7 +16,6 @@ use rabbitmq_stream_client::{
     Consumer, FilterConfiguration, NoDedup, Producer,
 };
 
-use crate::producer_test::routing_key_strategy_value_extractor;
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
@@ -21,6 +24,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::Notify;
 use tokio::task;
 use {std::sync::Arc, std::sync::Mutex};
+
+pub fn routing_key_strategy_value_extractor(_: &Message) -> String {
+    return "0".to_string();
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
