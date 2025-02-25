@@ -132,7 +132,7 @@ async fn producer_send_name_with_deduplication_ok() {
         .send_with_confirm(
             Message::builder()
                 .body(b"message0".to_vec())
-                .publising_id(0)
+                .publishing_id(0)
                 .build(),
         )
         .await
@@ -173,24 +173,24 @@ async fn producer_send_batch_name_with_deduplication_ok() {
             // confirmed
             Message::builder()
                 .body(b"message".to_vec())
-                .publising_id(0)
+                .publishing_id(0)
                 .build(),
             // this won't be confirmed
             // since it will skipped by deduplication
             Message::builder()
                 .body(b"message".to_vec())
-                .publising_id(0)
+                .publishing_id(0)
                 .build(),
             // confirmed since the publishing id is different
             Message::builder()
                 .body(b"message".to_vec())
-                .publising_id(1)
+                .publishing_id(1)
                 .build(),
             // not confirmed since the publishing id is the same
             // message will be skipped by deduplication
             Message::builder()
                 .body(b"message".to_vec())
-                .publising_id(1)
+                .publishing_id(1)
                 .build(),
         ])
         .await
