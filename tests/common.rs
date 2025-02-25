@@ -1,9 +1,11 @@
+use core::panic;
 use std::{collections::HashMap, future::Future, sync::Arc};
 
 use fake::{Fake, Faker};
 use rabbitmq_stream_client::{Client, ClientOptions, Environment};
 use rabbitmq_stream_protocol::commands::generic::GenericResponse;
 use rabbitmq_stream_protocol::ResponseCode;
+use serde::Deserialize;
 use tokio::sync::Semaphore;
 
 pub struct TestClient {
@@ -44,8 +46,12 @@ pub struct TestEnvironment {
 
 impl TestClient {
     pub async fn create() -> TestClient {
+        Self::create_with_option(ClientOptions::default()).await
+    }
+
+    pub async fn create_with_option(options: ClientOptions) -> TestClient {
         let stream: String = Faker.fake();
-        let client = Client::connect(ClientOptions::default()).await.unwrap();
+        let client = Client::connect(options).await.unwrap();
 
         let response = client.create_stream(&stream, HashMap::new()).await.unwrap();
 
@@ -177,4 +183,50 @@ pub async fn create_generic_super_stream(
         .unwrap();
 
     (response, partitions)
+}
+
+#[derive(Deserialize, Debug)]
+pub struct RabbitConnection {
+    pub name: String,
+    pub client_properties: HashMap<String, String>,
+}
+
+pub async fn list_http_connection() -> Vec<RabbitConnection> {
+    reqwest::Client::new()
+        .get("http://localhost:15672/api/connections/")
+        .basic_auth("guest", Some("guest"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap()
+}
+
+pub async fn wait_for_named_connection(connection_name: String) -> RabbitConnection {
+    let mut max = 10;
+    while max > 0 {
+        let connections = list_http_connection().await;
+        let connection = connections
+            .into_iter()
+            .find(|x| x.client_properties.get("connection_name") == Some(&connection_name));
+        match connection {
+            Some(connection) => return connection,
+            None => tokio::time::sleep(tokio::time::Duration::from_secs(1)).await,
+        }
+        max -= 1;
+    }
+    panic!("Connection not found. timeout");
+}
+
+pub async fn drop_connection(connection: RabbitConnection) {
+    reqwest::Client::new()
+        .delete(format!(
+            "http://localhost:15672/api/connections/{}",
+            connection.name
+        ))
+        .basic_auth("guest", Some("guest"))
+        .send()
+        .await
+        .unwrap();
 }

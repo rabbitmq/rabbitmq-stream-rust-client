@@ -25,7 +25,7 @@ use tokio::{net::TcpStream, sync::Notify};
 use tokio_rustls::client::TlsStream;
 
 use tokio_util::codec::Framed;
-use tracing::trace;
+use tracing::{trace, warn};
 
 use crate::{error::ClientError, RabbitMQStreamResult};
 pub use message::ClientMessage;
@@ -275,8 +275,12 @@ impl Client {
         state.handler = Some(Arc::new(handler));
     }
 
+    pub fn is_closed(&self) -> bool {
+        self.channel.is_closed()
+    }
+
     pub async fn close(&self) -> RabbitMQStreamResult<()> {
-        if self.channel.is_closed() {
+        if self.is_closed() {
             return Err(ClientError::AlreadyClosed);
         }
         let _: CloseResponse = self
@@ -286,12 +290,17 @@ impl Client {
             .await?;
 
         let mut state = self.state.write().await;
-
+        // This stop the tokio task that performs heartbeats
         state.heartbeat_task.take();
-
         drop(state);
+
+        self.force_drop_connection().await
+    }
+
+    async fn force_drop_connection(&self) -> RabbitMQStreamResult<()> {
         self.channel.close().await
     }
+
     pub async fn subscribe(
         &self,
         subscription_id: u8,
@@ -711,9 +720,16 @@ impl Client {
         let heartbeat_task = tokio::spawn(async move {
             loop {
                 trace!("Sending heartbeat");
-                let _ = channel.send(HeartBeatCommand::default().into()).await;
+                if channel
+                    .send(HeartBeatCommand::default().into())
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
                 tokio::time::sleep(Duration::from_secs(heartbeat_interval.into())).await;
             }
+            warn!("Heartbeat task stopped. Force closing connection");
         })
         .into();
         state.heartbeat_task = Some(heartbeat_task);

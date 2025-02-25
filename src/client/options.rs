@@ -223,6 +223,11 @@ impl ClientOptionsBuilder {
         self
     }
 
+    pub fn client_provided_name(mut self, client_provided_name: String) -> Self {
+        self.0.client_provided_name = client_provided_name;
+        self
+    }
+
     pub fn collector(mut self, collector: Arc<dyn MetricsCollector>) -> Self {
         self.0.collector = collector;
         self

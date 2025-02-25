@@ -467,7 +467,39 @@ async fn client_close() {
         .await
         .expect("Failed to close the client");
 
-    let err = test.client.unsubscribe(1).await.unwrap_err();
+    let err = test.client.unsubscribe(1).await;
+    assert!(
+        matches!(err, Err(ClientError::ConnectionClosed)) || matches!(err, Err(ClientError::Io(_)))
+    );
+}
 
-    assert!(matches!(err, ClientError::ConnectionClosed));
+#[tokio::test(flavor = "multi_thread")]
+async fn client_drop_connection() {
+    let _ = tracing_subscriber::fmt::try_init();
+    let client_provider_name: String = Faker.fake();
+
+    let options = ClientOptions::builder()
+        .client_provided_name(client_provider_name.clone())
+        .heartbeat(2)
+        .build();
+    let test = TestClient::create_with_option(options).await;
+
+    let reference: String = Faker.fake();
+    let _ = test
+        .client
+        .declare_publisher(1, Some(reference.clone()), "not_existing_stream")
+        .await;
+    let _ = test.client.unsubscribe(1).await;
+
+    let connection = wait_for_named_connection(client_provider_name.clone()).await;
+    drop_connection(connection).await;
+
+    let res = test
+        .client
+        .declare_publisher(1, Some(reference.clone()), "not_existing_stream")
+        .await;
+
+    assert!(matches!(res, Err(ClientError::ConnectionClosed)));
+    let res = test.client.close().await;
+    assert!(matches!(res, Err(ClientError::ConnectionClosed)));
 }

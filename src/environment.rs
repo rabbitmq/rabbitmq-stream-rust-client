@@ -326,6 +326,7 @@ impl EnvironmentBuilder {
         self.0.client_options.heartbeat = heartbeat;
         self
     }
+
     pub fn metrics_collector(
         mut self,
         collector: impl MetricsCollector + 'static,
