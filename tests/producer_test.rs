@@ -6,6 +6,7 @@ use futures::{lock::Mutex, StreamExt};
 use tokio::sync::mpsc::channel;
 
 use rabbitmq_stream_client::{
+    error::ClientError,
     types::{Message, OffsetSpecification, SimpleValue},
     Environment,
 };
@@ -680,4 +681,41 @@ async fn super_stream_producer_send_filtering_message() {
         Ok(_) => assert!(true),
         Err(_) => assert!(false),
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_drop_connection() {
+    let _ = tracing_subscriber::fmt::try_init();
+    let client_provided_name: String = Faker.fake();
+    let env = TestEnvironment::create().await;
+    let producer = env
+        .env
+        .producer()
+        .client_provided_name(&client_provided_name)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await
+        .unwrap();
+
+    let connection = wait_for_named_connection(client_provided_name.clone()).await;
+    drop_connection(connection).await;
+
+    let closed = producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await;
+
+    assert!(matches!(
+        closed,
+        Err(rabbitmq_stream_client::error::ProducerPublishError::Timeout)
+    ));
+
+    let err = producer.close().await.unwrap_err();
+    assert!(matches!(
+        err,
+        rabbitmq_stream_client::error::ProducerCloseError::Client(ClientError::ConnectionClosed)
+    ));
 }

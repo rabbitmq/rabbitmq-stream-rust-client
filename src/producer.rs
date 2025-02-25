@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::time::Duration;
 use std::{
     marker::PhantomData,
     sync::{
@@ -11,6 +12,7 @@ use dashmap::DashMap;
 use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::mpsc::channel;
 use tokio::sync::{mpsc, Mutex};
+use tokio::time::sleep;
 use tracing::{debug, error, trace};
 
 use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
@@ -364,13 +366,19 @@ impl<T> Producer<T> {
         })
         .await?;
 
-        rx.recv()
-            .await
-            .ok_or_else(|| ProducerPublishError::Confirmation {
-                stream: self.0.stream.clone(),
-            })?
-            .map_err(|err| ClientError::GenericError(Box::new(err)))
-            .map(Ok)?
+        let r = tokio::select! {
+            val = rx.recv() => {
+                Ok(val)
+            }
+            _ = sleep(Duration::from_secs(1)) => {
+                Err(ProducerPublishError::Timeout)
+            }
+        }?;
+        r.ok_or_else(|| ProducerPublishError::Confirmation {
+            stream: self.0.stream.clone(),
+        })?
+        .map_err(|err| ClientError::GenericError(Box::new(err)))
+        .map(Ok)?
     }
 
     async fn do_batch_send_with_confirm(
@@ -539,23 +547,23 @@ impl MessageHandler for ProducerConfirmHandler {
                             };
                             match waiter {
                                 ProducerMessageWaiter::Once(waiter) => {
-                                    let cb = waiter.cb;
-                                    cb(Ok(ConfirmationStatus {
-                                        publishing_id: id,
-                                        confirmed: true,
-                                        status: ResponseCode::Ok,
-                                        message: waiter.msg,
-                                    }))
+                                    invoke_handler_once(
+                                        waiter.cb,
+                                        id,
+                                        true,
+                                        ResponseCode::Ok,
+                                        waiter.msg,
+                                    )
                                     .await;
                                 }
                                 ProducerMessageWaiter::Shared(waiter) => {
-                                    let cb = waiter.cb;
-                                    cb(Ok(ConfirmationStatus {
-                                        publishing_id: id,
-                                        confirmed: true,
-                                        status: ResponseCode::Ok,
-                                        message: waiter.msg,
-                                    }))
+                                    invoke_handler(
+                                        waiter.cb,
+                                        id,
+                                        true,
+                                        ResponseCode::Ok,
+                                        waiter.msg,
+                                    )
                                     .await;
                                 }
                             }
@@ -576,24 +584,11 @@ impl MessageHandler for ProducerConfirmHandler {
                             };
                             match waiter {
                                 ProducerMessageWaiter::Once(waiter) => {
-                                    let cb = waiter.cb;
-                                    cb(Ok(ConfirmationStatus {
-                                        publishing_id: id,
-                                        confirmed: false,
-                                        status: code,
-                                        message: waiter.msg,
-                                    }))
-                                    .await;
+                                    invoke_handler_once(waiter.cb, id, false, code, waiter.msg)
+                                        .await;
                                 }
                                 ProducerMessageWaiter::Shared(waiter) => {
-                                    let cb = waiter.cb;
-                                    cb(Ok(ConfirmationStatus {
-                                        publishing_id: id,
-                                        confirmed: false,
-                                        status: code,
-                                        message: waiter.msg,
-                                    }))
-                                    .await;
+                                    invoke_handler(waiter.cb, id, false, code, waiter.msg).await;
                                 }
                             }
                         }
@@ -612,6 +607,51 @@ impl MessageHandler for ProducerConfirmHandler {
         }
         Ok(())
     }
+}
+
+async fn invoke_handler<T>(
+    f: T,
+    publishing_id: u64,
+    confirmed: bool,
+    status: ResponseCode,
+    message: Message,
+) where
+    T: std::ops::Deref<
+        Target = dyn Fn(
+            Result<ConfirmationStatus, ProducerPublishError>,
+        ) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send>>
+                     + Send
+                     + Sync,
+    >,
+{
+    f(Ok(ConfirmationStatus {
+        publishing_id,
+        confirmed,
+        status,
+        message,
+    }))
+    .await;
+}
+async fn invoke_handler_once(
+    f: Box<
+        dyn FnOnce(
+                Result<ConfirmationStatus, ProducerPublishError>,
+            ) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send>>
+            + Send
+            + Sync,
+    >,
+    publishing_id: u64,
+    confirmed: bool,
+    status: ResponseCode,
+    message: Message,
+) {
+    f(Ok(ConfirmationStatus {
+        publishing_id,
+        confirmed,
+        status,
+        message,
+    }))
+    .await;
 }
 
 type ConfirmCallback = Box<
