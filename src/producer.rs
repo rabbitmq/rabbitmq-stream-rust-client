@@ -609,21 +609,13 @@ impl MessageHandler for ProducerConfirmHandler {
     }
 }
 
-async fn invoke_handler<T>(
-    f: T,
+async fn invoke_handler(
+    f: ArcConfirmCallback,
     publishing_id: u64,
     confirmed: bool,
     status: ResponseCode,
     message: Message,
-) where
-    T: std::ops::Deref<
-        Target = dyn Fn(
-            Result<ConfirmationStatus, ProducerPublishError>,
-        ) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send>>
-                     + Send
-                     + Sync,
-    >,
-{
+) {
     f(Ok(ConfirmationStatus {
         publishing_id,
         confirmed,
@@ -633,13 +625,7 @@ async fn invoke_handler<T>(
     .await;
 }
 async fn invoke_handler_once(
-    f: Box<
-        dyn FnOnce(
-                Result<ConfirmationStatus, ProducerPublishError>,
-            ) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send>>
-            + Send
-            + Sync,
-    >,
+    f: ConfirmCallback,
     publishing_id: u64,
     confirmed: bool,
     status: ResponseCode,
