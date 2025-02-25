@@ -52,11 +52,11 @@ async fn environment_create_and_delete_super_stream_test() {
         .create_super_stream(&super_stream, 3, None)
         .await;
 
-    assert_eq!(response.is_ok(), true);
+    assert!(response.is_ok());
 
     let response = env.delete_super_stream(&super_stream).await;
 
-    assert_eq!(response.is_ok(), true);
+    assert!(response.is_ok());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -130,7 +130,7 @@ async fn environment_create_delete_stream_twice() {
     let env = Environment::builder().build().await.unwrap();
     let stream_to_test: String = Faker.fake();
     let response = env.stream_creator().create(&stream_to_test).await;
-    assert_eq!(response.is_ok(), true);
+    assert!(response.is_ok());
 
     let response = env.stream_creator().create(&stream_to_test).await;
 
@@ -144,7 +144,7 @@ async fn environment_create_delete_stream_twice() {
 
     // The first delete should succeed since the stream was created
     let delete_response = env.delete_stream(&stream_to_test).await;
-    assert_eq!(delete_response.is_ok(), true);
+    assert!(delete_response.is_ok());
 
     // the second delete should fail since the stream was already deleted
     let delete_response = env.delete_stream(&stream_to_test).await;
@@ -174,10 +174,10 @@ async fn environment_create_streams_with_parameters() {
         .max_segment_size(ByteCapacity::GB(1))
         .create(&stream_to_test)
         .await;
-    assert_eq!(response.is_ok(), true);
+    assert!(response.is_ok());
 
     let delete_response = env.delete_stream(&stream_to_test).await;
-    assert_eq!(delete_response.is_ok(), true);
+    assert!(delete_response.is_ok());
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -54,9 +54,9 @@ async fn start_publisher(
     env: Environment,
     stream: &String,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let _ = env.stream_creator().create(&stream).await;
+    let _ = env.stream_creator().create(stream).await;
 
-    let producer = env.producer().batch_size(BATCH_SIZE).build(&stream).await?;
+    let producer = env.producer().batch_size(BATCH_SIZE).build(stream).await?;
 
     let is_batch_send = true;
     tokio::task::spawn(async move {

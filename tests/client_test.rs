@@ -224,10 +224,10 @@ async fn client_store_query_offset_error_test() {
     match response_off_not_found {
         Ok(_) => panic!("Should not be ok"),
         Err(e) => {
-            assert_eq!(
-                matches!(e, ClientError::RequestError(ResponseCode::OffsetNotFound)),
-                true
-            )
+            assert!(matches!(
+                e,
+                ClientError::RequestError(ResponseCode::OffsetNotFound)
+            ))
         }
     }
 
@@ -241,13 +241,10 @@ async fn client_store_query_offset_error_test() {
     match response_stream_does_not_exist {
         Ok(_) => panic!("Should not be ok"),
         Err(e) => {
-            assert_eq!(
-                matches!(
-                    e,
-                    ClientError::RequestError(ResponseCode::StreamDoesNotExist)
-                ),
-                true
-            )
+            assert!(matches!(
+                e,
+                ClientError::RequestError(ResponseCode::StreamDoesNotExist)
+            ))
         }
     }
 }
@@ -400,7 +397,7 @@ async fn client_publish() {
     assert_eq!(1, delivery.messages.len());
     assert_eq!(
         Some(b"message".as_ref()),
-        delivery.messages.get(0).unwrap().data()
+        delivery.messages.first().unwrap().data()
     );
 }
 
@@ -432,8 +429,8 @@ async fn client_test_partitions_test() {
         .unwrap();
 
     assert_eq!(
-        response.streams.get(0).unwrap(),
-        test.partitions.get(0).unwrap()
+        response.streams.first().unwrap(),
+        test.partitions.first().unwrap()
     );
     assert_eq!(
         response.streams.get(1).unwrap(),
@@ -456,7 +453,21 @@ async fn client_test_route_test() {
 
     assert_eq!(response.streams.len(), 1);
     assert_eq!(
-        response.streams.get(0).unwrap(),
-        test.partitions.get(0).unwrap()
+        response.streams.first().unwrap(),
+        test.partitions.first().unwrap()
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_close() {
+    let test = TestClient::create().await;
+
+    test.client
+        .close()
+        .await
+        .expect("Failed to close the client");
+
+    let err = test.client.unsubscribe(1).await.unwrap_err();
+
+    assert!(matches!(err, ClientError::ConnectionClosed));
 }

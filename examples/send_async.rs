@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let create_response = environment
         .stream_creator()
         .max_length(ByteCapacity::GB(5))
-        .create(&stream)
+        .create(stream)
         .await;
 
     if let Err(e) = create_response {

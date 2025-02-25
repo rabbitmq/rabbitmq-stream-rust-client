@@ -76,14 +76,16 @@ impl TestClient {
 
 impl Drop for TestClient {
     fn drop(&mut self) {
-        if self.stream != "" {
+        if !self.stream.is_empty() {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
-                    self.client.delete_stream(&self.stream).await.unwrap();
+                    // Some tests may close the connection intentionally
+                    // so we ignore the error here
+                    let _ = self.client.delete_stream(&self.stream).await;
                 })
             });
         }
-        if self.super_stream != "" {
+        if !self.super_stream.is_empty() {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
                     self.client
@@ -129,14 +131,14 @@ impl TestEnvironment {
 
 impl Drop for TestEnvironment {
     fn drop(&mut self) {
-        if self.stream != "" {
+        if !self.stream.is_empty() {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
                     self.env.delete_stream(&self.stream).await.unwrap();
                 })
             });
         }
-        if self.super_stream != "" {
+        if !self.super_stream.is_empty() {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
                     self.env
@@ -166,7 +168,7 @@ pub async fn create_generic_super_stream(
 
     let response = client
         .create_super_stream(
-            &super_stream,
+            super_stream,
             partitions.clone(),
             binding_keys,
             HashMap::new(),
@@ -174,5 +176,5 @@ pub async fn create_generic_super_stream(
         .await
         .unwrap();
 
-    return (response, partitions);
+    (response, partitions)
 }

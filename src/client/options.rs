@@ -587,7 +587,7 @@ mod tests {
         assert_eq!(options.heartbeat, 10000);
         assert_eq!(options.max_frame_size, 1);
         assert!(matches!(options.tls, TlsConfiguration::Untrusted));
-        assert_eq!(options.load_balancer_mode, true);
+        assert!(options.load_balancer_mode);
     }
 
     #[cfg(feature = "serde")]
