@@ -30,7 +30,7 @@ impl MessageBuilder {
     pub fn application_properties(self) -> ApplicationPropertiesBuider {
         ApplicationPropertiesBuider(self)
     }
-    pub fn publising_id(mut self, publishing_id: u64) -> Self {
+    pub fn publishing_id(mut self, publishing_id: u64) -> Self {
         self.0.publishing_id = Some(publishing_id);
         self
     }

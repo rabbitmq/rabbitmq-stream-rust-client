@@ -6,11 +6,15 @@ use futures::{lock::Mutex, StreamExt};
 use tokio::sync::mpsc::channel;
 
 use rabbitmq_stream_client::{
+    error::ClientError,
     types::{Message, OffsetSpecification, SimpleValue},
     Environment,
 };
 
-use crate::common::{Countdown, TestEnvironment};
+#[path = "./common.rs"]
+mod common;
+
+use common::*;
 
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
@@ -68,7 +72,7 @@ async fn producer_send_name_deduplication_unique_ids() {
         for _ in 0..times {
             let cloned_ids = ids.clone();
             let countdown = countdown.clone();
-            let _ = producer
+            producer
                 .send(
                     Message::builder().body(b"message".to_vec()).build(),
                     move |result| {
@@ -129,7 +133,7 @@ async fn producer_send_name_with_deduplication_ok() {
         .send_with_confirm(
             Message::builder()
                 .body(b"message0".to_vec())
-                .publising_id(0)
+                .publishing_id(0)
                 .build(),
         )
         .await
@@ -170,24 +174,24 @@ async fn producer_send_batch_name_with_deduplication_ok() {
             // confirmed
             Message::builder()
                 .body(b"message".to_vec())
-                .publising_id(0)
+                .publishing_id(0)
                 .build(),
             // this won't be confirmed
             // since it will skipped by deduplication
             Message::builder()
                 .body(b"message".to_vec())
-                .publising_id(0)
+                .publishing_id(0)
                 .build(),
             // confirmed since the publishing id is different
             Message::builder()
                 .body(b"message".to_vec())
-                .publising_id(1)
+                .publishing_id(1)
                 .build(),
             // not confirmed since the publishing id is the same
             // message will be skipped by deduplication
             Message::builder()
                 .body(b"message".to_vec())
-                .publising_id(1)
+                .publishing_id(1)
                 .build(),
         ])
         .await
@@ -306,7 +310,7 @@ async fn producer_batch_send() {
 
     assert_eq!(1, result.len());
 
-    let confirmation = result.get(0).unwrap();
+    let confirmation = result.first().unwrap();
     assert_eq!(0, confirmation.publishing_id());
     assert!(confirmation.confirmed());
     assert_eq!(Some(b"message".as_ref()), confirmation.message().data());
@@ -411,8 +415,8 @@ async fn producer_send_with_complex_message_ok() {
     );
 
     assert_eq!(
-        Some(1u32.into()),
-        properties.and_then(|properties| properties.group_sequence.clone())
+        Some(1u32),
+        properties.and_then(|properties| properties.group_sequence)
     );
 
     assert_eq!(
@@ -451,13 +455,10 @@ async fn producer_create_stream_not_existing_error() {
     let producer = env.env.producer().build("stream_not_existing").await;
 
     match producer {
-        Err(e) => assert_eq!(
-            matches!(
-                e,
-                rabbitmq_stream_client::error::ProducerCreateError::StreamDoesNotExist { .. }
-            ),
-            true
-        ),
+        Err(e) => assert!(matches!(
+            e,
+            rabbitmq_stream_client::error::ProducerCreateError::StreamDoesNotExist { .. }
+        )),
         _ => panic!("Should be StreamNotFound error"),
     }
 }
@@ -472,22 +473,19 @@ async fn producer_send_after_close_error() {
         .await
         .unwrap_err();
 
-    assert_eq!(
-        matches!(
-            closed,
-            rabbitmq_stream_client::error::ProducerPublishError::Closed
-        ),
-        true
-    );
+    assert!(matches!(
+        closed,
+        rabbitmq_stream_client::error::ProducerPublishError::Closed
+    ));
 }
 
 pub fn routing_key_strategy_value_extractor(_: &Message) -> String {
-    return "0".to_string();
+    "0".to_string()
 }
 
 fn hash_strategy_value_extractor(message: &Message) -> String {
     let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
-    return s;
+    s
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -551,13 +549,10 @@ async fn key_super_steam_non_existing_producer_test() {
         .await
         .unwrap_err();
 
-    assert_eq!(
-        matches!(
-            result,
-            rabbitmq_stream_client::error::SuperStreamProducerPublishError::ProducerCreateError()
-        ),
-        true
-    );
+    assert!(matches!(
+        result,
+        rabbitmq_stream_client::error::SuperStreamProducerPublishError::ProducerCreateError()
+    ));
 
     _ = super_stream_producer.close();
 }
@@ -638,13 +633,10 @@ async fn producer_send_filtering_message() {
 
     let closed = producer.send_with_confirm(message).await.unwrap_err();
 
-    assert_eq!(
-        matches!(
-            closed,
-            rabbitmq_stream_client::error::ProducerPublishError::Closed
-        ),
-        true
-    );
+    assert!(matches!(
+        closed,
+        rabbitmq_stream_client::error::ProducerPublishError::Closed
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -689,4 +681,41 @@ async fn super_stream_producer_send_filtering_message() {
         Ok(_) => assert!(true),
         Err(_) => assert!(false),
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_drop_connection() {
+    let _ = tracing_subscriber::fmt::try_init();
+    let client_provided_name: String = Faker.fake();
+    let env = TestEnvironment::create().await;
+    let producer = env
+        .env
+        .producer()
+        .client_provided_name(&client_provided_name)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await
+        .unwrap();
+
+    let connection = wait_for_named_connection(client_provided_name.clone()).await;
+    drop_connection(connection).await;
+
+    let closed = producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await;
+
+    assert!(matches!(
+        closed,
+        Err(rabbitmq_stream_client::error::ProducerPublishError::Timeout)
+    ));
+
+    let err = producer.close().await.unwrap_err();
+    assert!(matches!(
+        err,
+        rabbitmq_stream_client::error::ProducerCloseError::Client(ClientError::ConnectionClosed)
+    ));
 }

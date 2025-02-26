@@ -109,6 +109,8 @@ pub enum ProducerPublishError {
     Confirmation { stream: String },
     #[error(transparent)]
     Client(#[from] ClientError),
+    #[error("Failed to publish message, timeout")]
+    Timeout,
 }
 
 #[derive(Error, Debug)]

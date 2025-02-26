@@ -4,6 +4,7 @@ exclude-files=[
     "benchmark/*",
     "build.rs",
     "src/lib.rs",
+    "src/bin/**/*.rs",
     "tests/**/*",
     "mod.rs"
 ]

@@ -1,6 +1,10 @@
 use std::time::Duration;
 
-use crate::common::TestEnvironment;
+#[path = "./common.rs"]
+mod common;
+
+use common::*;
+
 use fake::{Fake, Faker};
 use futures::StreamExt;
 use rabbitmq_stream_client::{
@@ -12,7 +16,6 @@ use rabbitmq_stream_client::{
     Consumer, FilterConfiguration, NoDedup, Producer,
 };
 
-use crate::producer_test::routing_key_strategy_value_extractor;
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
@@ -21,6 +24,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::Notify;
 use tokio::task;
 use {std::sync::Arc, std::sync::Mutex};
+
+pub fn routing_key_strategy_value_extractor(_: &Message) -> String {
+    "0".to_string()
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn consumer_test() {
@@ -64,7 +71,7 @@ async fn consumer_test() {
 
 fn hash_strategy_value_extractor(message: &Message) -> String {
     let s = String::from_utf8(Vec::from(message.data().unwrap())).expect("Found invalid UTF-8");
-    return s;
+    s
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -94,7 +101,7 @@ async fn super_stream_consumer_test() {
 
     for n in 0..message_count {
         let msg = Message::builder().body(format!("message{}", n)).build();
-        let _ = super_stream_producer
+        super_stream_producer
             .send(msg, |_confirmation_status| async move {})
             .await
             .unwrap();
@@ -104,7 +111,7 @@ async fn super_stream_consumer_test() {
     let handle = super_stream_consumer.handle();
 
     while let Some(_) = super_stream_consumer.next().await {
-        received_messages = received_messages + 1;
+        received_messages += 1;
         if received_messages == 10 {
             break;
         }
@@ -281,13 +288,10 @@ async fn consumer_create_stream_not_existing_error() {
     let consumer = env.env.consumer().build("stream_not_existing").await;
 
     match consumer {
-        Err(e) => assert_eq!(
-            matches!(
-                e,
-                rabbitmq_stream_client::error::ConsumerCreateError::StreamDoesNotExist { .. }
-            ),
-            true
-        ),
+        Err(e) => assert!(matches!(
+            e,
+            rabbitmq_stream_client::error::ConsumerCreateError::StreamDoesNotExist { .. }
+        )),
         _ => panic!("Should be StreamNotFound error"),
     }
 }
@@ -437,7 +441,7 @@ async fn consumer_test_with_filtering() {
     let filter_configuration = FilterConfiguration::new(vec!["filtering".to_string()], false)
         .post_filter(|message| {
             String::from_utf8(message.data().unwrap().to_vec()).unwrap_or("".to_string())
-                == "filtering".to_string()
+                == *"filtering"
         });
 
     let mut consumer = env
@@ -514,7 +518,7 @@ async fn super_stream_consumer_test_with_filtering() {
     let filter_configuration = FilterConfiguration::new(vec!["filtering".to_string()], false)
         .post_filter(|message| {
             String::from_utf8(message.data().unwrap().to_vec()).unwrap_or("".to_string())
-                == "filtering".to_string()
+                == *"filtering"
         });
 
     let mut super_stream_consumer = env
@@ -622,8 +626,7 @@ async fn consumer_test_with_filtering_match_unfiltered() {
 
     let filter_configuration =
         FilterConfiguration::new(vec!["1".to_string()], true).post_filter(|message| {
-            String::from_utf8(message.data().unwrap().to_vec()).unwrap_or("".to_string())
-                == "1".to_string()
+            String::from_utf8(message.data().unwrap().to_vec()).unwrap_or("".to_string()) == *"1"
         });
 
     let mut consumer = env
@@ -718,7 +721,7 @@ async fn super_stream_single_active_consumer_test() {
 
     for n in 0..message_count {
         let msg = Message::builder().body(format!("message{}", n)).build();
-        let _ = super_stream_producer
+        super_stream_producer
             .send(msg, |_confirmation_status| async move {})
             .await
             .unwrap();
@@ -877,7 +880,7 @@ async fn super_stream_single_active_consumer_test_with_callback() {
 
     for n in 0..message_count {
         let msg = Message::builder().body(format!("message{}", n)).build();
-        let _ = super_stream_producer
+        super_stream_producer
             .send(msg, |_confirmation_status| async move {})
             .await
             .unwrap();
