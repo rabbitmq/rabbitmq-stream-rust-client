@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.8.0...rabbitmq-stream-client-v0.9.0) - 2025-03-11
+
+### Other
+
+- Expose LeaderLocator enum ([#279](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/279))
+- Dynamic send ([#276](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/276))
+- FnOnce as Producer::send callback ([#273](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/273))
+
 ## [0.8.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.7.1...rabbitmq-stream-client-v0.8.0) - 2025-02-11
 
 ### Other
