@@ -100,6 +100,7 @@ pub mod types {
     pub use crate::client::{Broker, MessageResult, StreamMetadata};
     pub use crate::consumer::{Delivery, MessageContext};
     pub use crate::offset_specification::OffsetSpecification;
+    pub use crate::stream_creator::LeaderLocator;
     pub use crate::stream_creator::StreamCreator;
     pub use crate::superstream::HashRoutingMurmurStrategy;
     pub use crate::superstream::RoutingKeyRoutingStrategy;
