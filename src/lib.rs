@@ -71,6 +71,8 @@
 //! ```
 //! For more consumer options check [`ConsumerBuilder`]
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 mod byte_capacity;
 mod client;
 mod consumer;
