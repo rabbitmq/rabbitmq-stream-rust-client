@@ -84,7 +84,6 @@ mod metrics;
 mod options;
 mod task;
 
-#[cfg_attr(docsrs, doc(cfg(feature = "tokio-stream")))]
 #[pin_project(project = StreamProj)]
 #[derive(Debug)]
 pub enum GenericTcpStream {
