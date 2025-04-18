@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.8.0...rabbitmq-stream-protocol-v0.8.1) - 2025-04-18
+
+### Other
+
+- Dynamic send ([#276](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/276))
+- FnOnce as Producer::send callback ([#273](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/273))
+
 ## [0.7.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.6.0...rabbitmq-stream-protocol-v0.7.0) - 2024-11-21
 
 ### Other
