@@ -9,6 +9,7 @@ use std::{
 };
 
 use dashmap::DashMap;
+use futures::executor::block_on;
 use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::mpsc::channel;
 use tokio::sync::{mpsc, Mutex};
@@ -75,6 +76,19 @@ pub struct ProducerInternal {
 /// API for publising messages to RabbitMQ stream
 #[derive(Clone)]
 pub struct Producer<T>(Arc<ProducerInternal>, PhantomData<T>);
+
+/// drop implementation for Producer needed to properly close the connection.
+impl<T> Drop for Producer<T> {
+    fn drop(&mut self) {
+        if !self.is_closed() {
+            // producer connection must be closed before dropping.
+            // drop method can't be async, block it.
+            block_on(async {
+                let _ = self.close().await;
+            })
+        }
+    }
+}
 
 /// Builder for [`Producer`]
 pub struct ProducerBuilder<T> {
@@ -501,7 +515,7 @@ impl<T> Producer<T> {
         self.0.closed.load(Ordering::Relaxed)
     }
     // TODO handle producer state after close
-    pub async fn close(self) -> Result<(), ProducerCloseError> {
+    pub async fn close(&self) -> Result<(), ProducerCloseError> {
         match self
             .0
             .closed

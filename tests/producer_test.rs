@@ -684,6 +684,22 @@ async fn super_stream_producer_send_filtering_message() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn connect_and_drop() {
+    use tokio::time::Duration;
+
+    let env = TestEnvironment::create().await;
+    for _count in 0..50 {
+        let producer = env.env.producer().build(&env.stream).await.unwrap();
+
+        drop(producer);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    // all connections dropped, waiting a few seconds...
+    tokio::time::sleep(Duration::from_secs(5)).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn producer_drop_connection() {
     let _ = tracing_subscriber::fmt::try_init();
     let client_provided_name: String = Faker.fake();
