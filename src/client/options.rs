@@ -132,7 +132,7 @@ impl ClientOptions {
             let domain = ServerName::try_from(host.clone()).unwrap();
             let connector = TlsConnector::from(Arc::new(config));
             let conn = connector.connect(domain, stream).await?;
-            Ok(GenericTcpStream::SecureTcp(conn))
+            Ok(GenericTcpStream::SecureTcp(Box::new(conn)))
         }
         match &self.tls {
             TlsConfiguration::Trusted {
