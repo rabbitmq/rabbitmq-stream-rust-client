@@ -1,19 +1,20 @@
+use futures::executor::block_on;
 use std::future::Future;
 use std::time::Duration;
 use std::{
     marker::PhantomData,
     sync::{
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
 };
 
 use dashmap::DashMap;
 use futures::{future::BoxFuture, FutureExt};
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::channel;
-use tokio::sync::{mpsc, Mutex};
 use tokio::time::sleep;
-use tracing::{debug, error, trace};
+use tracing::{error, info, trace};
 
 use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
 
@@ -60,16 +61,47 @@ impl ConfirmationStatus {
 }
 
 pub struct ProducerInternal {
-    client: Client,
+    client: Arc<Client>,
     stream: String,
     producer_id: u8,
-    batch_size: usize,
     publish_sequence: Arc<AtomicU64>,
     waiting_confirmations: WaiterMap,
     closed: Arc<AtomicBool>,
-    accumulator: MessageAccumulator,
-    publish_version: u16,
+    sender: mpsc::Sender<ClientMessage>,
     filter_value_extractor: Option<FilterValueExtractor>,
+}
+
+impl Drop for ProducerInternal {
+    fn drop(&mut self) {
+        block_on(async {
+            if let Err(e) = self.close().await {
+                error!(error = ?e, "Error closing producer");
+            }
+        });
+    }
+}
+
+impl ProducerInternal {
+    pub async fn close(&self) -> Result<(), ProducerCloseError> {
+        match self
+            .closed
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            Ok(false) => {
+                let response = self.client.delete_publisher(self.producer_id).await?;
+                if response.is_ok() {
+                    self.client.close().await?;
+                    Ok(())
+                } else {
+                    Err(ProducerCloseError::Close {
+                        status: response.code().clone(),
+                        stream: self.stream.clone(),
+                    })
+                }
+            }
+            _ => Ok(()), // Already closed
+        }
+    }
 }
 
 /// API for publising messages to RabbitMQ stream
@@ -139,22 +171,29 @@ impl<T> ProducerBuilder<T> {
         };
 
         if response.is_ok() {
+            let (sender, receiver) = mpsc::channel(self.batch_size);
+
+            let client = Arc::new(client);
             let producer = ProducerInternal {
                 producer_id,
-                batch_size: self.batch_size,
                 stream: stream.to_string(),
                 client,
                 publish_sequence,
                 waiting_confirmations,
-                publish_version,
                 closed: Arc::new(AtomicBool::new(false)),
-                accumulator: MessageAccumulator::new(self.batch_size),
+                sender,
                 filter_value_extractor: self.filter_value_extractor,
             };
 
             let internal_producer = Arc::new(producer);
-            let producer = Producer(internal_producer.clone(), PhantomData);
-            schedule_batch_send(internal_producer);
+            schedule_batch_send(
+                self.batch_size,
+                receiver,
+                internal_producer.client.clone(),
+                producer_id,
+                publish_version,
+            );
+            let producer = Producer(internal_producer, PhantomData);
 
             Ok(producer)
         } else {
@@ -205,78 +244,33 @@ impl<T> ProducerBuilder<T> {
     }
 }
 
-pub struct MessageAccumulator {
-    sender: mpsc::Sender<ClientMessage>,
-    receiver: Mutex<mpsc::Receiver<ClientMessage>>,
-    message_count: AtomicUsize,
-}
-
-impl MessageAccumulator {
-    pub fn new(batch_size: usize) -> Self {
-        let (sender, receiver) = mpsc::channel(batch_size);
-        Self {
-            sender,
-            receiver: Mutex::new(receiver),
-            message_count: AtomicUsize::new(0),
-        }
-    }
-
-    pub async fn add(&self, message: ClientMessage) -> RabbitMQStreamResult<()> {
-        match self.sender.send(message).await {
-            Ok(_) => {
-                self.message_count.fetch_add(1, Ordering::Relaxed);
-                Ok(())
-            }
-            Err(e) => Err(ClientError::GenericError(Box::new(e))),
-        }
-    }
-
-    pub async fn get(&self, buffer: &mut Vec<ClientMessage>, batch_size: usize) -> (bool, usize) {
-        let mut receiver = self.receiver.lock().await;
-
-        let count = receiver.recv_many(buffer, batch_size).await;
-        self.message_count.fetch_sub(count, Ordering::Relaxed);
-
-        // `recv_many` returns 0 only if the channel is closed
-        // Read https://docs.rs/tokio/latest/tokio/sync/mpsc/struct.Receiver.html#method.recv_many
-        (count == 0, count)
-    }
-}
-
-fn schedule_batch_send(producer: Arc<ProducerInternal>) {
+fn schedule_batch_send(
+    batch_size: usize,
+    mut receiver: mpsc::Receiver<ClientMessage>,
+    client: Arc<Client>,
+    producer_id: u8,
+    publish_version: u16,
+) {
     tokio::task::spawn(async move {
-        let mut buffer = Vec::with_capacity(producer.batch_size);
+        let mut buffer = Vec::with_capacity(batch_size);
         loop {
-            let (is_closed, count) = producer
-                .accumulator
-                .get(&mut buffer, producer.batch_size)
-                .await;
+            let count = receiver.recv_many(&mut buffer, batch_size).await;
 
-            if is_closed {
-                error!("Channel is closed and this is bad");
+            if count == 0 || buffer.is_empty() {
+                // Channel is closed, exit the loop
                 break;
             }
 
-            if count > 0 {
-                debug!("Sending batch of {} messages", count);
-                let messages: Vec<_> = buffer.drain(..count).collect();
-                match producer
-                    .client
-                    .publish(producer.producer_id, messages, producer.publish_version)
-                    .await
-                {
-                    Ok(_) => {}
-                    Err(e) => {
-                        error!("Error publishing batch {:?}", e);
-
-                        // Stop loop if producer is closed
-                        if producer.closed.load(Ordering::Relaxed) {
-                            break;
-                        }
-                    }
-                };
-            }
+            let messages: Vec<_> = buffer.drain(..count).collect();
+            match client.publish(producer_id, messages, publish_version).await {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Error publishing batch {:?}", e);
+                }
+            };
         }
+
+        info!("Batch send task finished");
     });
 }
 
@@ -455,10 +449,13 @@ impl<T> Producer<T> {
             .waiting_confirmations
             .insert(publishing_id, ProducerMessageWaiter::Once(waiter));
 
-        self.0.accumulator.add(msg).await?;
+        if let Err(e) = self.0.sender.send(msg).await {
+            return Err(ClientError::GenericError(Box::new(e)))?;
+        }
 
         Ok(())
     }
+
     async fn internal_batch_send<Fut>(
         &self,
         messages: Vec<Message>,
@@ -488,7 +485,9 @@ impl<T> Producer<T> {
             }
 
             // Queue the message for sending
-            self.0.accumulator.add(client_message).await?;
+            if let Err(e) = self.0.sender.send(client_message).await {
+                return Err(ClientError::GenericError(Box::new(e)))?;
+            }
             self.0
                 .waiting_confirmations
                 .insert(publishing_id, ProducerMessageWaiter::Shared(waiter.clone()));
@@ -500,27 +499,9 @@ impl<T> Producer<T> {
     pub fn is_closed(&self) -> bool {
         self.0.closed.load(Ordering::Relaxed)
     }
-    // TODO handle producer state after close
+
     pub async fn close(self) -> Result<(), ProducerCloseError> {
-        match self
-            .0
-            .closed
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        {
-            Ok(false) => {
-                let response = self.0.client.delete_publisher(self.0.producer_id).await?;
-                if response.is_ok() {
-                    self.0.client.close().await?;
-                    Ok(())
-                } else {
-                    Err(ProducerCloseError::Close {
-                        status: response.code().clone(),
-                        stream: self.0.stream.clone(),
-                    })
-                }
-            }
-            _ => Err(ProducerCloseError::AlreadyClosed),
-        }
+        self.0.close().await
     }
 }
 
