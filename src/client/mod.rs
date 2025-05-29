@@ -88,7 +88,7 @@ mod task;
 #[derive(Debug)]
 pub enum GenericTcpStream {
     Tcp(#[pin] TcpStream),
-    SecureTcp(#[pin] TlsStream<TcpStream>),
+    SecureTcp(#[pin] Box<TlsStream<TcpStream>>),
 }
 
 impl AsyncRead for GenericTcpStream {
