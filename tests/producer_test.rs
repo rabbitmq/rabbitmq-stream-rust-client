@@ -1,9 +1,9 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use chrono::Utc;
 use fake::{Fake, Faker};
 use futures::{lock::Mutex, StreamExt};
-use tokio::sync::mpsc::channel;
+use tokio::{sync::mpsc::channel, time::sleep};
 
 use rabbitmq_stream_client::{
     error::ClientError,
@@ -718,4 +718,43 @@ async fn producer_drop_connection() {
         err,
         rabbitmq_stream_client::error::ProducerCloseError::Client(ClientError::ConnectionClosed)
     ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_close() {
+    let env = TestEnvironment::create().await;
+    let reference: String = Faker.fake();
+
+    let metrics = tokio::runtime::Handle::current().metrics();
+    println!("Metrics: {:#?}", metrics);
+    println!("metrics.global_queue_depth: {}", metrics.global_queue_depth());
+    println!("metrics.num_alive_tasks: {}", metrics.num_alive_tasks());
+    println!("metrics.num_workers: {}", metrics.num_workers());
+    println!("-----");
+
+    let producer = env
+        .env
+        .producer()
+        .name(&reference)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let metrics = tokio::runtime::Handle::current().metrics();
+    println!("Metrics: {:#?}", metrics);
+    println!("metrics.global_queue_depth: {}", metrics.global_queue_depth());
+    println!("metrics.num_alive_tasks: {}", metrics.num_alive_tasks());
+    println!("metrics.num_workers: {}", metrics.num_workers());
+    println!("-----\n\n");
+
+    producer.close().await.unwrap();
+
+    sleep(Duration::from_secs(1)).await;
+
+    let metrics = tokio::runtime::Handle::current().metrics();
+    println!("Metrics: {:#?}", metrics);
+    println!("metrics.global_queue_depth: {}", metrics.global_queue_depth());
+    println!("metrics.num_alive_tasks: {}", metrics.num_alive_tasks());
+    println!("metrics.num_workers: {}", metrics.num_workers());
+    println!("-----\n\n");
 }
