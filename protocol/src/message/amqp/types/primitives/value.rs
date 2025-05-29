@@ -180,9 +180,9 @@ macro_rules! impl_try_from_simple_value_ref {
             fn try_from(value: &'a Value) -> Result<Self, Self::Error> {
                 use std::convert::TryInto;
                 match value {
-                    Value::Simple(simple) => simple
-                        .try_into()
-                        .map_err(|err: &str| DecodeError::MessageParse(err.to_string())),
+                    Value::Simple(simple) => simple.try_into().map_err(|_| {
+                        DecodeError::MessageParse("Failed to cast Value to simple type".to_string())
+                    }),
                     _ => Err(DecodeError::MessageParse(
                         "Failed to cast Value to simple type".to_string(),
                     )),
