@@ -144,42 +144,6 @@ pub struct ClientState {
     heartbeat_task: Option<task::TaskHandle>,
 }
 
-#[async_trait::async_trait]
-impl MessageHandler for Client {
-    async fn handle_message(&self, item: MessageResult) -> RabbitMQStreamResult<()> {
-        match &item {
-            Some(Ok(response)) => match response.kind_ref() {
-                ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
-                ResponseKind::Heartbeat(_) => self.handle_heart_beat_command().await,
-                _ => {
-                    if let Some(handler) = self.state.read().await.handler.as_ref() {
-                        let handler = handler.clone();
-
-                        tokio::task::spawn(async move { handler.handle_message(item).await });
-                    }
-                }
-            },
-            Some(Err(err)) => {
-                trace!(?err);
-                if let Some(handler) = self.state.read().await.handler.as_ref() {
-                    let handler = handler.clone();
-
-                    tokio::task::spawn(async move { handler.handle_message(item).await });
-                }
-            }
-            None => {
-                trace!("Closing client");
-                if let Some(handler) = self.state.read().await.handler.as_ref() {
-                    let handler = handler.clone();
-                    tokio::task::spawn(async move { handler.handle_message(None).await });
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
 /// Raw API for taking to RabbitMQ stream
 ///
 /// For high level APIs check [`crate::Environment`]
@@ -749,5 +713,41 @@ impl Client {
             ConsumerUpdateRequestCommand::new(correlation_id, 1, offset_specification)
         })
         .await
+    }
+}
+
+#[async_trait::async_trait]
+impl MessageHandler for Client {
+    async fn handle_message(&self, item: MessageResult) -> RabbitMQStreamResult<()> {
+        match &item {
+            Some(Ok(response)) => match response.kind_ref() {
+                ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
+                ResponseKind::Heartbeat(_) => self.handle_heart_beat_command().await,
+                _ => {
+                    if let Some(handler) = self.state.read().await.handler.as_ref() {
+                        let handler = handler.clone();
+
+                        tokio::task::spawn(async move { handler.handle_message(item).await });
+                    }
+                }
+            },
+            Some(Err(err)) => {
+                trace!(?err);
+                if let Some(handler) = self.state.read().await.handler.as_ref() {
+                    let handler = handler.clone();
+
+                    tokio::task::spawn(async move { handler.handle_message(item).await });
+                }
+            }
+            None => {
+                trace!("Closing client");
+                if let Some(handler) = self.state.read().await.handler.as_ref() {
+                    let handler = handler.clone();
+                    tokio::task::spawn(async move { handler.handle_message(None).await });
+                }
+            }
+        }
+
+        Ok(())
     }
 }

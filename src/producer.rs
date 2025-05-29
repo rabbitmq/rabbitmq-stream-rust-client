@@ -116,6 +116,7 @@ pub struct ProducerBuilder<T> {
     pub(crate) data: PhantomData<T>,
     pub filter_value_extractor: Option<FilterValueExtractor>,
     pub(crate) client_provided_name: String,
+    pub(crate) on_closed: Option<Arc<dyn OnClosed + Send + Sync>>,
 }
 
 #[derive(Clone)]
@@ -151,6 +152,7 @@ impl<T> ProducerBuilder<T> {
         let confirm_handler = ProducerConfirmHandler {
             waiting_confirmations: waiting_confirmations.clone(),
             metrics_collector,
+            on_closed: self.on_closed,
         };
 
         client.set_handler(confirm_handler).await;
@@ -204,6 +206,11 @@ impl<T> ProducerBuilder<T> {
         }
     }
 
+    pub fn on_closed(mut self, on_closed: Arc<dyn OnClosed + Send + Sync>) -> ProducerBuilder<T> {
+        self.on_closed = Some(on_closed);
+        self
+    }
+
     pub fn batch_size(mut self, batch_size: usize) -> Self {
         self.batch_size = batch_size;
         self
@@ -223,6 +230,7 @@ impl<T> ProducerBuilder<T> {
             data: PhantomData,
             filter_value_extractor: None,
             client_provided_name: String::from("rust-stream-producer"),
+            on_closed: self.on_closed,
         }
     }
 
@@ -505,9 +513,15 @@ impl<T> Producer<T> {
     }
 }
 
+#[async_trait::async_trait]
+pub trait OnClosed {
+    async fn on_closed(&self);
+}
+
 struct ProducerConfirmHandler {
     waiting_confirmations: WaiterMap,
     metrics_collector: Arc<dyn MetricsCollector>,
+    on_closed: Option<Arc<dyn OnClosed + Send + Sync>>,
 }
 
 #[async_trait::async_trait]
@@ -583,6 +597,9 @@ impl MessageHandler for ProducerConfirmHandler {
             }
             None => {
                 trace!("Connection closed");
+                if let Some(on_close) = &self.on_closed {
+                    on_close.on_closed().await;
+                }
                 // TODO connection close clean all waiting
             }
         }

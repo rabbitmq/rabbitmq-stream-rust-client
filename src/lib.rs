@@ -93,7 +93,7 @@ pub use crate::consumer::{
     Consumer, ConsumerBuilder, ConsumerHandle, FilterConfiguration, MessageContext,
 };
 pub use crate::environment::{Environment, EnvironmentBuilder};
-pub use crate::producer::{Dedup, NoDedup, Producer, ProducerBuilder};
+pub use crate::producer::{Dedup, NoDedup, OnClosed, Producer, ProducerBuilder};
 pub mod types {
 
     pub use crate::byte_capacity::ByteCapacity;
