@@ -462,7 +462,9 @@ async fn client_test_route_test() {
 async fn client_close() {
     let test = TestClient::create().await;
 
-    let output = test.client.metadata(vec![test.stream.clone()])
+    let output = test
+        .client
+        .metadata(vec![test.stream.clone()])
         .await
         .unwrap();
     assert_ne!(output.len(), 0);

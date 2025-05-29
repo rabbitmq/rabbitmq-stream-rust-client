@@ -1,20 +1,20 @@
+use futures::executor::block_on;
 use std::future::Future;
 use std::time::Duration;
-use futures::executor::block_on;
 use std::{
     marker::PhantomData,
     sync::{
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
 };
 
 use dashmap::DashMap;
 use futures::{future::BoxFuture, FutureExt};
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::channel;
-use tokio::sync::{mpsc, Mutex};
 use tokio::time::sleep;
-use tracing::{debug, error, info, trace};
+use tracing::{error, info, trace};
 
 use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
 
@@ -64,12 +64,10 @@ pub struct ProducerInternal {
     client: Arc<Client>,
     stream: String,
     producer_id: u8,
-    batch_size: usize,
     publish_sequence: Arc<AtomicU64>,
     waiting_confirmations: WaiterMap,
     closed: Arc<AtomicBool>,
     sender: mpsc::Sender<ClientMessage>,
-    publish_version: u16,
     filter_value_extractor: Option<FilterValueExtractor>,
 }
 
@@ -80,7 +78,6 @@ impl Drop for ProducerInternal {
                 error!(error = ?e, "Error closing producer");
             }
         });
-        println!("ProducerInternal is being dropped");
     }
 }
 
@@ -174,18 +171,15 @@ impl<T> ProducerBuilder<T> {
         };
 
         if response.is_ok() {
-
             let (sender, receiver) = mpsc::channel(self.batch_size);
 
             let client = Arc::new(client);
             let producer = ProducerInternal {
                 producer_id,
-                batch_size: self.batch_size,
                 stream: stream.to_string(),
                 client,
                 publish_sequence,
                 waiting_confirmations,
-                publish_version,
                 closed: Arc::new(AtomicBool::new(false)),
                 sender,
                 filter_value_extractor: self.filter_value_extractor,
@@ -268,10 +262,7 @@ fn schedule_batch_send(
             }
 
             let messages: Vec<_> = buffer.drain(..count).collect();
-            match client
-                .publish(producer_id, messages, publish_version)
-                .await
-            {
+            match client.publish(producer_id, messages, publish_version).await {
                 Ok(_) => {}
                 Err(e) => {
                     error!("Error publishing batch {:?}", e);
@@ -508,14 +499,9 @@ impl<T> Producer<T> {
     pub fn is_closed(&self) -> bool {
         self.0.closed.load(Ordering::Relaxed)
     }
-    // TODO handle producer state after close
+
     pub async fn close(self) -> Result<(), ProducerCloseError> {
-        let a = self.0.close().await;
-
-        let b = Arc::strong_count(&self.0);
-        println!("Producer is closed, strong count: {}", b);
-
-        a
+        self.0.close().await
     }
 }
 

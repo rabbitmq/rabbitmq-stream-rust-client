@@ -3,7 +3,7 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use chrono::Utc;
 use fake::{Fake, Faker};
 use futures::{lock::Mutex, StreamExt};
-use tokio::{sync::mpsc::channel, time::sleep};
+use tokio::{sync::mpsc::channel, task::yield_now, time::sleep};
 
 use rabbitmq_stream_client::{
     error::ClientError,
@@ -19,6 +19,7 @@ use common::*;
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
+use tracing::span;
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::Notify;
@@ -723,38 +724,63 @@ async fn producer_drop_connection() {
 #[tokio::test(flavor = "multi_thread")]
 async fn producer_close() {
     let env = TestEnvironment::create().await;
-    let reference: String = Faker.fake();
+
+    let producer = env.env.producer().build(&env.stream).await.unwrap();
+    let producer2 = producer.clone();
 
     let metrics = tokio::runtime::Handle::current().metrics();
-    println!("Metrics: {:#?}", metrics);
-    println!("metrics.global_queue_depth: {}", metrics.global_queue_depth());
-    println!("metrics.num_alive_tasks: {}", metrics.num_alive_tasks());
-    println!("metrics.num_workers: {}", metrics.num_workers());
-    println!("-----");
+    assert_eq!(metrics.num_alive_tasks(), 3);
 
-    let producer = env
-        .env
-        .producer()
-        .name(&reference)
-        .build(&env.stream)
+    producer.close().await.unwrap();
+
+    let status = producer2
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await;
+    let err = status.unwrap_err();
+    assert!(matches!(
+        err,
+        rabbitmq_stream_client::error::ProducerPublishError::Closed
+    ));
+    drop(producer2);
+
+    // Ensure that the producer is closed and no tasks are alive
+    sleep(Duration::from_millis(500)).await;
+
+    let metrics = tokio::runtime::Handle::current().metrics();
+    assert_eq!(metrics.num_alive_tasks(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_drop() {
+    let env = TestEnvironment::create().await;
+
+    let producer = env.env.producer().build(&env.stream).await.unwrap();
+    let producer2 = producer.clone();
+
+    let metrics = tokio::runtime::Handle::current().metrics();
+    assert_eq!(metrics.num_alive_tasks(), 3);
+
+    // This should not close everything: another producer is still alive
+    drop(producer);
+
+    // Ensure that if something should drop some tasks, it has time to do so
+    sleep(Duration::from_millis(500)).await;
+
+    producer2
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
         .await
         .unwrap();
 
     let metrics = tokio::runtime::Handle::current().metrics();
-    println!("Metrics: {:#?}", metrics);
-    println!("metrics.global_queue_depth: {}", metrics.global_queue_depth());
-    println!("metrics.num_alive_tasks: {}", metrics.num_alive_tasks());
-    println!("metrics.num_workers: {}", metrics.num_workers());
-    println!("-----\n\n");
+    assert_eq!(metrics.num_alive_tasks(), 3);
 
-    producer.close().await.unwrap();
+    drop(producer2);
 
-    sleep(Duration::from_secs(1)).await;
+    // If we drop the last reference to internal producer,
+    // all tasks should be closed
+    // Keep time for tasks to close
+    sleep(Duration::from_millis(500)).await;
 
     let metrics = tokio::runtime::Handle::current().metrics();
-    println!("Metrics: {:#?}", metrics);
-    println!("metrics.global_queue_depth: {}", metrics.global_queue_depth());
-    println!("metrics.num_alive_tasks: {}", metrics.num_alive_tasks());
-    println!("metrics.num_workers: {}", metrics.num_workers());
-    println!("-----\n\n");
+    assert_eq!(metrics.num_alive_tasks(), 0);
 }

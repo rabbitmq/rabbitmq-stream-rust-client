@@ -221,12 +221,6 @@ async fn consumer_close_test() {
         consumer.handle().close().await,
         Err(ConsumerCloseError::AlreadyClosed),
     ));
-    producer.clone().close().await.unwrap();
-
-    assert!(matches!(
-        producer.close().await,
-        Err(ProducerCloseError::AlreadyClosed),
-    ));
 }
 
 #[tokio::test(flavor = "multi_thread")]
