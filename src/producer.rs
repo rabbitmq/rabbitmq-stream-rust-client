@@ -27,7 +27,7 @@ use crate::{
     error::{ClientError, ProducerCloseError, ProducerCreateError, ProducerPublishError},
 };
 
-type WaiterMap = Arc<DashMap<u64, ProducerMessageWaiter>>;
+type WaiterMap = Arc<DashMap<u64, (ClientMessage, ProducerMessageWaiter)>>;
 type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
 
 #[derive(Debug)]
@@ -464,9 +464,10 @@ impl<T> Producer<T> {
         }
 
         let waiter = OnceProducerMessageWaiter::waiter_with_cb(cb, message);
-        self.0
-            .waiting_confirmations
-            .insert(publishing_id, ProducerMessageWaiter::Once(waiter));
+        self.0.waiting_confirmations.insert(
+            publishing_id,
+            (msg.clone(), ProducerMessageWaiter::Once(waiter)),
+        );
 
         if let Err(e) = self.0.sender.send(msg).await {
             return Err(ClientError::GenericError(Box::new(e)))?;
@@ -503,13 +504,18 @@ impl<T> Producer<T> {
                 client_message.filter_value_extract(f.as_ref())
             }
 
+            self.0.waiting_confirmations.insert(
+                publishing_id,
+                (
+                    client_message.clone(),
+                    ProducerMessageWaiter::Shared(waiter.clone()),
+                ),
+            );
+
             // Queue the message for sending
             if let Err(e) = self.0.sender.send(client_message).await {
                 return Err(ClientError::GenericError(Box::new(e)))?;
             }
-            self.0
-                .waiting_confirmations
-                .insert(publishing_id, ProducerMessageWaiter::Shared(waiter.clone()));
         }
 
         Ok(())
@@ -526,7 +532,7 @@ impl<T> Producer<T> {
 
 #[async_trait::async_trait]
 pub trait OnClosed {
-    async fn on_closed(&self);
+    async fn on_closed(&self, unconfirmed: Vec<Message>);
 }
 
 struct ProducerConfirmHandler {
@@ -547,7 +553,8 @@ impl MessageHandler for ProducerConfirmHandler {
                         for publishing_id in &confirm.publishing_ids {
                             let id = *publishing_id;
 
-                            let waiter = match self.waiting_confirmations.remove(publishing_id) {
+                            let (_, waiter) = match self.waiting_confirmations.remove(publishing_id)
+                            {
                                 Some((_, confirm_sender)) => confirm_sender,
                                 None => todo!(),
                             };
@@ -584,7 +591,7 @@ impl MessageHandler for ProducerConfirmHandler {
                             let code = err.error_code.clone();
                             let id = err.publishing_id;
 
-                            let waiter = match self.waiting_confirmations.remove(&id) {
+                            let (_, waiter) = match self.waiting_confirmations.remove(&id) {
                                 Some((_, confirm_sender)) => confirm_sender,
                                 None => todo!(),
                             };
@@ -609,7 +616,13 @@ impl MessageHandler for ProducerConfirmHandler {
             None => {
                 trace!("Connection closed");
                 if let Some(on_close) = &self.on_closed {
-                    on_close.on_closed().await;
+                    let unconfirmed: Vec<Message> = self
+                        .waiting_confirmations
+                        .iter()
+                        .map(|entry| entry.value().0.clone().into_message())
+                        .collect();
+
+                    on_close.on_closed(unconfirmed).await;
                 }
                 // TODO connection close clean all waiting
             }
