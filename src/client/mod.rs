@@ -485,6 +485,7 @@ impl Client {
         self.filtering_supported
     }
 
+    /// Don't use this method in production code.
     pub async fn set_heartbeat(&self, heartbeat: u32) {
         let mut state = self.state.write().await;
         state.heartbeat = heartbeat;

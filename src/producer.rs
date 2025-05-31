@@ -221,6 +221,7 @@ impl<T> ProducerBuilder<T> {
         self
     }
 
+    /// Don't use this in production, it is only for testing purposes.
     pub fn overwrite_heartbeat(mut self, heartbeat: u32) -> ProducerBuilder<T> {
         self.overwrite_heartbeat = Some(heartbeat);
         self
