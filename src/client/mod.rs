@@ -522,7 +522,9 @@ impl Client {
         .await?;
 
         // Start heartbeat task after connection is established
-        self.start_hearbeat_task(self.state.write().await.deref_mut());
+        let mut state = self.state.write().await;
+        state.heartbeat_task = self.start_hearbeat_task(state.heartbeat);
+        drop(state);
 
         Ok(())
     }
@@ -661,7 +663,8 @@ impl Client {
         );
 
         if state.heartbeat_task.take().is_some() {
-            self.start_hearbeat_task(&mut state);
+            // Start heartbeat task after connection is established
+            state.heartbeat_task = self.start_hearbeat_task(state.heartbeat);
         }
 
         drop(state);
@@ -674,13 +677,14 @@ impl Client {
         self.tune_notifier.notify_one();
     }
 
-    fn start_hearbeat_task(&self, state: &mut ClientState) {
-        if state.heartbeat == 0 {
-            return;
+    fn start_hearbeat_task(&self, heartbeat: u32) -> Option<task::TaskHandle> {
+        if heartbeat == 0 {
+            return None;
         }
-        let heartbeat_interval = (state.heartbeat / 2).max(1);
+        let heartbeat_interval = (heartbeat / 2).max(1);
         let channel = self.channel.clone();
-        let heartbeat_task = tokio::spawn(async move {
+
+        let heartbeat_task: task::TaskHandle = tokio::spawn(async move {
             loop {
                 trace!("Sending heartbeat");
                 if channel
@@ -695,7 +699,8 @@ impl Client {
             warn!("Heartbeat task stopped. Force closing connection");
         })
         .into();
-        state.heartbeat_task = Some(heartbeat_task);
+
+        Some(heartbeat_task)
     }
 
     async fn handle_heart_beat_command(&self) {

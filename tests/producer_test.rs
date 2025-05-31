@@ -824,3 +824,44 @@ async fn producer_drop_connection_on_close() {
 
     notifier.notified().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_timeout() {
+    struct Foo {
+        notifier: Arc<Notify>,
+    }
+    #[async_trait::async_trait]
+    impl OnClosed for Foo {
+        async fn on_closed(&self) {
+            self.notifier.notify_one();
+        }
+    }
+
+    let notifier = Arc::new(Notify::new());
+    let _ = tracing_subscriber::fmt::try_init();
+    let client_provided_name: String = Faker.fake();
+    let env = TestEnvironment::create().await;
+    let producer = env
+        .env
+        .producer()
+        .client_provided_name(&client_provided_name)
+        .overwrite_heartbeat(1)
+        .on_closed(Arc::new(Foo {
+            notifier: notifier.clone(),
+        }))
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await
+        .unwrap();
+
+    sleep(Duration::from_millis(500)).await;
+
+    let connection = wait_for_named_connection(client_provided_name.clone()).await;
+    drop_connection(connection).await;
+
+    notifier.notified().await;
+}

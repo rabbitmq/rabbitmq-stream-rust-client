@@ -117,6 +117,7 @@ pub struct ProducerBuilder<T> {
     pub filter_value_extractor: Option<FilterValueExtractor>,
     pub(crate) client_provided_name: String,
     pub(crate) on_closed: Option<Arc<dyn OnClosed + Send + Sync>>,
+    pub(crate) overwrite_heartbeat: Option<u32>,
 }
 
 #[derive(Clone)]
@@ -216,6 +217,14 @@ impl<T> ProducerBuilder<T> {
         self
     }
 
+    pub fn overwrite_heartbeat(
+        mut self,
+        heartbeat: u32,
+    ) -> ProducerBuilder<T> {
+        self.overwrite_heartbeat = Some(heartbeat);
+        self
+    }
+
     pub fn client_provided_name(mut self, name: &str) -> Self {
         self.client_provided_name = String::from(name);
         self
@@ -231,6 +240,7 @@ impl<T> ProducerBuilder<T> {
             filter_value_extractor: None,
             client_provided_name: String::from("rust-stream-producer"),
             on_closed: self.on_closed,
+            overwrite_heartbeat: None,
         }
     }
 
