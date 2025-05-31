@@ -138,6 +138,10 @@ impl<T> ProducerBuilder<T> {
             .create_producer_client(stream, self.client_provided_name.clone())
             .await?;
 
+        if let Some(heartbeat) = self.overwrite_heartbeat {
+            client.set_heartbeat(heartbeat).await;
+        }
+
         let mut publish_version = 1;
 
         if self.filter_value_extractor.is_some() {
@@ -217,10 +221,7 @@ impl<T> ProducerBuilder<T> {
         self
     }
 
-    pub fn overwrite_heartbeat(
-        mut self,
-        heartbeat: u32,
-    ) -> ProducerBuilder<T> {
+    pub fn overwrite_heartbeat(mut self, heartbeat: u32) -> ProducerBuilder<T> {
         self.overwrite_heartbeat = Some(heartbeat);
         self
     }

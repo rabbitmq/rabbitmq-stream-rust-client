@@ -3,7 +3,7 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use chrono::Utc;
 use fake::{Fake, Faker};
 use futures::{lock::Mutex, StreamExt};
-use tokio::{sync::mpsc::channel, task::yield_now, time::sleep};
+use tokio::{sync::mpsc::channel, time::sleep};
 
 use rabbitmq_stream_client::{
     error::ClientError,
@@ -19,7 +19,6 @@ use common::*;
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
-use tracing::span;
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::Notify;
@@ -860,8 +859,10 @@ async fn producer_timeout() {
 
     sleep(Duration::from_millis(500)).await;
 
-    let connection = wait_for_named_connection(client_provided_name.clone()).await;
-    drop_connection(connection).await;
+    let is_stopped = tokio::select! {
+        _ = notifier.notified() => true,
+        _ = sleep(Duration::from_secs(5)) => false,
+    };
 
-    notifier.notified().await;
+    assert!(is_stopped, "Producer did not stop after timeout");
 }

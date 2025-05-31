@@ -1,4 +1,3 @@
-use std::ops::DerefMut;
 use std::{
     collections::HashMap,
     io,
@@ -142,6 +141,7 @@ pub struct ClientState {
     max_frame_size: u32,
     last_heatbeat: Instant,
     heartbeat_task: Option<task::TaskHandle>,
+    last_received_message: Arc<RwLock<Instant>>,
 }
 
 /// Raw API for taking to RabbitMQ stream
@@ -165,8 +165,9 @@ impl Client {
 
         let (sender, receiver) = Client::create_connection(&broker).await?;
 
-        let dispatcher = Dispatcher::new();
+        let last_received_message = Arc::new(RwLock::new(Instant::now()));
 
+        let dispatcher = Dispatcher::new();
         let state = ClientState {
             server_properties: HashMap::new(),
             connection_properties: HashMap::new(),
@@ -175,6 +176,7 @@ impl Client {
             max_frame_size: broker.max_frame_size,
             last_heatbeat: Instant::now(),
             heartbeat_task: None,
+            last_received_message: last_received_message.clone(),
         };
         let mut client = Client {
             dispatcher,
@@ -483,6 +485,14 @@ impl Client {
         self.filtering_supported
     }
 
+    pub async fn set_heartbeat(&self, heartbeat: u32) {
+        let mut state = self.state.write().await;
+        state.heartbeat = heartbeat;
+        // Eventually, this drops the previous heartbeat task
+        state.heartbeat_task =
+            self.start_hearbeat_task(heartbeat, state.last_received_message.clone());
+    }
+
     async fn create_connection(
         broker: &ClientOptions,
     ) -> Result<
@@ -500,6 +510,7 @@ impl Client {
 
         Ok((tx, rx))
     }
+
     async fn initialize<T>(&mut self, receiver: ChannelReceiver<T>) -> Result<(), ClientError>
     where
         T: Stream<Item = Result<Response, ClientError>> + Unpin + Send,
@@ -523,7 +534,8 @@ impl Client {
 
         // Start heartbeat task after connection is established
         let mut state = self.state.write().await;
-        state.heartbeat_task = self.start_hearbeat_task(state.heartbeat);
+        state.heartbeat_task =
+            self.start_hearbeat_task(state.heartbeat, state.last_received_message.clone());
         drop(state);
 
         Ok(())
@@ -664,7 +676,8 @@ impl Client {
 
         if state.heartbeat_task.take().is_some() {
             // Start heartbeat task after connection is established
-            state.heartbeat_task = self.start_hearbeat_task(state.heartbeat);
+            state.heartbeat_task =
+                self.start_hearbeat_task(state.heartbeat, state.last_received_message.clone());
         }
 
         drop(state);
@@ -677,14 +690,22 @@ impl Client {
         self.tune_notifier.notify_one();
     }
 
-    fn start_hearbeat_task(&self, heartbeat: u32) -> Option<task::TaskHandle> {
+    fn start_hearbeat_task(
+        &self,
+        heartbeat: u32,
+        last_received_message: Arc<RwLock<Instant>>,
+    ) -> Option<task::TaskHandle> {
         if heartbeat == 0 {
             return None;
         }
         let heartbeat_interval = (heartbeat / 2).max(1);
         let channel = self.channel.clone();
 
+        let client = self.clone();
+
         let heartbeat_task: task::TaskHandle = tokio::spawn(async move {
+            let timeout_threashold = u64::from(heartbeat * 4);
+
             loop {
                 trace!("Sending heartbeat");
                 if channel
@@ -695,7 +716,20 @@ impl Client {
                     break;
                 }
                 tokio::time::sleep(Duration::from_secs(heartbeat_interval.into())).await;
+
+                let now = Instant::now();
+                let last_message = last_received_message.read().await;
+                if now.duration_since(*last_message) >= Duration::from_secs(timeout_threashold) {
+                    warn!("Heartbeat timeout reached. Force closing connection.");
+                    if !client.is_closed() {
+                        if let Err(e) = client.close().await {
+                            warn!("Error closing client: {}", e);
+                        }
+                    }
+                    break;
+                }
             }
+
             warn!("Heartbeat task stopped. Force closing connection");
         })
         .into();
@@ -725,17 +759,28 @@ impl Client {
 impl MessageHandler for Client {
     async fn handle_message(&self, item: MessageResult) -> RabbitMQStreamResult<()> {
         match &item {
-            Some(Ok(response)) => match response.kind_ref() {
-                ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
-                ResponseKind::Heartbeat(_) => self.handle_heart_beat_command().await,
-                _ => {
-                    if let Some(handler) = self.state.read().await.handler.as_ref() {
-                        let handler = handler.clone();
+            Some(Ok(response)) => {
+                // Update last received message time: needed for heartbeat task
+                {
+                    let s = self.state.read().await;
+                    let mut last_received_message = s.last_received_message.write().await;
+                    *last_received_message = Instant::now();
+                    drop(last_received_message);
+                    drop(s);
+                }
 
-                        tokio::task::spawn(async move { handler.handle_message(item).await });
+                match response.kind_ref() {
+                    ResponseKind::Tunes(tune) => self.handle_tune_command(tune).await,
+                    ResponseKind::Heartbeat(_) => self.handle_heart_beat_command().await,
+                    _ => {
+                        if let Some(handler) = self.state.read().await.handler.as_ref() {
+                            let handler = handler.clone();
+
+                            tokio::task::spawn(async move { handler.handle_message(item).await });
+                        }
                     }
                 }
-            },
+            }
             Some(Err(err)) => {
                 trace!(?err);
                 if let Some(handler) = self.state.read().await.handler.as_ref() {
