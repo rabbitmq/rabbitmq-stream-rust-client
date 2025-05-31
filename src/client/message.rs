@@ -20,7 +20,7 @@ impl BaseMessage for Message {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ClientMessage {
     publishing_id: u64,
     message: Message,
@@ -38,6 +38,10 @@ impl ClientMessage {
 
     pub fn filter_value_extract(&mut self, filter_value_extractor: impl Fn(&Message) -> String) {
         self.filter_value = Some(filter_value_extractor(&self.message));
+    }
+
+    pub fn into_message(self) -> Message {
+        self.message
     }
 }
 
