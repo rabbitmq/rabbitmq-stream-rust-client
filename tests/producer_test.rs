@@ -8,7 +8,7 @@ use tokio::{sync::mpsc::channel, time::sleep};
 use rabbitmq_stream_client::{
     error::ClientError,
     types::{Message, OffsetSpecification, SimpleValue},
-    ClientMessage, Environment, OnClosed,
+    Environment, OnClosed,
 };
 
 #[path = "./common.rs"]
