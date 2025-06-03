@@ -617,11 +617,15 @@ impl MessageHandler for ProducerConfirmHandler {
             None => {
                 trace!("Connection closed");
                 if let Some(on_close) = &self.on_closed {
-                    let unconfirmed: Vec<Message> = self
+                    let mut unconfirmed: Vec<(u64, Message)> = self
                         .waiting_confirmations
                         .iter()
-                        .map(|entry| entry.value().0.clone().into_message())
+                        .map(|entry| (*entry.key(), entry.value().0.clone().into_message()))
                         .collect();
+                    unconfirmed.sort_by_key(|(id, _)| *id);
+
+                    let unconfirmed: Vec<Message> =
+                        unconfirmed.into_iter().map(|(_, msg)| msg).collect();
 
                     on_close.on_closed(unconfirmed).await;
                 }

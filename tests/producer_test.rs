@@ -906,14 +906,8 @@ async fn producer_got_back_unconfirmed_messages_on_close() {
                 }
             }
 
-            if producer
-                .send(
-                    Message::builder().body(b"message".to_vec()).build(),
-                    |_| async {},
-                )
-                .await
-                .is_err()
-            {
+            let message = Message::builder().body(format!("{}", i)).build();
+            if producer.send(message, |_| async {}).await.is_err() {
                 break;
             }
         }
@@ -925,8 +919,26 @@ async fn producer_got_back_unconfirmed_messages_on_close() {
     // Wait for the above task ends
     join_handler.await.unwrap();
 
-    let a = on_closed_receiver.recv().await.unwrap();
+    let unconfirmed = on_closed_receiver.recv().await.unwrap();
 
     // Some messages shouldn't be confirmed
-    assert!(a.len() > 0);
+    assert!(!unconfirmed.is_empty());
+
+    // Check that the unconfirmed messages are in order
+    for couple in unconfirmed.windows(2) {
+        let first = couple[0].data().expect("First message should have data");
+        let second = couple[1].data().expect("Second message should have data");
+        let first_value =
+            String::from_utf8(first.to_vec()).expect("First message should be valid UTF-8");
+        let second_value =
+            String::from_utf8(second.to_vec()).expect("Second message should be valid UTF-8");
+        let first_number: u32 = first_value
+            .parse()
+            .expect("First message should be a number");
+        let second_number: u32 = second_value
+            .parse()
+            .expect("Second message should be a number");
+
+        assert!(first_number < second_number, "Messages should be in order");
+    }
 }
