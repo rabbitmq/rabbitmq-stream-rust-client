@@ -8,10 +8,7 @@ use common::*;
 use fake::{Fake, Faker};
 use futures::StreamExt;
 use rabbitmq_stream_client::{
-    error::{
-        ClientError, ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError,
-        ProducerCloseError,
-    },
+    error::{ClientError, ConsumerCloseError, ConsumerDeliveryError, ConsumerStoreOffsetError},
     types::{Delivery, Message, OffsetSpecification, SuperStreamConsumer},
     Consumer, FilterConfiguration, NoDedup, Producer,
 };
