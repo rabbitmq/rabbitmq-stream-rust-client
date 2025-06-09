@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.8.0...rabbitmq-stream-client-v0.9.0) - 2025-06-09
+
+### Other
+
+- OnClosed callback for producer ([#293](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/293))
+- Update derive_more requirement from 0.99 to 2.0 ([#294](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/294))
+- Fix task leak ([#292](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/292))
+- Fix new clippy version issues ([#291](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/291))
+- Bump codecov/codecov-action from 5.4.0 to 5.4.2 ([#285](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/285))
+- Bump codecov/codecov-action from 5.3.1 to 5.4.0 ([#277](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/277))
+- Remove use of `doc(cfg(...))` and the docsrs configuration ([#282](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/282))
+- Update fake requirement from 3.0.0 to 4.2.0 ([#281](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/281))
+- Fix doc build failed ([#280](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/280))
+- Expose LeaderLocator enum ([#279](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/279))
+- Dynamic send ([#276](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/276))
+- FnOnce as Producer::send callback ([#273](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/273))
+
 ## [0.8.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.7.1...rabbitmq-stream-client-v0.8.0) - 2025-02-11
 
 ### Other
