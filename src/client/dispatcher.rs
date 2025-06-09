@@ -19,22 +19,6 @@ use super::{channel::ChannelReceiver, handler::MessageHandler};
 #[derive(Clone)]
 pub(crate) struct Dispatcher<T>(DispatcherState<T>);
 
-pub(crate) struct DispatcherState<T> {
-    requests: Arc<RequestsMap>,
-    correlation_id: Arc<AtomicU32>,
-    handler: Arc<RwLock<Option<T>>>,
-}
-
-impl<T> Clone for DispatcherState<T> {
-    fn clone(&self) -> Self {
-        DispatcherState {
-            requests: self.requests.clone(),
-            correlation_id: self.correlation_id.clone(),
-            handler: self.handler.clone(),
-        }
-    }
-}
-
 struct RequestsMap {
     requests: DashMap<u32, Sender<Response>>,
     closed: AtomicBool,
@@ -123,6 +107,22 @@ where
         R: 'static,
     {
         handle_response(self.0.clone(), stream).await
+    }
+}
+
+pub(crate) struct DispatcherState<T> {
+    requests: Arc<RequestsMap>,
+    correlation_id: Arc<AtomicU32>,
+    handler: Arc<RwLock<Option<T>>>,
+}
+
+impl<T> Clone for DispatcherState<T> {
+    fn clone(&self) -> Self {
+        DispatcherState {
+            requests: self.requests.clone(),
+            correlation_id: self.correlation_id.clone(),
+            handler: self.handler.clone(),
+        }
     }
 }
 

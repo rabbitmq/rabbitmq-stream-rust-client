@@ -3,12 +3,12 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use chrono::Utc;
 use fake::{Fake, Faker};
 use futures::{lock::Mutex, StreamExt};
-use tokio::{sync::mpsc::channel, task::yield_now, time::sleep};
+use tokio::{sync::mpsc::channel, time::sleep};
 
 use rabbitmq_stream_client::{
     error::ClientError,
     types::{Message, OffsetSpecification, SimpleValue},
-    Environment,
+    Environment, OnClosed,
 };
 
 #[path = "./common.rs"]
@@ -19,7 +19,6 @@ use common::*;
 use rabbitmq_stream_client::types::{
     HashRoutingMurmurStrategy, RoutingKeyRoutingStrategy, RoutingStrategy,
 };
-use tracing::span;
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::Notify;
@@ -783,4 +782,163 @@ async fn producer_drop() {
 
     let metrics = tokio::runtime::Handle::current().metrics();
     assert_eq!(metrics.num_alive_tasks(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_drop_connection_on_close() {
+    struct Foo {
+        notifier: Arc<Notify>,
+    }
+    #[async_trait::async_trait]
+    impl OnClosed for Foo {
+        async fn on_closed(&self, _: Vec<Message>) {
+            self.notifier.notify_one();
+        }
+    }
+
+    let notifier = Arc::new(Notify::new());
+    let _ = tracing_subscriber::fmt::try_init();
+    let client_provided_name: String = Faker.fake();
+    let env = TestEnvironment::create().await;
+    let producer = env
+        .env
+        .producer()
+        .client_provided_name(&client_provided_name)
+        .on_closed(Box::new(Foo {
+            notifier: notifier.clone(),
+        }))
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await
+        .unwrap();
+
+    sleep(Duration::from_millis(500)).await;
+
+    let connection = wait_for_named_connection(client_provided_name.clone()).await;
+    drop_connection(connection).await;
+
+    notifier.notified().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_timeout() {
+    struct Foo {
+        notifier: Arc<Notify>,
+    }
+    #[async_trait::async_trait]
+    impl OnClosed for Foo {
+        async fn on_closed(&self, _: Vec<Message>) {
+            self.notifier.notify_one();
+        }
+    }
+
+    let notifier = Arc::new(Notify::new());
+    let _ = tracing_subscriber::fmt::try_init();
+    let client_provided_name: String = Faker.fake();
+    let env = TestEnvironment::create().await;
+    let producer = env
+        .env
+        .producer()
+        .client_provided_name(&client_provided_name)
+        .overwrite_heartbeat(1)
+        .on_closed(Box::new(Foo {
+            notifier: notifier.clone(),
+        }))
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    producer
+        .send_with_confirm(Message::builder().body(b"message".to_vec()).build())
+        .await
+        .unwrap();
+
+    sleep(Duration::from_millis(500)).await;
+
+    let is_stopped = tokio::select! {
+        _ = notifier.notified() => true,
+        _ = sleep(Duration::from_secs(5)) => false,
+    };
+
+    assert!(is_stopped, "Producer did not stop after timeout");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn producer_got_back_unconfirmed_messages_on_close() {
+    struct Foo {
+        on_closed_sender: tokio::sync::mpsc::Sender<Vec<Message>>,
+    }
+    #[async_trait::async_trait]
+    impl OnClosed for Foo {
+        async fn on_closed(&self, unconfirmed: Vec<Message>) {
+            self.on_closed_sender.send(unconfirmed).await.unwrap();
+        }
+    }
+
+    let (on_closed_sender, mut on_closed_receiver) = tokio::sync::mpsc::channel(1);
+    let _ = tracing_subscriber::fmt::try_init();
+    let client_provided_name: String = Faker.fake();
+    let env = TestEnvironment::create().await;
+    let producer = env
+        .env
+        .producer()
+        .client_provided_name(&client_provided_name)
+        .on_closed(Box::new(Foo { on_closed_sender }))
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let connection = wait_for_named_connection(client_provided_name).await;
+
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+
+    let join_handler = tokio::spawn(async move {
+        let mut sender = Some(sender);
+        for i in 0..100 {
+            if i == 2 {
+                if let Some(sender) = sender.take() {
+                    // Simulate a delay to ensure the producer is closed before sending more messages
+                    sender.send(()).unwrap();
+                }
+            }
+
+            let message = Message::builder().body(format!("{}", i)).build();
+            if producer.send(message, |_| async {}).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    receiver.await.unwrap();
+    drop_connection(connection).await;
+
+    // Wait for the above task ends
+    join_handler.await.unwrap();
+
+    let unconfirmed = on_closed_receiver.recv().await.unwrap();
+
+    // Some messages shouldn't be confirmed
+    assert!(!unconfirmed.is_empty());
+
+    // Check that the unconfirmed messages are in order
+    for couple in unconfirmed.windows(2) {
+        let first = couple[0].data().expect("First message should have data");
+        let second = couple[1].data().expect("Second message should have data");
+        let first_value =
+            String::from_utf8(first.to_vec()).expect("First message should be valid UTF-8");
+        let second_value =
+            String::from_utf8(second.to_vec()).expect("Second message should be valid UTF-8");
+        let first_number: u32 = first_value
+            .parse()
+            .expect("First message should be a number");
+        let second_number: u32 = second_value
+            .parse()
+            .expect("Second message should be a number");
+
+        assert!(first_number < second_number, "Messages should be in order");
+    }
 }

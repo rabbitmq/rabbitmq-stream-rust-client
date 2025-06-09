@@ -199,6 +199,8 @@ impl Environment {
             data: PhantomData,
             filter_value_extractor: None,
             client_provided_name: String::from("rust-stream-producer"),
+            on_closed: None,
+            overwrite_heartbeat: None,
         }
     }
 

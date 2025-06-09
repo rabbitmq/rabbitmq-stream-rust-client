@@ -11,10 +11,10 @@ use std::{
 
 use dashmap::DashMap;
 use futures::{future::BoxFuture, FutureExt};
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::channel;
+use tokio::sync::{mpsc, RwLock};
 use tokio::time::sleep;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 
 use rabbitmq_stream_protocol::{message::Message, ResponseCode, ResponseKind};
 
@@ -27,7 +27,7 @@ use crate::{
     error::{ClientError, ProducerCloseError, ProducerCreateError, ProducerPublishError},
 };
 
-type WaiterMap = Arc<DashMap<u64, ProducerMessageWaiter>>;
+type WaiterMap = Arc<DashMap<u64, (ClientMessage, ProducerMessageWaiter)>>;
 type FilterValueExtractor = Arc<dyn Fn(&Message) -> String + 'static + Send + Sync>;
 
 #[derive(Debug)]
@@ -69,6 +69,7 @@ pub struct ProducerInternal {
     closed: Arc<AtomicBool>,
     sender: mpsc::Sender<ClientMessage>,
     filter_value_extractor: Option<FilterValueExtractor>,
+    on_closed: Arc<RwLock<Option<Box<dyn OnClosed + Send + Sync>>>>,
 }
 
 impl Drop for ProducerInternal {
@@ -116,6 +117,8 @@ pub struct ProducerBuilder<T> {
     pub(crate) data: PhantomData<T>,
     pub filter_value_extractor: Option<FilterValueExtractor>,
     pub(crate) client_provided_name: String,
+    pub(crate) on_closed: Option<Box<dyn OnClosed + Send + Sync>>,
+    pub(crate) overwrite_heartbeat: Option<u32>,
 }
 
 #[derive(Clone)]
@@ -136,6 +139,10 @@ impl<T> ProducerBuilder<T> {
             .create_producer_client(stream, self.client_provided_name.clone())
             .await?;
 
+        if let Some(heartbeat) = self.overwrite_heartbeat {
+            client.set_heartbeat(heartbeat).await;
+        }
+
         let mut publish_version = 1;
 
         if self.filter_value_extractor.is_some() {
@@ -146,11 +153,14 @@ impl<T> ProducerBuilder<T> {
             }
         }
 
+        let on_closed = Arc::new(RwLock::new(self.on_closed));
+
         let waiting_confirmations: WaiterMap = Arc::new(DashMap::new());
 
         let confirm_handler = ProducerConfirmHandler {
             waiting_confirmations: waiting_confirmations.clone(),
             metrics_collector,
+            on_closed: on_closed.clone(),
         };
 
         client.set_handler(confirm_handler).await;
@@ -183,6 +193,7 @@ impl<T> ProducerBuilder<T> {
                 closed: Arc::new(AtomicBool::new(false)),
                 sender,
                 filter_value_extractor: self.filter_value_extractor,
+                on_closed,
             };
 
             let internal_producer = Arc::new(producer);
@@ -204,8 +215,19 @@ impl<T> ProducerBuilder<T> {
         }
     }
 
+    pub fn on_closed(mut self, on_closed: Box<dyn OnClosed + Send + Sync>) -> ProducerBuilder<T> {
+        self.on_closed = Some(on_closed);
+        self
+    }
+
     pub fn batch_size(mut self, batch_size: usize) -> Self {
         self.batch_size = batch_size;
+        self
+    }
+
+    /// Don't use this in production, it is only for testing purposes.
+    pub fn overwrite_heartbeat(mut self, heartbeat: u32) -> ProducerBuilder<T> {
+        self.overwrite_heartbeat = Some(heartbeat);
         self
     }
 
@@ -223,6 +245,8 @@ impl<T> ProducerBuilder<T> {
             data: PhantomData,
             filter_value_extractor: None,
             client_provided_name: String::from("rust-stream-producer"),
+            on_closed: self.on_closed,
+            overwrite_heartbeat: None,
         }
     }
 
@@ -266,6 +290,15 @@ fn schedule_batch_send(
                 Ok(_) => {}
                 Err(e) => {
                     error!("Error publishing batch {:?}", e);
+
+                    // If the underlying error is a broken pipe, we can assume the connection is closed
+                    // In fact, BorkenPipe is not recoverable, so we can exit the loop.
+                    // This will close the receiver, so, the next time a send is called, it will return an error.
+                    if matches!(e, ClientError::Io(e) if e.kind() == std::io::ErrorKind::BrokenPipe)
+                    {
+                        // If the error is a broken pipe, we can assume the connection is closed
+                        break;
+                    }
                 }
             };
         }
@@ -445,11 +478,19 @@ impl<T> Producer<T> {
         }
 
         let waiter = OnceProducerMessageWaiter::waiter_with_cb(cb, message);
-        self.0
-            .waiting_confirmations
-            .insert(publishing_id, ProducerMessageWaiter::Once(waiter));
+        self.0.waiting_confirmations.insert(
+            publishing_id,
+            (msg.clone(), ProducerMessageWaiter::Once(waiter)),
+        );
 
         if let Err(e) = self.0.sender.send(msg).await {
+            // `send` fails only when the receiver is closed, which means the TCP connection is broken.
+            // In this case, we forcefully close the producer and return an error.
+            // The current message will not be sent, but it is not lost:
+            // `on_closed` handler will be called, and it can resend the message if needed.
+            if let Err(err) = self.0.close().await {
+                error!(error = ?err, "Failed to close producer after send error");
+            }
             return Err(ClientError::GenericError(Box::new(e)))?;
         }
 
@@ -484,13 +525,18 @@ impl<T> Producer<T> {
                 client_message.filter_value_extract(f.as_ref())
             }
 
+            self.0.waiting_confirmations.insert(
+                publishing_id,
+                (
+                    client_message.clone(),
+                    ProducerMessageWaiter::Shared(waiter.clone()),
+                ),
+            );
+
             // Queue the message for sending
             if let Err(e) = self.0.sender.send(client_message).await {
                 return Err(ClientError::GenericError(Box::new(e)))?;
             }
-            self.0
-                .waiting_confirmations
-                .insert(publishing_id, ProducerMessageWaiter::Shared(waiter.clone()));
         }
 
         Ok(())
@@ -503,11 +549,22 @@ impl<T> Producer<T> {
     pub async fn close(self) -> Result<(), ProducerCloseError> {
         self.0.close().await
     }
+
+    pub async fn set_on_closed(&self, on_closed: Box<dyn OnClosed + Send + Sync>) {
+        let mut on_closed_lock = self.0.on_closed.write().await;
+        *on_closed_lock = Some(on_closed);
+    }
+}
+
+#[async_trait::async_trait]
+pub trait OnClosed {
+    async fn on_closed(&self, unconfirmed: Vec<Message>);
 }
 
 struct ProducerConfirmHandler {
     waiting_confirmations: WaiterMap,
     metrics_collector: Arc<dyn MetricsCollector>,
+    on_closed: Arc<RwLock<Option<Box<dyn OnClosed + Send + Sync>>>>,
 }
 
 #[async_trait::async_trait]
@@ -522,7 +579,8 @@ impl MessageHandler for ProducerConfirmHandler {
                         for publishing_id in &confirm.publishing_ids {
                             let id = *publishing_id;
 
-                            let waiter = match self.waiting_confirmations.remove(publishing_id) {
+                            let (_, waiter) = match self.waiting_confirmations.remove(publishing_id)
+                            {
                                 Some((_, confirm_sender)) => confirm_sender,
                                 None => todo!(),
                             };
@@ -559,7 +617,7 @@ impl MessageHandler for ProducerConfirmHandler {
                             let code = err.error_code.clone();
                             let id = err.publishing_id;
 
-                            let waiter = match self.waiting_confirmations.remove(&id) {
+                            let (_, waiter) = match self.waiting_confirmations.remove(&id) {
                                 Some((_, confirm_sender)) => confirm_sender,
                                 None => todo!(),
                             };
@@ -582,8 +640,23 @@ impl MessageHandler for ProducerConfirmHandler {
                 // TODO clean all waiting for confirm
             }
             None => {
-                trace!("Connection closed");
-                // TODO connection close clean all waiting
+                info!("Connection closed");
+                let on_closed = self.on_closed.read().await;
+                if let Some(on_close) = &*on_closed {
+                    let mut unconfirmed: Vec<(u64, Message)> = self
+                        .waiting_confirmations
+                        .iter()
+                        .map(|entry| (*entry.key(), entry.value().0.clone().into_message()))
+                        .collect();
+                    unconfirmed.sort_by_key(|(id, _)| *id);
+
+                    let unconfirmed: Vec<Message> =
+                        unconfirmed.into_iter().map(|(_, msg)| msg).collect();
+
+                    on_close.on_closed(unconfirmed).await;
+                } else {
+                    warn!("No on_closed handler set, unconfirmed messages will be lost.");
+                }
             }
         }
         Ok(())
