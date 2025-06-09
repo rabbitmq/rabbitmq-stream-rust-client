@@ -9,9 +9,9 @@ use rabbitmq_stream_client::Environment;
 use rabbitmq_stream_client::{
     ConfirmationStatus, NoDedup, OnClosed, Producer, RabbitMQStreamResult,
 };
+use tokio::sync::Notify;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
-use tokio::sync::Notify;
 use tracing::info;
 
 struct MyHAProducerInner {
@@ -30,11 +30,14 @@ impl OnClosed for MyHAProducer {
     async fn on_closed(&self, unconfirmed: Vec<Message>) {
         info!("Producer is closed. Creating new one");
 
-        self.0.is_opened.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.0
+            .is_opened
+            .store(false, std::sync::atomic::Ordering::SeqCst);
 
         let mut producer = self.0.producer.write().await;
 
-        let new_producer = self.0
+        let new_producer = self
+            .0
             .environment
             .producer()
             .build(&self.0.stream)
@@ -52,7 +55,9 @@ impl OnClosed for MyHAProducer {
 
         *producer = new_producer;
 
-        self.0.is_opened.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.0
+            .is_opened
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         self.0.notify.notify_waiters();
     }
 }
@@ -61,9 +66,7 @@ impl MyHAProducer {
     async fn new(environment: Environment, stream: &str) -> RabbitMQStreamResult<Self> {
         ensure_stream_exists(&environment, stream).await?;
 
-        let producer = environment
-            .producer()
-            .build(stream).await.unwrap();
+        let producer = environment.producer().build(stream).await.unwrap();
 
         let inner = MyHAProducerInner {
             environment,
@@ -94,15 +97,12 @@ impl MyHAProducer {
 
         match err {
             Ok(s) => Ok(s),
-            Err(e) => {
-                match e {
-                    ProducerPublishError::Timeout | ProducerPublishError::Closed => {
-                        Box::pin(self.send_with_confirm(message))
-                            .await
-                    },
-                    _ => return Err(e),
+            Err(e) => match e {
+                ProducerPublishError::Timeout | ProducerPublishError::Closed => {
+                    Box::pin(self.send_with_confirm(message)).await
                 }
-            }
+                _ => return Err(e),
+            },
         }
     }
 }
@@ -143,9 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let msg = Message::builder()
             .body(format!("stream message_{}", i))
             .build();
-        producer
-            .send_with_confirm(msg)
-            .await?;
+        producer.send_with_confirm(msg).await?;
         sleep(Duration::from_millis(100)).await;
     }
 

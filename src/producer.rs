@@ -11,8 +11,8 @@ use std::{
 
 use dashmap::DashMap;
 use futures::{future::BoxFuture, FutureExt};
-use tokio::sync::{mpsc, RwLock};
 use tokio::sync::mpsc::channel;
+use tokio::sync::{mpsc, RwLock};
 use tokio::time::sleep;
 use tracing::{error, info, trace, warn};
 
@@ -294,7 +294,8 @@ fn schedule_batch_send(
                     // If the underlying error is a broken pipe, we can assume the connection is closed
                     // In fact, BorkenPipe is not recoverable, so we can exit the loop.
                     // This will close the receiver, so, the next time a send is called, it will return an error.
-                    if matches!(e, ClientError::Io(e) if e.kind() == std::io::ErrorKind::BrokenPipe) {
+                    if matches!(e, ClientError::Io(e) if e.kind() == std::io::ErrorKind::BrokenPipe)
+                    {
                         // If the error is a broken pipe, we can assume the connection is closed
                         break;
                     }
@@ -550,8 +551,7 @@ impl<T> Producer<T> {
     }
 
     pub async fn set_on_closed(&self, on_closed: Box<dyn OnClosed + Send + Sync>) {
-        let mut on_closed_lock = self.0
-            .on_closed.write().await;
+        let mut on_closed_lock = self.0.on_closed.write().await;
         *on_closed_lock = Some(on_closed);
     }
 }
