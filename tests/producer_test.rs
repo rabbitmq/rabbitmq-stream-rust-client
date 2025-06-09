@@ -804,7 +804,7 @@ async fn producer_drop_connection_on_close() {
         .env
         .producer()
         .client_provided_name(&client_provided_name)
-        .on_closed(Arc::new(Foo {
+        .on_closed(Box::new(Foo {
             notifier: notifier.clone(),
         }))
         .build(&env.stream)
@@ -845,7 +845,7 @@ async fn producer_timeout() {
         .producer()
         .client_provided_name(&client_provided_name)
         .overwrite_heartbeat(1)
-        .on_closed(Arc::new(Foo {
+        .on_closed(Box::new(Foo {
             notifier: notifier.clone(),
         }))
         .build(&env.stream)
@@ -887,7 +887,7 @@ async fn producer_got_back_unconfirmed_messages_on_close() {
         .env
         .producer()
         .client_provided_name(&client_provided_name)
-        .on_closed(Arc::new(Foo { on_closed_sender }))
+        .on_closed(Box::new(Foo { on_closed_sender }))
         .build(&env.stream)
         .await
         .unwrap();
