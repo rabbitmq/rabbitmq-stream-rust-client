@@ -12,7 +12,7 @@ wasm-bindgen = ["uuid/js"]
 
 [dependencies]
 byteorder = "1"
-ordered-float = "4.1.0"
+ordered-float = "5.1.0"
 uuid = "1"
 chrono = "0.4.26"
 num_enum = "0.7.0"
