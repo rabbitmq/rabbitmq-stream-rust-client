@@ -12,12 +12,12 @@ wasm-bindgen = ["uuid/js"]
 
 [dependencies]
 byteorder = "1"
-ordered-float = "4.1.0"
+ordered-float = "4.6.0"
 uuid = "1"
-chrono = "0.4.26"
-num_enum = "0.7.0"
+chrono = "0.4.42"
+num_enum = "0.7.5"
 derive_more = { version = "2.0.1", features = ["full"] }
 
 [dev-dependencies]
-pretty_assertions = "1.2.0"
-fake = { version = "4.0", features = [ "derive", "chrono", "uuid" ] }
+pretty_assertions = "1.4.1"
+fake = { version = "4.4", features = [ "derive", "chrono", "uuid" ] }
