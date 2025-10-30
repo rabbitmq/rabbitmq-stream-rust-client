@@ -229,8 +229,7 @@ mod tests {
     use crate::{
         codec::{Decoder, Encoder},
         commands::{
-            close::CloseResponse, consumer_update::ConsumerUpdateCommand,
-            consumer_update_request::ConsumerUpdateRequestCommand, deliver::DeliverCommand,
+            close::CloseResponse, consumer_update::ConsumerUpdateCommand, deliver::DeliverCommand,
             exchange_command_versions::ExchangeCommandVersionsResponse, generic::GenericResponse,
             heart_beat::HeartbeatResponse, metadata::MetadataResponse,
             metadata_update::MetadataUpdateCommand, open::OpenResponse,

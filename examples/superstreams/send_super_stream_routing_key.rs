@@ -54,14 +54,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create_super_stream(super_stream, 3, Some(routing_key))
         .await;
 
-    if let Err(e) = create_response {
-        if let StreamCreateError::Create { stream, status } = e {
-            match status {
-                // we can ignore this error because the stream already exists
-                ResponseCode::StreamAlreadyExists => {}
-                err => {
-                    println!("Error creating stream: {:?} {:?}", stream, err);
-                }
+    if let Err(StreamCreateError::Create { stream, status }) = create_response {
+        match status {
+            // we can ignore this error because the stream already exists
+            ResponseCode::StreamAlreadyExists => {}
+            err => {
+                println!("Error creating stream: {:?} {:?}", stream, err);
             }
         }
     }

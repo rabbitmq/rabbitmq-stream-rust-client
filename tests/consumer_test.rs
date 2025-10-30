@@ -107,7 +107,7 @@ async fn super_stream_consumer_test() {
     let mut received_messages = 0;
     let handle = super_stream_consumer.handle();
 
-    while let Some(_) = super_stream_consumer.next().await {
+    while super_stream_consumer.next().await.is_some() {
         received_messages += 1;
         if received_messages == 10 {
             break;
@@ -481,7 +481,7 @@ async fn consumer_test_with_filtering() {
         .lock()
         .await
         .iter()
-        .filter(|item| item == &&"filtering")
+        .filter(|item| item == &"filtering")
         .collect::<Vec<_>>()
         .len();
 
@@ -562,7 +562,7 @@ async fn super_stream_consumer_test_with_filtering() {
         .lock()
         .await
         .iter()
-        .filter(|item| item == &&"filtering")
+        .filter(|item| item == &"filtering")
         .collect::<Vec<_>>()
         .len();
 
@@ -654,7 +654,7 @@ async fn consumer_test_with_filtering_match_unfiltered() {
         .lock()
         .await
         .iter()
-        .filter(|item| item == &&"1")
+        .filter(|item| item == &"1")
         .collect::<Vec<_>>()
         .len();
 
@@ -728,7 +728,7 @@ async fn super_stream_single_active_consumer_test() {
     task::spawn(async move {
         let received_messages_int = received_message_outer.clone();
         let notify_received_messages_inner = notify_received_messages_outer.clone();
-        while let Some(_) = super_stream_consumer.next().await {
+        while super_stream_consumer.next().await.is_some() {
             let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
             if message_count == rec_msg {
                 notify_received_messages_inner.notify_one();
@@ -742,7 +742,7 @@ async fn super_stream_single_active_consumer_test() {
     task::spawn(async move {
         let received_messages_int = received_message_outer.clone();
         let notify_received_messages_inner = notify_received_messages_outer.clone();
-        while let Some(_) = super_stream_consumer_2.next().await {
+        while super_stream_consumer_2.next().await.is_some() {
             let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
             if message_count == rec_msg {
                 notify_received_messages_inner.notify_one();
@@ -756,7 +756,7 @@ async fn super_stream_single_active_consumer_test() {
     task::spawn(async move {
         let received_messages_int = received_message_outer.clone();
         let notify_received_messages_inner = notify_received_messages_outer.clone();
-        while let Some(_) = super_stream_consumer_3.next().await {
+        while super_stream_consumer_3.next().await.is_some() {
             let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
             if message_count == rec_msg {
                 notify_received_messages_inner.notify_one();
@@ -887,7 +887,7 @@ async fn super_stream_single_active_consumer_test_with_callback() {
     task::spawn(async move {
         let received_messages_int = received_message_outer.clone();
         let notify_received_messages_inner = notify_received_messages_outer.clone();
-        while let Some(_) = super_stream_consumer.next().await {
+        while super_stream_consumer.next().await.is_some() {
             let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
             if message_count == rec_msg {
                 notify_received_messages_inner.notify_one();
@@ -901,7 +901,7 @@ async fn super_stream_single_active_consumer_test_with_callback() {
     task::spawn(async move {
         let received_messages_int = received_message_outer.clone();
         let notify_received_messages_inner = notify_received_messages_outer.clone();
-        while let Some(_) = super_stream_consumer_2.next().await {
+        while super_stream_consumer_2.next().await.is_some() {
             let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
             if message_count == rec_msg {
                 notify_received_messages_inner.notify_one();
@@ -915,7 +915,7 @@ async fn super_stream_single_active_consumer_test_with_callback() {
     task::spawn(async move {
         let received_messages_int = received_message_outer.clone();
         let notify_received_messages_inner = notify_received_messages_outer.clone();
-        while let Some(_) = super_stream_consumer_3.next().await {
+        while super_stream_consumer_3.next().await.is_some() {
             let rec_msg = received_messages_int.fetch_add(1, Ordering::Relaxed);
             if message_count == rec_msg {
                 notify_received_messages_inner.notify_one();

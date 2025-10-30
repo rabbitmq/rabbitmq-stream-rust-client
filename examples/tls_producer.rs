@@ -50,10 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn start_publisher(
-    env: Environment,
-    stream: &String,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_publisher(env: Environment, stream: &str) -> Result<(), Box<dyn std::error::Error>> {
     let _ = env.stream_creator().create(stream).await;
 
     let producer = env.producer().batch_size(BATCH_SIZE).build(stream).await?;

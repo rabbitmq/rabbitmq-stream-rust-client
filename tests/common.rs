@@ -8,6 +8,7 @@ use rabbitmq_stream_protocol::ResponseCode;
 use serde::Deserialize;
 use tokio::sync::Semaphore;
 
+#[allow(unused)]
 pub struct TestClient {
     pub client: Client,
     pub stream: String,
@@ -24,6 +25,7 @@ impl Drop for Countdown {
     }
 }
 
+#[allow(unused)]
 impl Countdown {
     pub fn new(n: u32) -> (Self, impl Future + Send) {
         let sem = Arc::new(Semaphore::new(0));
@@ -41,14 +43,17 @@ pub struct TestEnvironment {
     pub env: Environment,
     pub stream: String,
     pub super_stream: String,
+    #[allow(unused)]
     pub partitions: Vec<String>,
 }
 
 impl TestClient {
+    #[allow(unused)]
     pub async fn create() -> TestClient {
         Self::create_with_option(ClientOptions::default()).await
     }
 
+    #[allow(unused)]
     pub async fn create_with_option(options: ClientOptions) -> TestClient {
         let stream: String = Faker.fake();
         let client = Client::connect(options).await.unwrap();
@@ -64,6 +69,7 @@ impl TestClient {
         }
     }
 
+    #[allow(unused)]
     pub async fn create_super_stream() -> TestClient {
         let super_stream: String = Faker.fake();
         let client = Client::connect(ClientOptions::default()).await.unwrap();
@@ -104,6 +110,7 @@ impl Drop for TestClient {
     }
 }
 
+#[allow(unused)]
 impl TestEnvironment {
     pub async fn create() -> TestEnvironment {
         let stream: String = Faker.fake();
@@ -203,6 +210,7 @@ pub async fn list_http_connection() -> Vec<RabbitConnection> {
         .unwrap()
 }
 
+#[allow(unused)]
 pub async fn wait_for_named_connection(connection_name: String) -> RabbitConnection {
     let mut max = 10;
     while max > 0 {
@@ -219,6 +227,7 @@ pub async fn wait_for_named_connection(connection_name: String) -> RabbitConnect
     panic!("Connection not found. timeout");
 }
 
+#[allow(unused)]
 pub async fn drop_connection(connection: RabbitConnection) {
     reqwest::Client::new()
         .delete(format!(
