@@ -160,7 +160,7 @@ impl ConsumerBuilder {
                 return Err(ConsumerCreateError::FilteringNotSupport);
             }
             for (index, item) in filter_input.filter_values.iter().enumerate() {
-                let key = format!("filter.{}", index);
+                let key = format!("filter.{index}");
                 self.properties.insert(key, item.to_owned());
             }
 
