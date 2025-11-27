@@ -295,7 +295,7 @@ async fn client_declare_delete_publisher_twice_error() {
         .await
         .unwrap();
 
-    assert_eq!(&ResponseCode::PrecoditionFailed, response_error.code());
+    assert_eq!(&ResponseCode::PreconditionFailed, response_error.code());
 
     let response = test.client.delete_publisher(1).await.unwrap();
     assert_eq!(&ResponseCode::Ok, response.code());

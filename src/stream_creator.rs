@@ -41,19 +41,22 @@ impl StreamCreator {
         binding_keys: Option<Vec<String>>,
     ) -> Result<(), StreamCreateError> {
         let mut partitions_names = Vec::with_capacity(number_of_partitions);
-        let mut new_binding_keys: Vec<String> = Vec::with_capacity(number_of_partitions);
-
-        if binding_keys.is_none() {
-            for i in 0..number_of_partitions {
-                new_binding_keys.push(i.to_string());
-                partitions_names.push(super_stream.to_owned() + "-" + i.to_string().as_str())
-            }
+        let new_binding_keys: Vec<String> = if let Some(keys) = binding_keys {
+            // Use the provided binding keys
+            keys.iter()
+                .map(|binding_key| {
+                    partitions_names.push(super_stream.to_owned() + "-" + binding_key);
+                    binding_key.clone()
+                })
+                .collect()
         } else {
-            new_binding_keys = binding_keys.unwrap();
-            for binding_key in new_binding_keys.iter() {
-                partitions_names.push(super_stream.to_owned() + "-" + binding_key)
-            }
-        }
+            (0..number_of_partitions)
+                .map(|i| {
+                    partitions_names.push(super_stream.to_owned() + "-" + &i.to_string());
+                    i.to_string()
+                })
+                .collect()
+        };
 
         let client = self.env.create_client().await?;
         let response = client
