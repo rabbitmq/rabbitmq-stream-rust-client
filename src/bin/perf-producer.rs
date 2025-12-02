@@ -78,14 +78,14 @@ async fn main() {
             metrics = Vec::with_capacity(50 * 60 * minutes as usize);
             tokio::spawn(async move {
                 let stats = calculate_stats(last_metrics).await;
-                println!("stats: {:?}", stats);
+                println!("stats: {stats:?}");
             });
         }
         metrics.push(metric);
     }
 
     let stats = calculate_stats(metrics).await;
-    println!("stats: {:?}", stats);
+    println!("stats: {stats:?}");
 }
 
 async fn calculate_stats(metrics: Vec<Metric>) -> Stats {

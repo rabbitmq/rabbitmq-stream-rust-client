@@ -43,7 +43,7 @@ pub enum ResponseCode {
     FrameTooLarge,
     InternalError,
     AccessRefused,
-    PrecoditionFailed,
+    PreconditionFailed,
     PublisherDoesNotExist,
     OffsetNotFound,
 }

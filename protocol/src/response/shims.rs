@@ -32,7 +32,7 @@ impl TryFrom<u16> for ResponseCode {
             RESPONSE_CODE_FRAME_TOO_LARGE => Ok(ResponseCode::FrameTooLarge),
             RESPONSE_CODE_INTERNAL_ERROR => Ok(ResponseCode::InternalError),
             RESPONSE_CODE_ACCESS_REFUSED => Ok(ResponseCode::AccessRefused),
-            RESPONSE_CODE_PRECONDITION_FAILED => Ok(ResponseCode::PrecoditionFailed),
+            RESPONSE_CODE_PRECONDITION_FAILED => Ok(ResponseCode::PreconditionFailed),
             RESPONSE_CODE_PUBLISHER_DOES_NOT_EXIST => Ok(ResponseCode::PublisherDoesNotExist),
             RESPONSE_CODE_OFFSET_NOT_FOUND => Ok(ResponseCode::OffsetNotFound),
             _ => Err(DecodeError::UnknownResponseCode(value)),
@@ -65,7 +65,7 @@ impl From<&ResponseCode> for u16 {
             ResponseCode::FrameTooLarge => RESPONSE_CODE_FRAME_TOO_LARGE,
             ResponseCode::InternalError => RESPONSE_CODE_INTERNAL_ERROR,
             ResponseCode::AccessRefused => RESPONSE_CODE_ACCESS_REFUSED,
-            ResponseCode::PrecoditionFailed => RESPONSE_CODE_PRECONDITION_FAILED,
+            ResponseCode::PreconditionFailed => RESPONSE_CODE_PRECONDITION_FAILED,
             ResponseCode::PublisherDoesNotExist => RESPONSE_CODE_PUBLISHER_DOES_NOT_EXIST,
             ResponseCode::OffsetNotFound => RESPONSE_CODE_OFFSET_NOT_FOUND,
         }
