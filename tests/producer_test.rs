@@ -251,12 +251,15 @@ async fn producer_send_with_callback_can_drop() {
     // A non copy structure
     struct Foo;
 
-    let f = Foo;
+    let f = Foo {};
     producer
         .send(
             Message::builder().body(b"message".to_vec()).build(),
             move |_| {
-                // this callback is an FnOnce, so we can drop a value here
+                // This callback is an FnOnce, so we can drop a value here
+                // Foo doesn't actually implement Drop, so Clippy will complain
+                // if we don't squelch it.
+                #[allow(clippy::drop_non_drop)]
                 drop(f);
                 async {}
             },
@@ -676,11 +679,7 @@ async fn super_stream_producer_send_filtering_message() {
         .build();
 
     let closed = super_stream_producer.send(message, |_| async move {}).await;
-
-    match closed {
-        Ok(_) => assert!(true),
-        Err(_) => assert!(false),
-    }
+    assert!(closed.is_ok())
 }
 
 #[tokio::test(flavor = "multi_thread")]

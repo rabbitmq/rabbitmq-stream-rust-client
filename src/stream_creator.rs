@@ -40,32 +40,16 @@ impl StreamCreator {
         number_of_partitions: usize,
         binding_keys: Option<Vec<String>>,
     ) -> Result<(), StreamCreateError> {
-        let mut partitions_names = Vec::with_capacity(number_of_partitions);
-        let new_binding_keys: Vec<String> = if let Some(keys) = binding_keys {
-            // Use the provided binding keys
-            keys.iter()
-                .map(|binding_key| {
-                    partitions_names.push(super_stream.to_owned() + "-" + binding_key);
-                    binding_key.clone()
-                })
-                .collect()
-        } else {
-            (0..number_of_partitions)
-                .map(|i| {
-                    partitions_names.push(super_stream.to_owned() + "-" + &i.to_string());
-                    i.to_string()
-                })
-                .collect()
-        };
+        let binding_keys = binding_keys
+            .unwrap_or_else(|| (0..number_of_partitions).map(|i| i.to_string()).collect());
+        let partition_names = binding_keys
+            .iter()
+            .map(|binding_key| format!("{super_stream}-{binding_key}"))
+            .collect();
 
         let client = self.env.create_client().await?;
         let response = client
-            .create_super_stream(
-                super_stream,
-                partitions_names,
-                new_binding_keys,
-                self.options,
-            )
+            .create_super_stream(super_stream, partition_names, binding_keys, self.options)
             .await?;
         client.close().await?;
 

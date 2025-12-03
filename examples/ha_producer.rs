@@ -101,7 +101,7 @@ impl MyHAProducer {
                 ProducerPublishError::Timeout | ProducerPublishError::Closed => {
                     Box::pin(self.send_with_confirm(message)).await
                 }
-                _ => return Err(e),
+                _ => Err(e),
             },
         }
     }
@@ -114,14 +114,12 @@ async fn ensure_stream_exists(environment: &Environment, stream: &str) -> Rabbit
         .create(stream)
         .await;
 
-    if let Err(e) = create_response {
-        if let StreamCreateError::Create { stream, status } = e {
-            match status {
-                // we can ignore this error because the stream already exists
-                ResponseCode::StreamAlreadyExists => {}
-                err => {
-                    panic!("Error creating stream: {:?} {:?}", stream, err);
-                }
+    if let Err(StreamCreateError::Create { stream, status }) = create_response {
+        match status {
+            // we can ignore this error because the stream already exists
+            ResponseCode::StreamAlreadyExists => {}
+            err => {
+                panic!("Error creating stream: {:?} {:?}", stream, err);
             }
         }
     }
