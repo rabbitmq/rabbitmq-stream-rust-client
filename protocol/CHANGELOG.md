@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.9.0...rabbitmq-stream-protocol-v0.10.0) - 2025-12-03
+
+### Other
+
+- Upgrade all dependencies where doing so wouldn't cause breaking changes. ([#303](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/303))
+- Fixed typo for `ResponseCode::PrecoditionFailed` ([#307](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/307))
+
 ## [0.8.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.8.0...rabbitmq-stream-protocol-v0.8.1) - 2025-06-09
 
 ### Other
