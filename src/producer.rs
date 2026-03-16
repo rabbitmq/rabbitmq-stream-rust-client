@@ -76,7 +76,7 @@ impl Drop for ProducerInternal {
     fn drop(&mut self) {
         block_on(async {
             if let Err(e) = self.close().await {
-                error!(error = ?e, "Error closing producer");
+                warn!(error = ?e, "Error closing producer");
             }
         });
     }
@@ -161,6 +161,7 @@ impl<T> ProducerBuilder<T> {
             waiting_confirmations: waiting_confirmations.clone(),
             metrics_collector,
             on_closed: on_closed.clone(),
+            handler_failed: client.handler_failed_flag(),
         };
 
         client.set_handler(confirm_handler).await;
@@ -289,7 +290,7 @@ fn schedule_batch_send(
             match client.publish(producer_id, messages, publish_version).await {
                 Ok(_) => {}
                 Err(e) => {
-                    error!("Error publishing batch {:?}", e);
+                    warn!("Error publishing batch {:?}", e);
 
                     // If the underlying error is a broken pipe, we can assume the connection is closed
                     // In fact, BorkenPipe is not recoverable, so we can exit the loop.
@@ -565,6 +566,7 @@ struct ProducerConfirmHandler {
     waiting_confirmations: WaiterMap,
     metrics_collector: Arc<dyn MetricsCollector>,
     on_closed: Arc<RwLock<Option<Box<dyn OnClosed + Send + Sync>>>>,
+    handler_failed: Arc<AtomicBool>,
 }
 
 #[async_trait::async_trait]
@@ -638,6 +640,8 @@ impl MessageHandler for ProducerConfirmHandler {
             Some(Err(error)) => {
                 trace!(?error);
                 // TODO clean all waiting for confirm
+                self.handler_failed.store(true, Ordering::Relaxed);
+                return Err(error);
             }
             None => {
                 info!("Connection closed");

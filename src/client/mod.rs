@@ -244,6 +244,10 @@ impl Client {
         self.channel.is_closed()
     }
 
+    pub(crate) fn handler_failed_flag(&self) -> Arc<std::sync::atomic::AtomicBool> {
+        self.dispatcher.handler_failed_flag()
+    }
+
     pub async fn close(&self) -> RabbitMQStreamResult<()> {
         if self.is_closed() {
             return Err(ClientError::AlreadyClosed);
@@ -790,8 +794,8 @@ impl MessageHandler for Client {
                                     Ok(Err(err)) => {
                                         warn!("Message handler returned error: {}", err);
                                     }
-                                    Err(_panic) => {
-                                        tracing::error!("Message handler panicked");
+                                    Err(panic) => {
+                                        tracing::error!("Message handler panicked: {:?}", panic);
                                     }
                                 }
                             });
