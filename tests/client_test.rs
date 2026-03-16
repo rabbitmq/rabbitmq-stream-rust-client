@@ -481,6 +481,114 @@ async fn client_close() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn client_handler_panic_does_not_crash() {
+    let test = TestClient::create().await;
+    let reference: String = Faker.fake();
+
+    // Set a handler that panics when it receives a message
+    let handler = move |msg: MessageResult| async move {
+        if let Some(Ok(_response)) = msg {
+            panic!("handler panic on purpose");
+        }
+        Ok(())
+    };
+
+    let _ = test
+        .client
+        .subscribe(
+            1,
+            &test.stream,
+            OffsetSpecification::First,
+            1,
+            HashMap::new(),
+        )
+        .await
+        .unwrap();
+
+    test.client.set_handler(handler).await;
+
+    let _ = test
+        .client
+        .declare_publisher(1, Some(reference.clone()), &test.stream)
+        .await
+        .unwrap();
+
+    // Publish a message that will trigger the panicking handler
+    let _ = test
+        .client
+        .publish(
+            1,
+            Message::builder().body(b"panic_test".to_vec()).build(),
+            1,
+        )
+        .await
+        .unwrap();
+
+    // Wait for the handler to process the message (and panic, which should be caught)
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+    // The client should still be functional after the handler panicked
+    assert!(!test.client.is_closed());
+
+    let _ = test.client.unsubscribe(1).await.unwrap();
+    let _ = test.client.delete_publisher(1).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_handler_error_does_not_crash() {
+    let test = TestClient::create().await;
+    let reference: String = Faker.fake();
+
+    // Set a handler that returns an error
+    let handler = move |msg: MessageResult| async move {
+        if let Some(Ok(_response)) = msg {
+            return Err(rabbitmq_stream_client::error::ClientError::ConnectionClosed);
+        }
+        Ok(())
+    };
+
+    let _ = test
+        .client
+        .subscribe(
+            1,
+            &test.stream,
+            OffsetSpecification::First,
+            1,
+            HashMap::new(),
+        )
+        .await
+        .unwrap();
+
+    test.client.set_handler(handler).await;
+
+    let _ = test
+        .client
+        .declare_publisher(1, Some(reference.clone()), &test.stream)
+        .await
+        .unwrap();
+
+    // Publish a message that will trigger the error-returning handler
+    let _ = test
+        .client
+        .publish(
+            1,
+            Message::builder().body(b"error_test".to_vec()).build(),
+            1,
+        )
+        .await
+        .unwrap();
+
+    // Wait for the handler to process the message
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+    // The client should still be functional after the handler returned an error
+    assert!(!test.client.is_closed());
+
+    let _ = test.client.unsubscribe(1).await.unwrap();
+    let _ = test.client.delete_publisher(1).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn client_drop_connection() {
     let _ = tracing_subscriber::fmt::try_init();
     let client_provider_name: String = Faker.fake();

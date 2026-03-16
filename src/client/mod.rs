@@ -10,7 +10,7 @@ use std::{future::Future, sync::atomic::Ordering};
 
 use futures::{
     stream::{SplitSink, SplitStream},
-    Stream, StreamExt, TryFutureExt,
+    FutureExt, Stream, StreamExt, TryFutureExt,
 };
 use pin_project::pin_project;
 use rabbitmq_stream_protocol::commands::exchange_command_versions::{
@@ -242,6 +242,10 @@ impl Client {
 
     pub fn is_closed(&self) -> bool {
         self.channel.is_closed()
+    }
+
+    pub(crate) fn handler_failed_flag(&self) -> Arc<std::sync::atomic::AtomicBool> {
+        self.dispatcher.handler_failed_flag()
     }
 
     pub async fn close(&self) -> RabbitMQStreamResult<()> {
@@ -777,7 +781,24 @@ impl MessageHandler for Client {
                         if let Some(handler) = self.state.read().await.handler.as_ref() {
                             let handler = handler.clone();
 
-                            tokio::task::spawn(async move { handler.handle_message(item).await });
+                            tokio::task::spawn(async move {
+                                // We want to log any panic that happens in the user provided handler.
+                                //
+                                // NB: tokio::task::spawn catches panics and prevents them from crashing the process,
+                                //     but we want to log them for debugging purposes.
+                                match std::panic::AssertUnwindSafe(handler.handle_message(item))
+                                    .catch_unwind()
+                                    .await
+                                {
+                                    Ok(Ok(())) => {}
+                                    Ok(Err(err)) => {
+                                        warn!("Message handler returned error: {}", err);
+                                    }
+                                    Err(panic) => {
+                                        tracing::error!("Message handler panicked: {:?}", panic);
+                                    }
+                                }
+                            });
                         }
                     }
                 }

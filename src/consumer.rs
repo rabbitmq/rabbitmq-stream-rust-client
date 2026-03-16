@@ -25,7 +25,7 @@ use crate::error::ConsumerStoreOffsetError;
 
 use crate::{
     client::{MessageHandler, MessageResult},
-    error::{ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
+    error::{ClientError, ConsumerCloseError, ConsumerCreateError, ConsumerDeliveryError},
     Client, Environment, MetricsCollector,
 };
 use futures::{future::BoxFuture, task::AtomicWaker, Stream};
@@ -377,7 +377,8 @@ impl MessageHandler for ConsumerMessageHandler {
                                 continue;
                             }
                         }
-                        let _ = self
+
+                        if let Err(err) = self
                             .0
                             .sender
                             .send(Ok(Delivery {
@@ -387,12 +388,29 @@ impl MessageHandler for ConsumerMessageHandler {
                                 message,
                                 offset,
                             }))
-                            .await;
+                            .await
+                        {
+                            tracing::warn!(error=?err, "Consumer receiver dropped, stopping message handler");
+                            self.0.closed.store(true, Relaxed);
+                            self.0.client.handler_failed_flag().store(true, Relaxed);
+                            self.0.waker.wake();
+                            return Err(ClientError::ConnectionClosed);
+                        }
                         offset += 1;
                     }
 
-                    // TODO handle credit fail
-                    let _ = self.0.client.credit(self.0.subscription_id, 1).await;
+                    if let Err(err) = self.0.client.credit(self.0.subscription_id, 1).await {
+                        tracing::warn!(
+                            "Failed to send credit for subscription {}: {}. Closing consumer.",
+                            self.0.subscription_id,
+                            err
+                        );
+                        let _ = self.0.sender.send(Err(err.into())).await;
+                        self.0.closed.store(true, Relaxed);
+                        self.0.client.handler_failed_flag().store(true, Relaxed);
+                        self.0.waker.wake();
+                        return Err(ClientError::ConnectionClosed);
+                    }
                     self.0.metrics_collector.consume(len as u64).await;
                 } else if let ResponseKind::ConsumerUpdate(consumer_update) = response.kind_ref() {
                     trace!("Received a ConsumerUpdate message");
