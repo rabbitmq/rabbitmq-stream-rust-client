@@ -778,6 +778,10 @@ impl MessageHandler for Client {
                             let handler = handler.clone();
 
                             tokio::task::spawn(async move {
+                                // We want to log any panic that happens in the user provided handler.
+                                //
+                                // NB: tokio::task::spawn catches panics and prevents them from crashing the process,
+                                //     but we want to log them for debugging purposes.
                                 match std::panic::AssertUnwindSafe(handler.handle_message(item))
                                     .catch_unwind()
                                     .await
