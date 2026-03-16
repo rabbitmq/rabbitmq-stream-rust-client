@@ -516,7 +516,11 @@ async fn client_handler_panic_does_not_crash() {
     // Publish a message that will trigger the panicking handler
     let _ = test
         .client
-        .publish(1, Message::builder().body(b"panic_test".to_vec()).build(), 1)
+        .publish(
+            1,
+            Message::builder().body(b"panic_test".to_vec()).build(),
+            1,
+        )
         .await
         .unwrap();
 
@@ -566,7 +570,11 @@ async fn client_handler_error_does_not_crash() {
     // Publish a message that will trigger the error-returning handler
     let _ = test
         .client
-        .publish(1, Message::builder().body(b"error_test".to_vec()).build(), 1)
+        .publish(
+            1,
+            Message::builder().body(b"error_test".to_vec()).build(),
+            1,
+        )
         .await
         .unwrap();
 

@@ -666,12 +666,7 @@ async fn consumer_drop_receiver_closes_consumer() {
     let env = TestEnvironment::create().await;
 
     let message_count = 10;
-    let producer = env
-        .env
-        .producer()
-        .build(&env.stream)
-        .await
-        .unwrap();
+    let producer = env.env.producer().build(&env.stream).await.unwrap();
 
     let consumer = env
         .env
