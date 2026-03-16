@@ -662,6 +662,48 @@ async fn consumer_test_with_filtering_match_unfiltered() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn consumer_drop_receiver_closes_consumer() {
+    let env = TestEnvironment::create().await;
+
+    let message_count = 10;
+    let producer = env
+        .env
+        .producer()
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let consumer = env
+        .env
+        .consumer()
+        .offset(OffsetSpecification::Next)
+        .build(&env.stream)
+        .await
+        .unwrap();
+
+    let handle = consumer.handle();
+
+    // Drop the consumer, which drops the receiver side of the channel
+    drop(consumer);
+
+    // Publish messages that will trigger the handler to try sending to the dropped receiver
+    for n in 0..message_count {
+        let _ = producer
+            .send_with_confirm(Message::builder().body(format!("message{}", n)).build())
+            .await
+            .unwrap();
+    }
+
+    // Wait for the handler to detect the dropped receiver
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // The handler should have detected the dropped receiver and marked the consumer as closed
+    assert!(handle.is_closed().await);
+
+    producer.close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn super_stream_single_active_consumer_test() {
     let env = TestEnvironment::create_super_stream().await;
 

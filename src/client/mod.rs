@@ -10,7 +10,7 @@ use std::{future::Future, sync::atomic::Ordering};
 
 use futures::{
     stream::{SplitSink, SplitStream},
-    Stream, StreamExt, TryFutureExt,
+    FutureExt, Stream, StreamExt, TryFutureExt,
 };
 use pin_project::pin_project;
 use rabbitmq_stream_protocol::commands::exchange_command_versions::{
@@ -777,7 +777,20 @@ impl MessageHandler for Client {
                         if let Some(handler) = self.state.read().await.handler.as_ref() {
                             let handler = handler.clone();
 
-                            tokio::task::spawn(async move { handler.handle_message(item).await });
+                            tokio::task::spawn(async move {
+                                match std::panic::AssertUnwindSafe(handler.handle_message(item))
+                                    .catch_unwind()
+                                    .await
+                                {
+                                    Ok(Ok(())) => {}
+                                    Ok(Err(err)) => {
+                                        warn!("Message handler returned error: {}", err);
+                                    }
+                                    Err(_panic) => {
+                                        tracing::error!("Message handler panicked");
+                                    }
+                                }
+                            });
                         }
                     }
                 }
