@@ -3,9 +3,8 @@ use std::sync::Arc;
 
 use crate::types::OffsetSpecification;
 use crate::{client::TlsConfiguration, producer::NoDedup};
-use rand::prelude::SliceRandom;
+use rand::prelude::IndexedRandom;
 use rand::rngs::StdRng;
-use rand::SeedableRng;
 use std::collections::HashMap;
 
 use crate::{
@@ -144,7 +143,8 @@ impl Environment {
         if let Some(metadata) = client.metadata(vec![stream.to_string()]).await?.get(stream) {
             // If there are no replicas we do not reassign client, meaning we just keep reading from the leader.
             // This is desired behavior in case there is only one node in the cluster.
-            if let Some(replica) = metadata.replicas.choose(&mut StdRng::from_entropy()) {
+            let mut rng: StdRng = rand::make_rng();
+            if let Some(replica) = metadata.replicas.choose(&mut rng) {
                 tracing::debug!(
                     "Picked replica {:?} out of possible candidates {:?} for stream {}",
                     replica,
