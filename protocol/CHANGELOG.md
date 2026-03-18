@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.10.0...rabbitmq-stream-protocol-v0.10.1) - 2026-03-18
+
+### Other
+
+- Update rand, fake and reqwest deps ([#316](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/316))
+
 ## [0.10.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-protocol-v0.9.0...rabbitmq-stream-protocol-v0.10.0) - 2025-12-03
 
 ### Other
