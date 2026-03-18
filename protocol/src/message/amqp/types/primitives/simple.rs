@@ -688,7 +688,7 @@ mod tests {
     use crate::message::amqp::{tests::type_encode_decode_test_fuzzy, types::SimpleValue};
 
     impl Dummy<Faker> for Float {
-        fn dummy_with_rng<R: fake::rand::RngCore + ?Sized>(config: &Faker, rng: &mut R) -> Self {
+        fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(config: &Faker, rng: &mut R) -> Self {
             let num: f32 = config.fake_with_rng(rng);
             Float(OrderedFloat::from(num))
         }

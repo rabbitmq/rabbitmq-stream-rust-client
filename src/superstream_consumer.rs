@@ -198,11 +198,19 @@ impl SuperStreamConsumerHandle {
         self.0.waker.wake();
         match self.0.closed.compare_exchange(false, true, SeqCst, SeqCst) {
             Ok(false) => {
+                let mut first_error = None;
                 for handle in &self.0.handlers {
-                    handle.internal_close().await.unwrap();
+                    if let Err(e) = handle.internal_close().await {
+                        first_error.get_or_insert(e);
+                    }
                 }
-                self.0.client.close().await?;
-                Ok(())
+                if let Err(e) = self.0.client.close().await {
+                    first_error.get_or_insert(e.into());
+                }
+                match first_error {
+                    Some(e) => Err(e),
+                    None => Ok(()),
+                }
             }
             _ => Err(ConsumerCloseError::AlreadyClosed),
         }

@@ -20,4 +20,4 @@ derive_more = { version = "2.0.1", features = ["full"] }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
-fake = { version = "4.4", features = [ "derive", "chrono", "uuid" ] }
+fake = { version = "5.1.0", features = [ "derive", "chrono", "uuid" ] }
