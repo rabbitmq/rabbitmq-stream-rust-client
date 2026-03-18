@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.10.0...rabbitmq-stream-client-v0.11.0) - 2026-03-18
+
+### Other
+
+- Update rand, fake and reqwest deps ([#316](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/316))
+- Handle consumer receiver drop and credit failure gracefully, catch handler panics ([#314](https://github.com/rabbitmq/rabbitmq-stream-rust-client/pull/314))
+
 ## [0.9.1](https://github.com/rabbitmq/rabbitmq-stream-rust-client/compare/rabbitmq-stream-client-v0.9.0...rabbitmq-stream-client-v0.9.1) - 2025-12-03
 
 ### Other
