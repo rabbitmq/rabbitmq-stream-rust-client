@@ -469,11 +469,17 @@ impl Client {
         reference: &str,
         stream: &str,
     ) -> Result<u64, ClientError> {
-        self.send_and_receive::<QueryPublisherResponse, _, _>(|correlation_id| {
-            QueryPublisherRequest::new(correlation_id, reference.to_owned(), stream.to_owned())
-        })
-        .await
-        .map(|sequence| sequence.from_response())
+        let response = self
+            .send_and_receive::<QueryPublisherResponse, _, _>(|correlation_id| {
+                QueryPublisherRequest::new(correlation_id, reference.to_owned(), stream.to_owned())
+            })
+            .await?;
+
+        if response.code() == &ResponseCode::Ok {
+            Ok(response.from_response())
+        } else {
+            Err(ClientError::RequestError(response.code().clone()))
+        }
     }
 
     pub async fn exchange_command_versions(

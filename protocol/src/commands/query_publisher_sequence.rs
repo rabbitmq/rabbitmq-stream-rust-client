@@ -99,6 +99,10 @@ impl QueryPublisherResponse {
     pub fn from_response(&self) -> u64 {
         self.sequence
     }
+
+    pub fn code(&self) -> &ResponseCode {
+        &self.response_code
+    }
 }
 
 impl Encoder for QueryPublisherResponse {
@@ -146,10 +150,34 @@ mod tests {
     use super::QueryPublisherRequest;
     use super::QueryPublisherResponse;
     use crate::commands::tests::command_encode_decode_test;
+    use crate::{
+        codec::{Decoder, Encoder},
+        ResponseCode,
+    };
 
     #[test]
     fn query_publisher_request_test() {
         command_encode_decode_test::<QueryPublisherRequest>();
+    }
+
+    #[test]
+    fn query_publisher_response_preserves_status_and_sequence() {
+        for code in [
+            ResponseCode::Ok,
+            ResponseCode::AccessRefused,
+            ResponseCode::StreamDoesNotExist,
+        ] {
+            for sequence in [0, 123, u64::MAX] {
+                let response = QueryPublisherResponse::new(42, code.clone(), sequence);
+                let mut bytes = Vec::new();
+                response.encode(&mut bytes).unwrap();
+                let (remaining, decoded) = QueryPublisherResponse::decode(&bytes).unwrap();
+                assert!(remaining.is_empty());
+                assert_eq!(decoded.code(), &code);
+                assert_eq!(decoded.from_response(), sequence);
+                assert_eq!(decoded, response);
+            }
+        }
     }
 
     #[test]

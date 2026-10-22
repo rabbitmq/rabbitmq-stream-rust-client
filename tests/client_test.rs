@@ -347,6 +347,160 @@ async fn client_query_publisher() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn client_query_publisher_missing_stream() {
+    let test = TestClient::create().await;
+
+    let response = test.client.delete_stream(&test.stream).await.unwrap();
+
+    assert_eq!(response.code(), &ResponseCode::Ok);
+
+    let result = test
+        .client
+        .query_publisher_sequence("publisher", &test.stream)
+        .await;
+
+    assert!(
+        matches!(
+            result,
+            Err(ClientError::RequestError(ResponseCode::StreamDoesNotExist))
+        ),
+        "unexpected query result: {:?}",
+        result
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_query_publisher_without_read_permission() {
+    let test = TestClient::create().await;
+
+    // Use a separate user so parallel tests retain their existing permissions.
+    let username = format!("publisher-query-{}", rand::random::<u64>());
+    let password: String = Faker.fake();
+    let http = reqwest::Client::new();
+    let user_url = format!("http://localhost:15672/api/users/{}", username);
+
+    http.put(&user_url)
+        .basic_auth("guest", Some("guest"))
+        .json(&serde_json::json!({"password": password, "tags": []}))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+    // Save the result before asserting so the test user is removed even when
+    // the old client incorrectly returns Ok(0).
+    let result: Result<_, Box<dyn std::error::Error>> = async {
+        http.put(format!(
+            "http://localhost:15672/api/permissions/%2F/{}",
+            username
+        ))
+        .basic_auth("guest", Some("guest"))
+        .json(&serde_json::json!({"configure": ".*", "write": ".*", "read": "^$"}))
+        .send()
+        .await?
+        .error_for_status()?;
+
+        let client = Client::connect(
+            ClientOptions::builder()
+                .user(&username)
+                .password(&password)
+                .build(),
+        )
+        .await?;
+
+        let query = client
+            .query_publisher_sequence("publisher", &test.stream)
+            .await;
+
+        client.close().await?;
+
+        Ok(query)
+    }
+    .await;
+
+    http.delete(&user_url)
+        .basic_auth("guest", Some("guest"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+    let query = result.unwrap();
+
+    assert!(
+        matches!(
+            query,
+            Err(ClientError::RequestError(ResponseCode::AccessRefused))
+        ),
+        "unexpected query result: {:?}",
+        query
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_query_publisher_after_confirmed_publish() {
+    let test = TestClient::create().await;
+
+    let reference: String = Faker.fake();
+
+    let response = test
+        .client
+        .declare_publisher(1, Some(reference.clone()), &test.stream)
+        .await
+        .unwrap();
+
+    assert_eq!(response.code(), &ResponseCode::Ok);
+
+    let (tx, mut rx) = channel(1);
+
+    test.client
+        .set_handler(move |msg: MessageResult| async move {
+            if let Some(Ok(response)) = msg {
+                if let ResponseKind::PublishConfirm(confirm) = response.kind() {
+                    tx.send(confirm).await.unwrap();
+                }
+            }
+            Ok(())
+        })
+        .await;
+
+    let sequences = test
+        .client
+        .publish(
+            1,
+            Message::builder()
+                .body(b"message".to_vec())
+                .publishing_id(123)
+                .build(),
+            1,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(sequences, vec![123]);
+
+    let confirm = tokio::time::timeout(std::time::Duration::from_secs(10), rx.recv())
+        .await
+        .expect("publisher confirmation timed out")
+        .unwrap();
+
+    assert_eq!(confirm.publisher_id, 1);
+    assert_eq!(confirm.publishing_ids, vec![123]);
+
+    let result = test
+        .client
+        .query_publisher_sequence(&reference, &test.stream)
+        .await;
+
+    let response = test.client.delete_publisher(1).await.unwrap();
+
+    assert_eq!(response.code(), &ResponseCode::Ok);
+    assert_eq!(result.unwrap(), 123);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn client_publish() {
     let test = TestClient::create().await;
 
