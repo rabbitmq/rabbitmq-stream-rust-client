@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 
 use fake::{Fake, Faker};
 use tokio::sync::mpsc::channel;
@@ -617,4 +619,36 @@ async fn client_drop_connection() {
     assert!(matches!(res, Err(ClientError::ConnectionClosed)));
     let res = test.client.close().await;
     assert!(matches!(res, Err(ClientError::ConnectionClosed)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn client_releases_its_handler_after_close_test() {
+    let client = Client::connect(ClientOptions::default()).await.unwrap();
+
+    // A consumer's handler holds the client it is registered on; so does this one.
+    let marker = Arc::new(());
+    let held = marker.clone();
+    let held_client = client.clone();
+    client
+        .set_handler(move |_| {
+            let _held = (held.clone(), held_client.clone());
+            async { Ok(()) }
+        })
+        .await;
+
+    client.close().await.unwrap();
+    drop(client);
+
+    // Released once the client sees the connection end, which follows the close response.
+    for _ in 0..50 {
+        if Arc::strong_count(&marker) == 1 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert_eq!(
+        1,
+        Arc::strong_count(&marker),
+        "a closed client must release its handler, and with it the client and its socket"
+    );
 }

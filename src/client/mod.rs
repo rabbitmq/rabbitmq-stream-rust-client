@@ -813,8 +813,16 @@ impl MessageHandler for Client {
             }
             None => {
                 trace!("Closing client");
-                if let Some(handler) = self.state.read().await.handler.as_ref() {
-                    let handler = handler.clone();
+                // The connection is gone: stop the heartbeat task and take the handler out.
+                // Both hold this client (a consumer's or producer's handler holds it through
+                // its own state), so leaving them in place would keep the client and its
+                // socket alive after close.
+                let handler = {
+                    let mut state = self.state.write().await;
+                    state.heartbeat_task.take();
+                    state.handler.take()
+                };
+                if let Some(handler) = handler {
                     tokio::task::spawn(async move { handler.handle_message(None).await });
                 }
             }
