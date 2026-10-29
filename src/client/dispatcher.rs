@@ -160,7 +160,11 @@ where
 
     pub async fn close(self, error: Option<ClientError>) {
         self.requests.close();
-        if let Some(handler) = self.handler.read().await.as_ref() {
+        // Take the handler rather than borrow it. For a `Client` the handler is the client
+        // itself, so leaving it here would keep the client, its connection and its socket
+        // alive after the connection has ended.
+        let handler = self.handler.write().await.take();
+        if let Some(handler) = handler.as_ref() {
             if let Some(err) = error {
                 if let Err(e) = handler.handle_message(Some(Err(err))).await {
                     warn!("Message handler returned error during close: {}", e);
@@ -381,6 +385,29 @@ mod tests {
 
         let maybe_channel = dispatcher.response_channel();
         assert!(maybe_channel.is_none());
+    }
+
+    #[tokio::test]
+    async fn should_release_the_handler_when_the_connection_ends() {
+        // No pending request: the mock stream ends at once, as a closed connection does.
+        let mock_source = MockIO::request();
+        let marker = Arc::new(());
+        let held = marker.clone();
+        let handler = move |_| {
+            let _held = held.clone();
+            async { Ok(()) }
+        };
+        let (_tx, rx) = channel(mock_source.clone(), mock_source.clone());
+        let dispatcher = Dispatcher::with_handler(handler);
+
+        dispatcher.start(rx).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        assert_eq!(
+            1,
+            Arc::strong_count(&marker),
+            "the dispatcher must drop its handler once the connection ends"
+        );
     }
 
     struct FailingHandler {
